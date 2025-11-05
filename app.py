@@ -5,20 +5,20 @@ from StudioCore_Complete_v4 import StudioCore
 app = FastAPI()
 core = StudioCore()
 
-class Request(BaseModel):
+class Payload(BaseModel):
     lyrics: str
     prefer_gender: str = "auto"
 
 @app.post("/analyze")
-def analyze(req: Request):
-    r = core.analyze(req.lyrics, prefer_gender=req.prefer_gender)
+def analyze(data: Payload):
+    result = core.analyze(data.lyrics, prefer_gender=data.prefer_gender)
     return {
-        "genre": r.genre,
-        "bpm": r.bpm,
-        "tonality": r.tonality,
-        "prompt": r.prompt,
-        "emotions": r.emotions,
-        "tlp": r.tlp,
-        "resonance": r.resonance,
-        "tonesync": r.tonesync
+        "genre": result.genre,
+        "bpm": result.bpm,
+        "tonality": result.tonality,
+        "prompt": result.prompt,
+        "emotions": result.emotions,
+        "tlp": result.tlp,
+        "resonance": result.resonance,
+        "tonesync": result.tonesync
     }
