@@ -1,13 +1,13 @@
 ---
 title: StudioCore API
-emoji: 😻
-colorFrom: pink
-colorTo: purple
+---
+title: Basic Docker SDK Space
+emoji: 🐳
+colorFrom: purple
+colorTo: gray
 sdk: docker
-sdk_version: 5.49.1
-app_file: app.py
-pinned: false
-license: mit
+app_port: 7860
+---
 short_description: StudioCore-API
 ---
 
