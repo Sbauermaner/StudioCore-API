@@ -1,34 +1,27 @@
-import gradio as gr
+from fastapi import FastAPI
+from pydantic import BaseModel
 from StudioCore_Complete_v4 import StudioCore
 
+app = FastAPI()
 core = StudioCore()
 
-def analyze_lyrics(lyrics, prefer_gender):
-    result = core.analyze(lyrics, prefer_gender=prefer_gender)
-    return (
-        result.prompt,
-        result.genre,
-        result.bpm,
-        result.tonality,
-        result.tlp,
-        result.emotions,
-        result.resonance
-    )
+class LyricsInput(BaseModel):
+    lyrics: str
+    prefer_gender: str = "auto"
 
-demo = gr.Interface(
-    fn=analyze_lyrics,
-    inputs=[gr.Textbox(label="Lyrics"), gr.Dropdown(choices=["auto", "male", "female"], label="Prefer Gender")],
-    outputs=[
-        gr.Textbox(label="Prompt"),
-        gr.Textbox(label="Genre"),
-        gr.Textbox(label="BPM"),
-        gr.Textbox(label="Tonality"),
-        gr.Textbox(label="TLP"),
-        gr.Textbox(label="Emotions"),
-        gr.Textbox(label="Resonance")
-    ],
-    title="StudioCore API"
-)
+@app.post("/analyze")
+def analyze(data: LyricsInput):
+    result = core.analyze(data.lyrics, prefer_gender=data.prefer_gender)
+    return {
+        "prompt": result.prompt,
+        "genre": result.genre,
+        "bpm": result.bpm,
+        "tonality": result.tonality,
+        "tlp": result.tlp,
+        "emotions": result.emotions,
+        "resonance": result.resonance
+    }
 
 if __name__ == "__main__":
-    demo.launch()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=7860)
