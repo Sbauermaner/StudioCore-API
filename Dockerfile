@@ -1,19 +1,11 @@
-FROM python:3.10-slim
+FROM python:3.10
 
-# Создаём пользователя
-RUN useradd -m -u 1000 user
-USER user
-ENV PATH="/home/user/.local/bin:${PATH}"
-
-# Рабочая директория
 WORKDIR /app
 
-# Установка зависимостей
-COPY --chown=user ./requirements.txt .
+COPY . /app
+
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем всё приложение
-COPY --chown=user ./ /app
+EXPOSE 7860
 
-# Запуск FastAPI через uvicorn
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "app_fastapi:app", "--host", "0.0.0.0", "--port", "7860"]
