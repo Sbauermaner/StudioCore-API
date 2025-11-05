@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY studiocore_pilgrim.py /app/studiocore_pilgrim.py
+COPY StudioCore_Complete_v4.py /app/StudioCore_Complete_v4.py
 COPY app_fastapi.py /app/app_fastapi.py
 
 EXPOSE 7860
