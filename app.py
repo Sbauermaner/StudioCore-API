@@ -1,24 +1,18 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+import gradio as gr
 from StudioCore_Complete_v4 import StudioCore
 
-app = FastAPI()
 core = StudioCore()
 
-class Payload(BaseModel):
-    lyrics: str
-    prefer_gender: str = "auto"
+def analyze_lyrics(lyrics, prefer_gender):
+    result = core.analyze(lyrics, prefer_gender=prefer_gender)
+    return result.prompt
 
-@app.post("/analyze")
-def analyze(data: Payload):
-    result = core.analyze(data.lyrics, prefer_gender=data.prefer_gender)
-    return {
-        "genre": result.genre,
-        "bpm": result.bpm,
-        "tonality": result.tonality,
-        "prompt": result.prompt,
-        "emotions": result.emotions,
-        "tlp": result.tlp,
-        "resonance": result.resonance,
-        "tonesync": result.tonesync
-    }
+demo = gr.Interface(
+    fn=analyze_lyrics,
+    inputs=[gr.Textbox(label="Lyrics"), gr.Dropdown(choices=["auto", "male", "female"], label="Prefer Gender")],
+    outputs="text",
+    title="StudioCore API"
+)
+
+if __name__ == "__main__":
+    demo.launch()
