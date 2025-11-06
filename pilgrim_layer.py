@@ -1,6 +1,3 @@
-# pilgrim_layer.py
-# Pilgrim Interface Layer — адаптер между пользователем и StudioCore
-
 import re
 from StudioCore_Complete_v4 import StudioCore, normalize_text_preserve_symbols
 
