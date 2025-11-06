@@ -1,4 +1,4 @@
-fastapi==0.115.0
-uvicorn==0.30.6
-pydantic==1.10.15
+pain-transmute: _
+rage-to-truth: _
+sacred-silence: _
 
