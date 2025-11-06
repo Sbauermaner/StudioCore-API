@@ -1,90 +1,54 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from fastapi.responses import HTMLResponse, JSONResponse
-from StudioCore_Complete_v4 import StudioCore, load_config
+from fastapi import FastAPI, Body, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
+import uvicorn
 
-app = FastAPI(title="StudioCore Pilgrim API", version="1.0")
+from StudioCore_v4_1_Pilgrim import StudioCore, load_config
 
-# загрузка конфигурации и ядра
-cfg = load_config()
-core = StudioCore(cfg)
+app = FastAPI(title="StudioCore Pilgrim API", version="4.1")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ------------------------------
-# МОДЕЛЬ ЗАПРОСА
-# ------------------------------
+core = StudioCore(load_config())
 
-class LyricsRequest(BaseModel):
-    lyrics: str
-    gender: str | None = "auto"
+class AnalyzeRequest(BaseModel):
+    lyrics: str = Field(..., description="Raw lyrics text. Newlines allowed.")
+    prefer_gender: Optional[str] = Field("auto", description="'male'|'female'|'auto'")
+    author_style: Optional[str] = Field(None, description="Optional author overrides for style words")
 
+@app.get("/health")
+def health() -> Dict[str, Any]:
+    return {"status": "ok", "engine": "StudioCore v4.1 Pilgrim"}
 
-# ------------------------------
-# ROOT UI — без f-строки
-# ------------------------------
+@app.post("/analyze", response_model=None)
+async def analyze(req: Request, payload: Optional[AnalyzeRequest] = Body(default=None)) -> Dict[str, Any]:
+    """
+    Accepts:
+      1) JSON: { "lyrics": "...", "prefer_gender": "male", "author_style": "Tagelharpa + throat singing" }
+      2) text/plain body with raw lyrics
+    """
+    content_type = req.headers.get("content-type", "").lower()
+    if payload is None:
+        # try text/plain
+        if "text/plain" in content_type:
+            raw = await req.body()
+            lyrics = raw.decode("utf-8", errors="ignore")
+            result = core.analyze(lyrics, prefer_gender="auto", author_style=None)
+        else:
+            # No body or wrong type
+            return {"detail": "Pass JSON with 'lyrics' or text/plain body"}
+    else:
+        result = core.analyze(payload.lyrics, prefer_gender=(payload.prefer_gender or "auto"),
+                              author_style=payload.author_style)
 
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    return """
-<!DOCTYPE html>
-<html>
-<head>
-<title>StudioCore API</title>
-<style>
-body {
-  background: #000;
-  color: #21ffcb;
-  font-family: monospace;
-  padding: 30px;
-}
-h1 {
-  color: #00eaff;
-  font-size: 26px;
-}
-code {
-  background: #111;
-  padding: 10px;
-  display: block;
-  border-radius: 6px;
-  color: #ffdf6e;
-  white-space: pre-wrap;
-}
-a { color: #00ffaa; }
-</style>
-</head>
-
-<body>
-<h1>StudioCore Pilgrim API</h1>
-<p>API активно. Отправь текст POST /analyze чтобы получить музыкальный стиль и Suno prompt.</p>
-
-<p><strong>Пример curl:</strong></p>
-<code>
-curl -X POST https://sbauer8-studiocore-api.hf.space/analyze \\
- -H "Content-Type: application/json" \\
- -d '{"lyrics":"Пилигрим..."}'
-</code>
-
-<p>Документация:</p>
-<ul>
-<li><a href="/docs">/docs</a></li>
-<li><a href="/openapi.json">/openapi.json</a></li>
-<li><a href="/health">/health</a></li>
-</ul>
-
-</body>
-</html>
-"""
-
-
-# ------------------------------
-# API ENDPOINT: анализ текста
-# ------------------------------
-
-@app.post("/analyze")
-async def analyze_text(req: LyricsRequest):
-    result = core.analyze(req.lyrics, prefer_gender=req.gender)
-
-    return JSONResponse({
+    out = {
         "genre": result.genre,
         "bpm": result.bpm,
         "tonality": result.tonality,
@@ -95,14 +59,11 @@ async def analyze_text(req: LyricsRequest):
         "resonance": result.resonance,
         "integrity": result.integrity,
         "tonesync": result.tonesync,
+        "sections": result.sections,
         "prompt": result.prompt
-    })
+    }
+    return out
 
-
-# ------------------------------
-# HEALTH CHECK
-# ------------------------------
-
-@app.get("/health")
-async def health():
-    return {"status": "StudioCore FastAPI running"}
+if __name__ == "__main__":
+    # HF Spaces Docker expects port 7860 by default
+    uvicorn.run("app_fastapi:app", host="0.0.0.0", port=7860, reload=False)
