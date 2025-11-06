@@ -1,91 +1,118 @@
-from __future__ import annotations
-from typing import Optional, Dict, Any
-import textwrap
-
-from fastapi import FastAPI, Body, Request
-from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse
+from fastapi import FastAPI, Request, Body, Form
+from fastapi.responses import PlainTextResponse, HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 from pydantic import BaseModel
+from pilgrim_layer import PilgrimInterface
 
-from StudioCore_Complete_v4 import load_config  # ядро не трогаем
-from pilgrim_layer import PilgrimInterface       # новый слой
-
-app = FastAPI(title="StudioCore Pilgrim API", version="1.0.0")
+app = FastAPI(title="StudioCore API", version="1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"],
 )
+pilgrim = PilgrimInterface()
 
-_cfg = load_config()         # загружаем твой конфиг
-_pilgrim = PilgrimInterface()  # инициализируем слой поверх ядра
-
-# --- Модели для /analyze (но тело может быть и «сырым» текстом)
-class AnalyzePayload(BaseModel):
+class AnalyzeIn(BaseModel):
     lyrics: str
     prefer_gender: Optional[str] = "auto"
     author_style: Optional[str] = None
-    autoskeleton: Optional[bool] = True
+    genre_hint: Optional[str] = None
 
 @app.get("/", response_class=HTMLResponse)
-def root():
-    return HTMLResponse(textwrap.dedent("""
-    <html>
-    <head>
-      <meta charset="utf-8"/>
-      <title>StudioCore Pilgrim API</title>
-      <style>
-        body{background:#0a0f14;color:#b7f7c6;font-family:ui-monospace,Menlo,Consolas,monospace;padding:32px}
-        pre{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;padding:16px;border-radius:8px;overflow:auto}
-        a{color:#7ee787;text-decoration:none}
-      </style>
-    </head>
-    <body>
-      <h1>StudioCore Pilgrim API</h1>
-      <p>API активно. Отправь текст на <code>POST /analyze</code> (можно <b>просто сырой текст</b>) — получишь стиль и Suno prompt.</p>
-      <h3>curl (RAW TEXT):</h3>
-      <pre>curl -X POST https://sbauer8-studiocore-api.hf.space/analyze \\
-  -H "Content-Type: text/plain; charset=utf-8" \\
-  --data-binary $'Пилигрим, одинокий как век...'</pre>
+async def root():
+    return """
+<!doctype html>
+<html><head><meta charset="utf-8"><title>StudioCore — Pilgrim</title>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial;max-width:900px;margin:40px auto;padding:0 16px}
+textarea{width:100%;min-height:240px;padding:12px;font-size:16px}
+button{padding:10px 16px;font-size:16px;cursor:pointer}
+pre{white-space:pre-wrap;background:#0b0b0b;color:#eaeaea;padding:16px;border-radius:8px}
+label{display:inline-block;margin:8px 8px 8px 0}
+select,input{padding:6px 8px;margin-left:6px}
+.small{opacity:.7}
+</style></head>
+<body>
+<h1>StudioCore Pilgrim — Лирика → Скелет + Style Prompt</h1>
+<p class="small">Вставь свою лирику в любое формате (со знаками/без) и нажми «Анализировать». Ответ вернётся как чистый текст.</p>
 
-      <h3>curl (JSON):</h3>
-      <pre>curl -X POST https://sbauer8-studiocore-api.hf.space/analyze \\
-  -H "Content-Type: application/json" \\
-  -d '{"lyrics":"Пилигрим...","prefer_gender":"male","autoskeleton":true}'</pre>
+<label>Предпочт. вокал:
+<select id="gender">
+  <option value="auto" selected>auto</option>
+  <option value="male">male</option>
+  <option value="female">female</option>
+  <option value="duet">duet</option>
+  <option value="choir">choir</option>
+</select></label>
 
-      <h3>Документация:</h3>
-      <ul>
-        <li><a href="/docs">/docs</a></li>
-        <li><a href="/openapi.json">/openapi.json</a></li>
-        <li><a href="/health">/health</a></li>
-      </ul>
-    </body>
-    </html>
-    """))
+<label>Подсказка жанра:
+<select id="genre">
+  <option value="">auto</option>
+  <option>rock</option><option>metal</option><option>pop</option>
+  <option>folk</option><option>ambient</option><option>classical</option>
+  <option>electronic</option><option>orchestral</option>
+</select></label>
 
-@app.get("/health")
-def health():
-    return {"status": "StudioCore Pilgrim running"}
+<textarea id="lyrics" placeholder="Вставь лирику здесь..."></textarea>
+<button id="go">Анализировать</button>
 
-@app.post("/analyze")
-async def analyze(request: Request):
+<h3>Результат</h3>
+<pre id="out">(пусто)</pre>
+
+<script>
+const go = document.getElementById('go');
+go.onclick = async () => {
+  const lyrics = document.getElementById('lyrics').value || "";
+  const prefer_gender = document.getElementById('gender').value || "auto";
+  const genre_hint = document.getElementById('genre').value || "";
+  const resp = await fetch('/analyze_raw?prefer_gender='+encodeURIComponent(prefer_gender)+'&genre_hint='+encodeURIComponent(genre_hint), {
+    method: 'POST',
+    headers: {'Content-Type':'text/plain;charset=utf-8'},
+    body: lyrics
+  });
+  const text = await resp.text();
+  document.getElementById('out').textContent = text || "(пусто)";
+};
+</script>
+</body></html>
     """
-    Принимает ИЛИ:
-    1) application/json: { "lyrics": "...", ... }
-    2) text/plain: сырая лирика (без JSON, без скобок)
-    """
-    ctype = request.headers.get("content-type", "")
-    try:
-        if "application/json" in ctype:
-            data = await request.json()
-            if not isinstance(data, dict):
-                return JSONResponse({"detail": "Invalid JSON object"}, status_code=400)
-            return _pilgrim.analyze_structured(data)
 
-        # Иначе читаем как сырой текст
+@app.get("/health", response_class=JSONResponse)
+async def health():
+    return {"status":"ok","app":"StudioCore Pilgrim"}
+
+@app.post("/analyze", response_class=JSONResponse)
+async def analyze(payload: AnalyzeIn):
+    data = pilgrim.analyze_to_objects(
+        lyrics=payload.lyrics,
+        prefer_gender=payload.prefer_gender or "auto",
+        author_style=payload.author_style,
+        genre_hint=payload.genre_hint
+    )
+    return data
+
+@app.post("/analyze_raw", response_class=PlainTextResponse)
+async def analyze_raw(request: Request, prefer_gender: Optional[str] = "auto", genre_hint: Optional[str] = None):
+    # принимает text/plain ИЛИ форму с полем lyrics
+    content_type = request.headers.get("content-type","").lower()
+    lyrics = ""
+    if "text/plain" in content_type:
         body = await request.body()
-        lyrics_raw = body.decode("utf-8", errors="replace")
-        return _pilgrim.analyze_plain(lyrics_raw=lyrics_raw, prefer_gender="auto", author_style=None, autoskeleton=True)
+        lyrics = body.decode("utf-8", errors="ignore")
+    elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        form = await request.form()
+        lyrics = form.get("lyrics","")
+    else:
+        # пробуем как есть
+        body = await request.body()
+        lyrics = body.decode("utf-8", errors="ignore")
 
-    except Exception as e:
-        return JSONResponse({"detail": f"Error: {e.__class__.__name__}: {e}"}, status_code=500)
+    lyrics = lyrics or ""
+    text = pilgrim.analyze_to_text(
+        lyrics=lyrics,
+        prefer_gender=prefer_gender or "auto",
+        author_style=None,
+        genre_hint=(genre_hint or None) if genre_hint else None
+    )
+    return text
