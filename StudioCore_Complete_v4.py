@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-StudioCore_Complete_v4 — Core (compact, full-logic kept)
-Do not rename this file.
-"""
-
 from __future__ import annotations
 import re, json, math, os
 from dataclasses import dataclass
