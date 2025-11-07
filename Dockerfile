@@ -1,20 +1,17 @@
-# -----------------------------
-# StudioCore Pilgrim Logic API
-# -----------------------------
+# StudioCore Pilgrim Logic API (v4.2)
 FROM python:3.10-slim
 
 WORKDIR /app
 
-# Установка зависимостей
+# Устанавливаем зависимости
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копирование всех основных файлов
-COPY StudioCore_Complete_v4.py /app/StudioCore_Complete_v4.py
-COPY pilgrim_layer.py /app/pilgrim_layer.py
-COPY app_fastapi.py /app/app_fastapi.py
+# Копируем файлы приложения
+COPY StudioCore_Complete_v4.py .
+COPY pilgrim_layer.py .
+COPY app_fastapi.py .
 
-# Экспонируем порт
 EXPOSE 7860
 
 # Запуск сервера
