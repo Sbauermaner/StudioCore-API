@@ -1,38 +1,57 @@
-from typing import Optional
-from StudioCore_Complete_v4 import StudioCore, make_skeleton
+from StudioCore_Complete_v4 import StudioCore, PipelineResult
 
 class PilgrimInterface:
+    """
+    Pilgrim Layer связывает StudioCore и внешний API.
+    Его задача — обернуть анализ ядра и подготовить данные для вывода
+    в удобной форме (plain text, json, или UI).
+    """
+
     def __init__(self):
         self.core = StudioCore()
 
-    def analyze_to_objects(self, lyrics: str, prefer_gender: str = "auto",
-                           author_style: Optional[str] = None,
-                           genre_hint: Optional[str] = None) -> dict:
-        result = self.core.analyze(lyrics, prefer_gender=prefer_gender,
-                                   author_style=author_style, genre_hint=genre_hint)
+    def process_lyrics(self, lyrics: str, gender: str = "auto", author_style: str = None) -> dict:
+        """Запуск основного анализа лирики"""
+        result: PipelineResult = self.core.analyze(
+            lyrics=lyrics,
+            prefer_gender=gender,
+            author_style=author_style
+        )
+
+        # Подготовка итогового отчёта
         return {
             "genre": result.genre,
             "bpm": result.bpm,
             "tonality": result.tonality,
             "vocals": result.vocals,
             "instruments": result.instruments,
-            "tlp": result.tlp,
-            "emotions": result.emotions,
-            "resonance": result.resonance,
+            "prompt": result.prompt,
+            "skeleton_text": result.skeleton_text,
+            "vocal_profile": result.vocal_profile,
             "integrity": result.integrity,
+            "resonance": result.resonance,
             "tonesync": result.tonesync,
-            "prompt": result.prompt
+            "truth_love_pain": result.tlp,
+            "emotions": result.emotions
         }
 
-    def analyze_to_text(self, lyrics: str, prefer_gender: str = "auto",
-                        author_style: Optional[str] = None,
-                        genre_hint: Optional[str] = None) -> str:
-        r = self.core.analyze(lyrics, prefer_gender=prefer_gender,
-                              author_style=author_style, genre_hint=genre_hint)
-        skeleton = make_skeleton(lyrics, prefer_gender, genre_hint or r.genre, r.emotions)
-        out = []
-        out.append(skeleton)
-        out.append("")
-        out.append("Style Prompt:")
-        out.append(r.prompt)
-        return "\n".join(out).strip()
+    def as_text(self, data: dict) -> str:
+        """Формирует человекочитаемый ответ (для text/plain вывода)"""
+        lines = [
+            f"🎼 Genre: {data['genre']}",
+            f"🎚 BPM: {data['bpm']}",
+            f"🎵 Tonality: {data['tonality']}",
+            "",
+            "🧩 Vocal Profile:",
+            f"  Type: {data['vocal_profile'].get('type')}",
+            f"  Register: {data['vocal_profile'].get('register')}",
+            f"  Phonation: {data['vocal_profile'].get('phonation')}",
+            f"  Techniques: {', '.join(data['vocal_profile'].get('techniques', []))}",
+            "",
+            "📝 Lyric Skeleton:",
+            data['skeleton_text'],
+            "",
+            "🎧 Style Prompt:",
+            data['prompt']
+        ]
+        return "\n".join(lines)
