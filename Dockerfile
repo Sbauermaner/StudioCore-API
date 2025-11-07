@@ -1,21 +1,18 @@
+# --- StudioCore Pilgrim Logic API ---
 FROM python:3.10-slim
 
+# Устанавливаем зависимости
+RUN pip install --no-cache-dir fastapi==0.115.4 uvicorn==0.32.0 pydantic==2.9.2 typing-extensions numpy
+
+# Рабочая директория
 WORKDIR /app
 
-# только нужные системные пакеты (минимум)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential && \
-    rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
-
-# ВАЖНО: имена не меняем
+# Копируем файлы
 COPY StudioCore_Complete_v4.py /app/StudioCore_Complete_v4.py
-COPY pilgrim_layer.py           /app/pilgrim_layer.py
-COPY app_fastapi.py             /app/app_fastapi.py
+COPY app_fastapi.py /app/app_fastapi.py
 
+# Устанавливаем стандартный порт
 EXPOSE 7860
-ENV PORT=7860
 
+# Точка запуска
 CMD ["uvicorn", "app_fastapi:app", "--host", "0.0.0.0", "--port", "7860"]
