@@ -1,7 +1,5 @@
-fastapi==0.115.4
-uvicorn==0.32.0
-pydantic==2.9.2
-typing-extensions>=4.9.0
-numpy>=1.26.4
+fastapi==0.115.0
+uvicorn==0.30.6
+
 
 
