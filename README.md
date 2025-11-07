@@ -1,8 +1,7 @@
-# StudioCore Pilgrim Logic API
+# 🎧 StudioCore Pilgrim Logic API
+### Версия: 4.2  •  Архитектор: Bauer Synesthetic Studio
 
-**Версия:** 4.2  
-**Автор:** Bauer Synesthetic Studio  
+---
 
-### 🚀 Запуск локально
-```bash
-uvicorn app_fastapi:app --host 0.0.0.0 --port 7860
+## 🧠 Архитектура проекта
+
