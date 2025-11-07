@@ -1,10 +1,8 @@
----
-title: StudioCore API
-emoji: 🎧
-colorFrom: pink
-colorTo: purple
-sdk: docker
-app_port: 7860
-short_description: StudioCore FastAPI for lyric-to-style
-license: mit
----
+# StudioCore Pilgrim Logic API
+
+**Версия:** 4.2  
+**Автор:** Bauer Synesthetic Studio  
+
+### 🚀 Запуск локально
+```bash
+uvicorn app_fastapi:app --host 0.0.0.0 --port 7860
