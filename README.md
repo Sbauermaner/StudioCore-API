@@ -1,3 +1,6 @@
+---
+sdk: docker
+---
 # 🎧 StudioCore Pilgrim — Lyric → Style Prompt API  
 Author: Bauer Synesthetic Studio  
 Core: StudioCore_Complete_v4.py (Pilgrim Logic Layer)  
@@ -29,4 +32,3 @@ StudioCore Pilgrim — это интеллектуальное ядро для �
 - Port: 7860
 
 ### 2️⃣ Files in root directory:
-
