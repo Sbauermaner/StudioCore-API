@@ -1,34 +1,46 @@
 ---
+title: StudioCore Pilgrim API
+emoji: 🎛️
+colorFrom: blue
+colorTo: pink
 sdk: docker
----
-# 🎧 StudioCore Pilgrim — Lyric → Style Prompt API  
-Author: Bauer Synesthetic Studio  
-Core: StudioCore_Complete_v4.py (Pilgrim Logic Layer)  
-Version: 4.2  
-Runtime: FastAPI + Docker (port 7860)
-
+app_port: 7860
+pinned: false
+license: mit
 ---
 
-## 🧠 Overview
+# StudioCore Pilgrim (API)
 
-StudioCore Pilgrim — это интеллектуальное ядро для анализа лирики и автоматического построения Suno Style Prompt.  
-Оно определяет:
-- 🎼 жанр  
-- 🎚 BPM (ритм)  
-- 🎵 тональность  
-- 🎙️ вокальный тип (мужской, женский, дуэт, хор)  
-- 🎻 инструменты  
-- 💬 структуру текста (куплеты, припевы, бриджи)  
-- ❤️‍🔥 эмоциональный спектр (Truth × Love × Pain)  
-- 🧩 StylePrompt под Suno v3–v5
+**Назначение:** вставляешь *чистую лирику* → ядро автоматически:
+- нормализует и строит скелет `[Verse/Chorus/Bridge]`
+- определяет эмоции + T×L×P
+- подбирает жанр, тональность, BPM, вокал (male/female/duet/choir + тембровые подсказки)
+- рассчитывает резонансную зону и режим (healing / rage→truth / pain→light / ritual / sacred_silence / neutral)
+- собирает **Style Prompt** для Suno v3–v5 (с авто-сжатием под лимит версии)
 
----
+## Эндпоинты
 
-## 🚀 How to Run (Docker)
+### 1) Health
+`GET /` → `{ "status": "StudioCore Pilgrim running" }`
 
-### 1️⃣ Runtime Settings
-В Hugging Face Space:
-- Runtime type: Docker
-- Port: 7860
+### 2) Анализ (вход: текст ИЛИ JSON)
+- `POST /analyze`  
+  - **Text**: `Content-Type: text/plain` — сырая лирика в теле  
+  - **JSON**: `{"lyrics":"...", "prefer_gender":"auto|male|female|duet|choir", "author_style":"..."}`  
+  - **Ответ**: JSON (жанр, bpm, tlp, emotions, prompt, skeleton, mode)
 
-### 2️⃣ Files in root directory:
+### 3) Готовый текст (скелет + prompt)
+- `POST /build`  
+  - **Text**: `Content-Type: text/plain` — сырая лирика в теле  
+  - **Ответ**: `text/plain` (готовый текст + Style Prompt)
+
+### 4) Быстрая форма
+- `GET /ui` — простая HTML-форма для ручной проверки.
+
+## Примеры
+
+**curl (чистый текст → JSON):**
+```bash
+curl -X POST 'https://sbauer8-studiocore-api.hf.space/analyze?prefer_gender=auto' \
+  -H 'Content-Type: text/plain' \
+  --data-binary $'Cold snow, warm fire...'
