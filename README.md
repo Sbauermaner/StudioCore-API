@@ -1,6 +1,16 @@
-# StudioCore API v4.3 — Deploy Guide
+# 🎧 StudioCore API v4.3
+Truth × Love × Pain = Conscious Frequency  
+Built by Bauer Synesthetic Studio
 
-## 🧱 Local Run
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
+### 🧠 Description
+StudioCore — это движок анализа и синтеза эмоциональных, частотных и смысловых слоёв текста.  
+Он выстраивает профиль Truth × Love × Pain, определяет BPM, жанр, вокал и инструментальный состав.
+
+### 🚀 API Endpoints
+**GET /** — проверка состояния  
+**POST /analyze** — анализ текста  
+Пример:
+```bash
+curl -X POST https://<space-url>/analyze \
+-H "Content-Type: application/json" \
+-d '{"text":"Я сварю себе зелье из грёз"}'
