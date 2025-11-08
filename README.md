@@ -1,3 +1,6 @@
+---
+sdk: docker
+---
 # 🎧 StudioCore Pilgrim API v4.3
 
 **Author:** Bauer Synesthetic Studio  
