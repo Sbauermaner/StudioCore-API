@@ -1,5 +1,6 @@
 ---
 SDK: Docker
+sdk: docker
 ---
 # 🎧 StudioCore API v4.3
 Truth × Love × Pain = Conscious Frequency  
