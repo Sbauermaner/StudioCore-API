@@ -1,5 +1,6 @@
-# StudioCore_API v4.3
+# StudioCore API v4.3 — Deploy Guide
 
-Expressive Adaptive Engine (Truth × Love × Pain) + Suno v5 prompt builder.
-
-## Структура
+## 🧱 Local Run
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
