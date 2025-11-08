@@ -14,6 +14,6 @@ StudioCore — это движок анализа и синтеза эмоцио
 **POST /analyze** — анализ текста  
 Пример:
 ```bash
-curl -X POST https://<space-url>/analyze \
+curl -X POST [https://<space-url>/analyze](https://SBauer8-StudioCore-API.hf.space/analyze) \
 -H "Content-Type: application/json" \
 -d '{"text":"Я сварю себе зелье из грёз"}'
