@@ -1,35 +1,3 @@
-# 🎧 StudioCore Pilgrim v4.3
-
-Expressive Adaptive Engine — "Truth × Love × Pain = Conscious Frequency"  
-Developed by Bauer Synesthetic Studio
-
----
-
-## ⚙️ Overview
-
-StudioCore Pilgrim — это ядро анализа лирики и генерации музыкального стиля,  
-совместимое с Suno v3–v5 и оптимизированное под AI-music pipelines.
-
-Система автоматически:
-- анализирует смысловую и эмоциональную структуру текста,  
-- определяет жанр, темп (BPM), тональность, вокальные техники,  
-- создаёт готовый StylePrompt для Suno AI,  
-- сохраняет резонансную безопасность (RNS protocol),  
-- возвращает результат в виде JSON-объекта.
-
----
-
-## 🚀 API Endpoints
-
-### GET /
-Проверка статуса ядра  
-Response:
-`json
-{"status": "ok", "engine": "StudioCore v4.3", "author": "Bauer Synesthetic Studio"}
----
-
-### ⚙️ Hugging Face Config (for reference only)
-`yaml
 sdk: docker
 sdk_version: 1.0
 app_file: app_fastapi.py
