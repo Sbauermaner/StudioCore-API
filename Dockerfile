@@ -1,22 +1,19 @@
 # ===============================
-# StudioCore Pilgrim API v4.3
+# StudioCore Pilgrim API v4.3 — FastAPI
 # ===============================
 FROM python:3.10-slim
 
-# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем зависимости
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем все файлы проекта (включая ядро)
 COPY . .
 
-# Проверяем, что ядро действительно есть
+# Проверка файлов
 RUN ls -l /app && echo "✅ Files copied successfully"
 
-# Создаём конфиг studio_config.json, если отсутствует
+# Создаём конфиг при отсутствии
 RUN if [ ! -f /app/studio_config.json ]; then \
   echo '{ \
     "suno_version": "v5", \
@@ -32,7 +29,10 @@ RUN if [ ! -f /app/studio_config.json ]; then \
   }' > /app/studio_config.json; \
   fi
 
+# Hugging Face Spaces слушает только 7860
 EXPOSE 7860
 
-# Запуск FastAPI
-CMD ["python", "app_fastapi.py"]
+# ===============================
+# ВАЖНО: указываем запуск FastAPI через Uvicorn
+# ===============================
+CMD ["uvicorn", "app_fastapi:app", "--host", "0.0.0.0", "--port", "7860"]
