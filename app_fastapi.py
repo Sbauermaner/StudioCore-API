@@ -116,4 +116,3 @@ async function build() {
 </html>
 """
     return Response(content=html, media_type="text/html; charset=utf-8")
-
