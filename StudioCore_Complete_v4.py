@@ -1,17 +1,19 @@
 from __future__ import annotations
-import re, json, os, math
+import re, json, math, os
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Tuple
 
-# ---------- CONFIG ----------
-VERSION_LIMITS = {"v3":200,"v3.5":200,"v4":500,"v5":1000}
+# ---------------------------
+# Config & constants
+# ---------------------------
+VERSION_LIMITS = {"v3": 200, "v3.5": 200, "v4": 500, "v5": 1000}
 DEFAULT_CONFIG = {
     "suno_version": "v5",
     "safety": {
         "max_peak_db": -1.0,
         "max_rms_db": -14.0,
         "avoid_freq_bands_hz": [18.0, 30.0],
-        "safe_octaves": [2,3,4,5],
+        "safe_octaves": [2, 3, 4, 5],
         "max_session_minutes": 20,
         "fade_in_ms": 1000,
         "fade_out_ms": 1500
@@ -20,205 +22,318 @@ DEFAULT_CONFIG = {
 
 def load_config(path: str = "studio_config.json") -> dict:
     if not os.path.exists(path):
-        with open(path,"w",encoding="utf-8") as f:
-            json.dump(DEFAULT_CONFIG,f,indent=2,ensure_ascii=False)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(DEFAULT_CONFIG, f, indent=2, ensure_ascii=False)
         return DEFAULT_CONFIG.copy()
-    with open(path,"r",encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-# ---------- TEXT ----------
-PUNCT_WEIGHTS = {",":0.10,".":0.30,"!":0.50,"?":0.40,"…":0.60,"—":0.20,"–":0.20,":":0.25,";":0.20,"\"":0.05,"'":0.05,"(":0.05,")":0.05,"[":0.05,"]":0.05}
-SAFE_KEEP = set(list(",.;:!?…—–()[]\"'“”‘’*•‧·_/|♡♥❤❥❣☀☁☂☮☯☾☽★☆✨⚡☼⚔⚖⚙⚗⚛✝✟✞✡☠☢☣❄☃"))
-
+# ---------------------------
+# Text helpers
+# ---------------------------
+PUNCTUATION_SAFE = set(list(",.;:!?…—–()[]\"'“”‘’*•‧·_/|"))
+EMOJI_SAFE = set(list("♡♥❤❥❣☀☁☂☮☯☾☽★☆✨⚡☼⚔⚖⚙⚗⚛✝✟✞✡☠☢☣❄☃"))
 SECTION_TAG_RE = re.compile(r"^\s*\[([^\]]+)\]\s*$")
 
-def normalize_text(text: str) -> str:
-    text = text.replace("\r\n","\n").replace("\r","\n")
-    lines = [re.sub(r"[ \t]+"," ",ln).rstrip() for ln in text.split("\n")]
+PUNCT_WEIGHTS = {
+    ",": 0.10, ".": 0.30, "!": 0.50, "?": 0.40, "…": 0.60,
+    "—": 0.20, "–": 0.20, ":": 0.25, ";": 0.20, "\"": 0.05, "'": 0.05,
+    "(": 0.05, ")": 0.05, "[": 0.05, "]": 0.05
+}
+EMOJI_WEIGHTS = {ch: 0.40 for ch in EMOJI_SAFE}
+
+def normalize_text_preserve_symbols(text: str) -> str:
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    # лёгкое подчистить пробелы, но не трогать знаки и переносы
+    lines = [re.sub(r"[ \t]+", " ", ln).rstrip() for ln in text.split("\n")]
     return "\n".join(lines).strip()
 
-def extract_sections(text: str) -> List[Dict[str,Any]]:
-    sections, cur = [], {"tag":"Body","lines":[]}
+def extract_sections(text: str) -> List[Dict[str, Any]]:
+    sections: List[Dict[str, Any]] = []
+    current = {"tag": "Body", "lines": []}
     for ln in text.split("\n"):
         m = SECTION_TAG_RE.match(ln)
         if m:
-            if cur["lines"]: sections.append(cur)
-            cur = {"tag":m.group(1).strip(),"lines":[]}
+            if current["lines"]:
+                sections.append(current)
+            current = {"tag": m.group(1).strip(), "lines": []}
         else:
-            cur["lines"].append(ln)
-    if cur["lines"]: sections.append(cur)
+            current["lines"].append(ln)
+    if current["lines"]:
+        sections.append(current)
+    # убрать пустые
     for s in sections:
-        s["lines"] = [l for l in s["lines"] if l.strip()!=""]
+        s["lines"] = [l for l in s["lines"] if l.strip() != ""]
     return sections
 
-# ---------- ENGINES ----------
-class TruthLovePain:
-    t = ['truth','true','real','authentic','honest','истина','честно','реально','правда']
-    l = ['love','care','heart','soul','compassion','unity','любовь','сердце','душа','забота','единство']
-    p = ['pain','hurt','loss','tears','cry','grief','страдання','страдание','боль','печаль','слёзы','горе']
-    def analyze(self, text:str)->Dict[str,float]:
+# ---------------------------
+# Auto-punctuation (щадящее)
+# ---------------------------
+def soft_autopunct(text: str) -> str:
+    """
+    Не «переписывает» автора; только:
+    - длинные строки без завершающей пунктуации -> добавляет '.' или ','
+    - ставит запятую перед 'но/и/а' в рус., 'but/and' в англ. если длинно
+    - не трогает, если уже есть .!?…
+    """
+    def needs_end(ch: str) -> bool:
+        return ch not in ".!?…"
+    out_lines = []
+    for ln in text.split("\n"):
+        ln_trim = ln.strip()
+        if not ln_trim:
+            out_lines.append(ln)
+            continue
+        if needs_end(ln_trim[-1]) and len(ln_trim) > 25:
+            # простая эвристика конца фразы
+            ln_trim = ln_trim + "."
+        # лёгкая запятая перед союзами (рус/англ), если фраза длинная
+        ln_trim = re.sub(r"\s+(но|и|а)\s+", r", \1 ", ln_trim, flags=re.IGNORECASE)
+        ln_trim = re.sub(r"\s+(but|and)\s+", r", \1 ", ln_trim, flags=re.IGNORECASE)
+        out_lines.append(ln_trim)
+    return "\n".join(out_lines)
+
+# ---------------------------
+# TLP / Emotions
+# ---------------------------
+class TruthLovePainEngine:
+    _truth = ['truth','true','real','authentic','honest','истина','честно','реально','правда']
+    _love  = ['love','care','heart','soul','compassion','unity','любовь','сердце','душа','забота','единство']
+    _pain  = ['pain','hurt','loss','tears','cry','grief','страдание','боль','печаль','слёзы','горе']
+    def analyze(self, text: str) -> Dict[str, float]:
         words = re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text.lower())
-        n = max(1,len(words))
-        def sc(b): return sum(1 for w in words if w in b)/n
-        tv, lv, pv = sc(self.t), sc(self.l), sc(self.p)
-        cf = (tv*lv*max(pv,0.05))*10.0
-        return {"truth":min(tv*5,1.0), "love":min(lv*5,1.0), "pain":min(pv*5,1.0), "conscious_frequency":min(cf,1.0)}
+        n = max(1, len(words))
+        def score(bag): return sum(1 for w in words if w in bag) / n
+        t, l, p = score(self._truth), score(self._love), score(self._pain)
+        cf = (t * l * max(p, 0.05)) * 10.0
+        return {
+            "truth": min(t * 5, 1.0),
+            "love": min(l * 5, 1.0),
+            "pain": min(p * 5, 1.0),
+            "conscious_frequency": min(cf, 1.0)
+        }
 
-class Emo:
-    base = {
-        "joy": ['joy','happy','счаст','радость','улыб','smile','laugh'],
+class AutoEmotionalAnalyzer:
+    base_dicts = {
+        "joy":     ['joy','happy','счаст','радость','улыб','smile','laugh'],
         "sadness": ['sad','грусть','печаль','слёзы','cry','tear'],
-        "anger": ['anger','rage','ярость','злость','hate','furious'],
-        "fear": ['страх','fear','паника','panic'],
-        "peace": ['мир','спокой','тихо','calm','peace','still'],
-        "epic": ['epic','геро','велич','монумент','anthem'],
-        "love": ['love','любов']
+        "anger":   ['anger','rage','ярость','злость','hate','furious'],
+        "fear":    ['страх','fear','паника','panic'],
+        "peace":   ['мир','спокой','тихо','calm','peace','still'],
+        "epic":    ['epic','геро','велич','монумент','anthem','гимн']
     }
-    def analyze(self,text:str)->Dict[str,float]:
+    def analyze(self, text: str) -> Dict[str, float]:
         s = text.lower()
-        raw = {k: sum(1 for t in v if t in s)/max(1,len(v)) for k,v in self.base.items()}
-        punct = sum(PUNCT_WEIGHTS.get(ch,0.0) for ch in s)
-        if punct>0:
-            raw["anger"] += 0.2*punct
-            raw["epic"]  += 0.3*punct
-            raw["joy"]   += 0.2*punct
-        tot = sum(raw.values()) or 1.0
-        return {k: v/tot for k,v in raw.items()}
+        raw = {k: sum(1 for t in v if t in s) / max(1, len(v)) for k, v in self.base_dicts.items()}
+        punct_intensity = 0.0
+        for ch in s:
+            if ch in PUNCT_WEIGHTS: punct_intensity += PUNCT_WEIGHTS[ch]
+            if ch in EMOJI_WEIGHTS: punct_intensity += EMOJI_WEIGHTS[ch]
+        if punct_intensity > 0:
+            raw["anger"] += 0.3 * punct_intensity
+            raw["epic"]  += 0.4 * punct_intensity
+            raw["joy"]   += 0.3 * punct_intensity
+        total = sum(raw.values()) or 1.0
+        return {k: v / total for k, v in raw.items()}
 
-class Freq:
+# ---------------------------
+# Frequency / Safety
+# ---------------------------
+class UniversalFrequencyEngine:
     base = 24.5
     mapping = {
-        0: ("16-32Hz", "Subconscious","Deep meditation","#000080"),
-        1: ("33-65Hz", "Body awareness","Physical presence","#4169E1"),
-        2: ("66-130Hz","Emotional base","Feeling foundation","#00BFFF"),
-        3: ("131-261Hz","Heart center","Emotional expression","#FF69B4"),
-        4: ("262-523Hz","Voice of truth","Authentic communication","#FFD700"),
-        5: ("524-1046Hz","Higher mind","Mental clarity","#90EE90"),
-        6: ("1047-2093Hz","Intuitive wisdom","Inner knowing","#9370DB"),
-        7: ("2094-4186Hz","Spiritual connection","Universal awareness","#FF4500"),
-        8: ("4187-7902Hz","Cosmic unity","Transcendence","#FFFFFF")
+        0: ("16-32Hz",    "Subconscious",         "Deep meditation",      "#000080"),
+        1: ("33-65Hz",    "Body awareness",       "Physical presence",    "#4169E1"),
+        2: ("66-130Hz",   "Emotional base",       "Feeling foundation",   "#00BFFF"),
+        3: ("131-261Hz",  "Heart center",         "Emotional expression", "#FF69B4"),
+        4: ("262-523Hz",  "Voice of truth",       "Authentic communication", "#FFD700"),
+        5: ("524-1046Hz", "Higher mind",          "Mental clarity",       "#90EE90"),
+        6: ("1047-2093Hz","Intuitive wisdom",     "Inner knowing",        "#9370DB"),
+        7: ("2094-4186Hz","Spiritual connection", "Universal awareness",  "#FF4500"),
+        8: ("4187-7902Hz","Cosmic unity",         "Transcendence",        "#FFFFFF")
     }
-    def info(self,f:float)->Dict[str,Any]:
-        for o,(rng,cons,state,color) in self.mapping.items():
-            lo,hi = [float(x) for x in rng.replace("Hz","").split("-")]
-            if lo<=f<=hi:
-                return {"octave":o,"range":rng,"consciousness":cons,"state":state,"color":color}
-        return {"octave":-1,"range":"Unknown","consciousness":"Unknown","state":"Unknown","color":"#000000"}
-    def resonance(self, tlp:Dict[str,float])->Dict[str,Any]:
-        base = self.base*(1.0+tlp["truth"])
-        spread = tlp["love"]*2000.0
-        mod = 1.0 + tlp["pain"]*0.5
-        info = self.info(base)
-        if tlp["conscious_frequency"]>0.7: rec=[4,5,6,7]
-        elif tlp["conscious_frequency"]>0.3: rec=[2,3,4,5]
-        else: rec=[1,2,3,4]
-        return {"base_frequency":base,"harmonic_range":spread,"modulation_depth":mod,"info":info,"recommended_octaves":rec}
+    def consciousness_info(self, f: float) -> Dict[str, Any]:
+        for octv, (rng, cons, state, color) in self.mapping.items():
+            mn, mx = map(float, rng.replace("Hz", "").split("-"))
+            if mn <= f <= mx:
+                return {"octave": octv, "range": rng, "consciousness": cons, "state": state, "color": color}
+        return {"octave": -1, "range": "Unknown", "consciousness": "Unknown", "state": "Unknown", "color": "#000000"}
+    def resonance_profile(self, tlp: Dict[str, float]) -> Dict[str, Any]:
+        base = self.base * (1.0 + tlp["truth"])
+        spread = tlp["love"] * 2000.0
+        mod = 1.0 + tlp["pain"] * 0.5
+        info = self.consciousness_info(base)
+        if tlp["conscious_frequency"] > 0.7: rec = [4, 5, 6, 7]
+        elif tlp["conscious_frequency"] > 0.3: rec = [2, 3, 4, 5]
+        else: rec = [1, 2, 3, 4]
+        return {"base_frequency": base, "harmonic_range": spread, "modulation_depth": mod,
+                "info": info, "recommended_octaves": rec}
 
-class Safety:
-    def __init__(self,cfg:dict): self.cfg = cfg["safety"]
-    def clamp(self, rec:List[int])->List[int]:
-        safe=set(self.cfg["safe_octaves"])
-        out=[o for o in rec if o in safe]
-        return out or [2,3,4]
+class RNSSafety:
+    def __init__(self, config: dict): self.cfg = config["safety"]
+    def check_band(self, freq: float) -> bool:
+        lo, hi = self.cfg["avoid_freq_bands_hz"][0], self.cfg["avoid_freq_bands_hz"][1]
+        return not (lo <= freq <= hi)
+    def suggested_gain_db(self) -> Tuple[float, float]:
+        return (self.cfg["max_peak_db"], self.cfg["max_rms_db"])
+    def session_limit(self) -> int: return self.cfg["max_session_minutes"]
+    def fade_edges_ms(self) -> Tuple[int, int]: return self.cfg["fade_in_ms"], self.cfg["fade_out_ms"]
+    def clamp_octaves(self, rec: List[int]) -> List[int]:
+        safe = set(self.cfg["safe_octaves"])
+        filt = [o for o in rec if o in safe]
+        return filt or [2, 3, 4]
 
-class Meter:
-    vowels=set("aeiouyауоыиэяюёе")
-    def syll(self,line:str)->int:
-        w=line.lower()
-        return max(1,sum(1 for ch in w if ch in self.vowels))
-    def bpm(self,text:str)->int:
-        lines=[l for l in text.split("\n") if l.strip()]
-        if not lines: return 100
-        avg=sum(self.syll(l) for l in lines)/len(lines)
-        bpm=140 - min(60,(avg-8)*6)
-        punct_boost = sum(PUNCT_WEIGHTS.get(ch,0.0) for ch in text)
-        bpm = bpm + min(20, punct_boost*4.0)
-        return max(60,min(160,int(bpm)))
+# ---------------------------
+# Integrity / ToneSync / Meter
+# ---------------------------
+class IntegrityScanEngine:
+    def analyze(self, text: str) -> Dict[str, Any]:
+        words = re.findall(r"[^\s]+", text)
+        sents = re.split(r"[.!?…]+", text)
+        form = {
+            "word_count": len(words),
+            "sentence_count": len([s for s in sents if s.strip()]),
+            "avg_sentence_len": (len(words) / max(1, len(sents)))
+        }
+        # простая саморефлексия
+        ref_words = set("i me my myself я мне меня сам себя думаю чувствую знаю понимаю".split())
+        tokens = set(re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text.lower()))
+        reflection = len(tokens & ref_words) / max(1, len(tokens))
+        # эмоции/тлп внутрь integrity
+        emo = AutoEmotionalAnalyzer().analyze(text)
+        tlp = TruthLovePainEngine().analyze(text)
+        return {"form": form, "essence": {"emotions": emo, "tlp": tlp}, "reflection": {"self_awareness": reflection}}
 
-class Style:
-    def genre(self, emo:Dict[str,float], tlp:Dict[str,float])->str:
-        if emo.get("anger",0)>0.3 and emo.get("epic",0)>0.2: return "metal"
-        if emo.get("joy",0)>0.3 and emo.get("love",0)>0.2:   return "pop"
-        if emo.get("peace",0)>0.3 and emo.get("love",0)>0.2: return "ambient"
-        if emo.get("peace",0)>0.3 and tlp.get("truth",0)>0.2:return "folk"
-        if emo.get("sadness",0)>0.3 and tlp.get("truth",0)>0.2:return "classical"
+class ToneSyncEngine:
+    def colors_for_primary(self, emo: Dict[str, float]) -> List[str]:
+        m = max(emo, key=emo.get)
+        cmap = {
+            "joy": ["#FFD700", "#FF6B6B"], "sadness": ["#4169E1", "#87CEEB"],
+            "anger": ["#DC143C", "#8B0000"], "love": ["#FF69B4", "#FF1493"],
+            "peace": ["#98FB98", "#F0FFF0"], "epic": ["#FFFFFF", "#AAAAAA"]
+        }
+        return cmap.get(m, ["#808080", "#A9A9A9"])
+    def sync(self, text: str, emo: Dict[str, float]) -> Dict[str, Any]:
+        colors = self.colors_for_primary(emo)
+        intensity = sum(emo.values()) / len(emo)
+        balance = 1.0 - (sum(abs(v - intensity) for v in emo.values()) / len(emo))
+        prof = {
+            "brightness": emo.get("joy", 0) + emo.get("epic", 0) * 0.3,
+            "warmth": emo.get("love", 0) + emo.get("peace", 0),
+            "depth": emo.get("sadness", 0) + emo.get("fear", 0),
+            "intensity": emo.get("anger", 0) + emo.get("epic", 0)
+        }
+        sync = 1.0 - abs(balance - 0.66)
+        return {"visual": {"palette": colors, "balance": balance}, "audio": prof,
+                "sync_score": max(0.0, min(sync, 1.0))}
+
+class LyricMeter:
+    vowels = set("aeiouyауоыиэяюёе")
+    def syllables(self, line: str) -> int:
+        w = line.lower()
+        return max(1, sum(1 for ch in w if ch in self.vowels))
+    def bpm_from_density(self, text: str) -> int:
+        lines = [l for l in text.split("\n") if l.strip()]
+        if not lines:
+            return 100
+        avg = sum(self.syllables(l) for l in lines) / len(lines)
+        bpm = 140 - min(60, (avg - 8) * 6)
+        punct_boost = sum(PUNCT_WEIGHTS.get(ch, 0.0) for ch in text)
+        bpm = bpm + min(20, punct_boost * 4.0)
+        return max(60, min(160, int(bpm)))
+
+# ---------------------------
+# Style / Vocals
+# ---------------------------
+class StyleMatrix:
+    def genre(self, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
+        if emo.get("anger", 0) > 0.3 and emo.get("epic", 0) > 0.2: return "metal"
+        if emo.get("joy", 0) > 0.3 and emo.get("love", 0) > 0.2:   return "pop"
+        if emo.get("peace", 0) > 0.3 and emo.get("love", 0) > 0.2: return "ambient"
+        if emo.get("peace", 0) > 0.3 and tlp.get("truth", 0) > 0.2:return "folk"
+        if emo.get("sadness", 0) > 0.3 and tlp.get("truth", 0) > 0.2:return "classical"
         return "rock"
-    def tonality(self,emo:Dict[str,float])->str:
-        pos = emo.get("joy",0)+emo.get("love",0)+emo.get("peace",0)
-        neg = emo.get("sadness",0)+emo.get("anger",0)+emo.get("fear",0)
-        if pos>neg*1.3: return "major"
-        if neg>pos*1.3: return "minor"
+    def tonality(self, emo: Dict[str, float]) -> str:
+        pos = emo.get("joy", 0) + emo.get("love", 0) + emo.get("peace", 0)
+        neg = emo.get("sadness", 0) + emo.get("anger", 0) + emo.get("fear", 0)
+        if pos > neg * 1.3: return "major"
+        if neg > pos * 1.3: return "minor"
         return "modal"
-    def recommend(self,emo,tlp,author_style=None,sections=None)->str:
-        base = author_style.strip() if author_style else None
-        if not base:
-            if tlp["truth"]>0.7 and tlp["love"]>0.7: base="uplifting cinematic with warm harmonies"
-            elif tlp["pain"]>0.7 and tlp["truth"]>0.6: base="raw emotional rock with open space"
-            elif emo.get("epic",0)>0.4: base="anthemic arrangement with wide dynamics"
-            else: base="healing, clarity, compassionate space"
-        hints=[]
+    def recommend(self, emo: Dict[str, float], tlp: Dict[str, float],
+                  author_style: Optional[str] = None, sections: Optional[List[Dict[str, Any]]] = None) -> str:
+        base = None
+        if author_style:
+            base = author_style.strip()
+        else:
+            if tlp["truth"] > 0.7 and tlp["love"] > 0.7: base = "uplifting cinematic with warm harmonies"
+            elif tlp["pain"] > 0.7 and tlp["truth"] > 0.6: base = "raw emotional rock with open space"
+            elif emo.get("epic", 0) > 0.4: base = "anthemic arrangement with wide dynamics"
+            else: base = "healing, clarity, compassionate space"
+        tag_hints = []
         if sections:
             for s in sections:
-                tag=s.get("tag","")
-                if any(k in tag.lower() for k in ["tagelharpa","throat","choir","chant","blast","drum","duet","a cappella"]):
-                    hints.append(tag)
-        if hints:
-            base = f"{base}; hints: "+", ".join(sorted(set(hints))[:4])
+                tag = s.get("tag", "")
+                if any(k in tag.lower() for k in ["tagelharpa", "throat", "choir", "chant", "blast", "drum"]):
+                    tag_hints.append(tag)
+        if tag_hints:
+            base = f"{base}; hints: " + ", ".join(sorted(set(tag_hints))[:4])
         return base
 
-VALID_VOICES = ["male","female","duet","choir","tenor","soprano","alto","baritone","bass","raspy","breathy","powerful","soft","emotional","angelic","deep","whispered","warm","clear"]
-VALID_INSTRUMENTS = ["guitar","piano","synth","bass","drums","strings","violin","cello","trumpet","saxophone","organ","harp","choir","pad","flute","horns","percussion","tagelharpa"]
-
+VALID_VOICES = [
+    "male","female","duet","choir",
+    "tenor","soprano","alto","baritone","bass",
+    "raspy","breathy","powerful","soft","emotional","angelic","deep","whispered","warm","clear"
+]
+VALID_INSTRUMENTS = [
+    "guitar","piano","synth","bass","drums","strings","violin","cello","trumpet",
+    "saxophone","organ","harp","choir","vocals","pad","flute","horns","percussion","tagelharpa"
+]
 DEFAULT_VOCAL_MAP = {
-    "metal":{"female":["female","powerful","alto"],"male":["male","powerful","baritone"],"inst":["guitar","drums","strings","choir"]},
-    "rock":{"female":["female","emotional","alto"],"male":["male","raspy","tenor"],"inst":["guitar","drums","bass","piano"]},
-    "pop":{"female":["female","clear","soprano"],"male":["male","soft","tenor"],"inst":["piano","synth","bass","drums"]},
-    "folk":{"female":["female","warm","alto"],"male":["male","emotional","baritone"],"inst":["guitar","strings","flute"]},
-    "classical":{"female":["soprano","angelic"],"male":["tenor","baritone"],"inst":["strings","piano","choir"]},
-    "electronic":{"female":["female","breathy"],"male":["male","soft"],"inst":["synth","pad","bass","drums"]},
-    "ambient":{"female":["female","whispered"],"male":["male","soft"],"inst":["pad","piano","strings"]},
-    "orchestral":{"female":["female","angelic"],"male":["male","deep"],"inst":["strings","choir","horns","percussion"]}
+    "metal":      {"female":["female","powerful","alto"], "male":["male","powerful","baritone"], "inst":["guitar","drums","strings","choir"]},
+    "rock":       {"female":["female","emotional","alto"], "male":["male","raspy","tenor"], "inst":["guitar","drums","bass","piano"]},
+    "pop":        {"female":["female","clear","soprano"],  "male":["male","soft","tenor"], "inst":["piano","synth","bass","drums"]},
+    "folk":       {"female":["female","warm","alto"],      "male":["male","emotional","baritone"], "inst":["guitar","strings","flute"]},
+    "classical":  {"female":["soprano","angelic"],         "male":["tenor","baritone"], "inst":["strings","piano","choir"]},
+    "electronic": {"female":["female","breathy"],          "male":["male","soft"], "inst":["synth","pad","bass","drums"]},
+    "ambient":    {"female":["female","whispered"],        "male":["male","soft"], "inst":["pad","piano","strings"]},
+    "orchestral": {"female":["female","angelic"],          "male":["male","deep"], "inst":["strings","choir","horns","percussion"]}
 }
 
-class VocalRegistry:
-    def __init__(self): self.map=DEFAULT_VOCAL_MAP
-    def auto_gender(self, text:str)->str:
-        s=text.lower()
-        if "[duet]" in s or "duet" in s: return "duet"
-        if "choir" in s or "[choir]" in s: return "choir"
-        # простая эвристика по местоимениям/лексике
-        if re.search(r"\b(she|her|queen|goddess)\b",s): return "female"
-        if re.search(r"\b(he|his|king|father)\b",s): return "male"
-        # по эмоциям: мягкий/интимный -> female; агрессивный -> male
-        if any(k in s for k in ["tender","soft","whisper","angelic"]): return "female"
-        if any(k in s for k in ["rage","roar","growl","war"]): return "male"
-        return "male"
-    def get(self, genre:str, preferred:str, text:str)->Tuple[List[str],List[str]]:
+class VocalProfileRegistry:
+    def __init__(self): self.map = DEFAULT_VOCAL_MAP
+    def get(self, genre: str, preferred_gender: str = "auto", force_voice: Optional[str]=None) -> Tuple[List[str], List[str]]:
         g = genre if genre in self.map else "rock"
-        if preferred in ("female","male"): vox = self.map[g][preferred]
-        elif preferred in ("duet","choir"): vox = [preferred]
-        else:
-            auto = self.auto_gender(text)
-            vox = self.map[g]["female"] if auto=="female" else (["choir"] if auto=="choir" else (["duet"] if auto=="duet" else self.map[g]["male"]))
-        inst=self.map[g]["inst"]
-        vox=[v for v in vox if v in VALID_VOICES]
-        inst=[i for i in inst if i in VALID_INSTRUMENTS]
-        return vox,inst
+        if preferred_gender == "female": vox = self.map[g]["female"]
+        elif preferred_gender == "male": vox = self.map[g]["male"]
+        elif preferred_gender == "duet": vox = (self.map[g]["male"][:2] + self.map[g]["female"][:2])
+        elif preferred_gender == "choir": vox = ["choir","angelic","emotional"]
+        else: vox = self.map[g]["male"]
+        if force_voice and force_voice in VALID_VOICES and force_voice not in vox:
+            vox = [force_voice] + vox
+        inst = self.map[g]["inst"]
+        vox = [v for v in vox if v in VALID_VOICES][:5]
+        inst = [i for i in inst if i in VALID_INSTRUMENTS][:5]
+        return vox, inst
 
-def soft_trim(txt:str, max_len:int)->str:
-    t=re.sub(r"\s+"," ",txt).strip()
-    if len(t)<=max_len: return t
-    for token in ["Philosophy:","Production:","Instruments:","Vocals:"]:
-        if len(t)<=max_len: break
-        if token in t:
-            t=re.sub(rf"{token}[^|]*\|?","",t).strip(" |")
-    if len(t)>max_len:
-        t=t[:max_len].rsplit(" ",1)[0]
-    return t
+# ---------------------------
+# Prompt builder
+# ---------------------------
+def soft_trim(text: str, max_len: int) -> str:
+    txt = re.sub(r"\s+", " ", text).strip()
+    if len(txt) <= max_len:
+        return txt
+    for token in ["Philosophy:", "Production:", "Instruments:", "Vocals:"]:
+        if len(txt) <= max_len: break
+        if token in txt:
+            txt = re.sub(rf"{token}[^|]*\|?", "", txt).strip(" |")
+    if len(txt) > max_len:
+        txt = txt[:max_len].rsplit(" ", 1)[0]
+    return txt
 
-def build_prompt(genre:str, style_words:str, vocals:List[str], instruments:List[str], bpm:Optional[int], philosophy:str, version:str)->str:
-    max_len=VERSION_LIMITS.get(version.lower(),1000)
-    parts=[
+def build_suno_prompt(genre: str, style_words: str, vocals: List[str], instruments: List[str],
+                      bpm: Optional[int], philosophy: str, version: str) -> str:
+    max_len = VERSION_LIMITS.get(version.lower(), 1000)
+    parts = [
         f"Genre: {genre}",
         f"Style: {style_words}",
         f"Vocals: {', '.join(vocals[:5])}",
@@ -227,74 +342,110 @@ def build_prompt(genre:str, style_words:str, vocals:List[str], instruments:List[
         f"Philosophy: {philosophy}",
         "Production: spatial depth, harmonic clarity, vocal intelligibility"
     ]
-    return soft_trim(" | ".join([p for p in parts if p]), max_len)
+    prompt = " | ".join([p for p in parts if p])
+    return soft_trim(prompt, max_len)
 
-def make_skeleton(text:str)->str:
-    lines=[l.strip() for l in text.split("\n") if l.strip()]
-    if not lines: return ""
-    blocks=[]
-    chunk=[]
-    for ln in lines:
-        chunk.append(ln)
-        if len(chunk)>=4:
-            blocks.append(chunk); chunk=[]
-    if chunk: blocks.append(chunk)
-    out=[]
-    for i,b in enumerate(blocks,1):
-        tag="Chorus" if i==2 else ("Bridge" if i==3 else f"Verse {1 if i==1 else i}")
-        out.append(f"[{tag}]")
-        out.extend(b)
-        out.append("")
+# ---------------------------
+# Skeleton builder (для выдачи чистого текста)
+# ---------------------------
+def build_skeleton_text(lyrics: str, vocals_hint: List[str]) -> str:
+    """
+    Возвращает «чистый» текст с верхними подсказками по подаче — без JSON.
+    Пример формата:
+      (Voice: male raspy tenor; Dynamics: soft→power; Tempo: 90 BPM)
+      [Verse 1]
+      ...
+      [Chorus]
+      ...
+    """
+    lines = [l for l in lyrics.split("\n") if l.strip() != ""]
+    # простая сегментация: каждые 6–10 строк — куплет/припев
+    chunks = []
+    i = 0
+    block = 8
+    while i < len(lines):
+        chunk = lines[i:i+block]
+        tag = "Chorus" if (len(chunks) % 2 == 1) else "Verse"
+        chunks.append((tag, chunk))
+        i += block
+    # сборка
+    head = f"(Voice: {' '.join(vocals_hint[:3])}; Dynamics: gentle→strong; Breathing: natural pauses)\n"
+    out = [head]
+    v = 1; c = 1
+    for tag, chunk in chunks:
+        if tag == "Verse":
+            out.append(f"[Verse {v}]")
+            v += 1
+        else:
+            out.append(f"[Chorus {c}]")
+            c += 1
+        out.extend(chunk)
+        out.append("")  # пустая строка между секциями
     return "\n".join(out).strip()
 
+# ---------------------------
+# Pipeline & Public API
+# ---------------------------
 @dataclass
 class PipelineResult:
-    genre:str; bpm:int; tonality:str; vocals:List[str]; instruments:List[str]
-    tlp:Dict[str,float]; emotions:Dict[str,float]; resonance:Dict[str,Any]
-    sections:List[Dict[str,Any]]; mode:str; prompt:str; skeleton:str
+    genre: str
+    bpm: int
+    tonality: str
+    vocals: List[str]
+    instruments: List[str]
+    tlp: Dict[str, float]
+    emotions: Dict[str, float]
+    resonance: Dict[str, Any]
+    integrity: Dict[str, Any]
+    tonesync: Dict[str, Any]
+    sections: List[Dict[str, Any]]
+    prompt: str
+    formatted_text: str  # чистовый текст со скелетом
 
 class StudioCore:
-    def __init__(self, config:Optional[dict]=None):
-        self.cfg= config or load_config()
-        self.tlp=TruthLovePain(); self.emo=Emo(); self.freq=Freq()
-        self.meter=Meter(); self.style=Style(); self.vox=VocalRegistry()
-        self.safe=Safety(self.cfg)
+    def __init__(self, config: Optional[dict] = None):
+        self.config = config or load_config()
+        self.tlp = TruthLovePainEngine()
+        self.emo = AutoEmotionalAnalyzer()
+        self.freq = UniversalFrequencyEngine()
+        self.integrity = IntegrityScanEngine()
+        self.tsync = ToneSyncEngine()
+        self.meter = LyricMeter()
+        self.style = StyleMatrix()
+        self.vocals = VocalProfileRegistry()
+        self.rns = RNSSafety(self.config)
 
-    def _decide_mode(self, em:Dict[str,float], tlp:Dict[str,float])->str:
-        if tlp["pain"]>0.4 and tlp["truth"]>0.2: return "pain→light"
-        if em.get("anger",0)>0.3: return "rage→truth"
-        if em.get("peace",0)>0.35 and (em.get("love",0)>0.2 or tlp["conscious_frequency"]>0.4): return "healing"
-        if tlp["truth"]>0.3 and em.get("fear",0)<0.1: return "ritual"
-        if em.get("fear",0)<0.05 and tlp["pain"]<0.05: return "sacred_silence"
-        return "neutral"
+    def analyze(self, lyrics: str, prefer_gender: str = "auto",
+                author_style: Optional[str] = None,
+                force_voice: Optional[str] = None,
+                genre_hint: Optional[str] = None) -> PipelineResult:
 
-    def analyze(self, lyrics:str, prefer_gender:str="auto", author_style:Optional[str]=None)->PipelineResult:
-        raw=normalize_text(lyrics)
-        sections=extract_sections(raw)
-        tlp=self.tlp.analyze(raw)
-        emotions=self.emo.analyze(raw)
-        bpm=self.meter.bpm(raw)
-        genre=self.style.genre(emotions,tlp)
-        ton=self.style.tonality(emotions)
-        vox,inst=self.vox.get(genre, preferred=prefer_gender, text=raw)
-        # hints из секций
-        tag_text=" ".join([s["tag"] for s in sections])
-        if re.search(r"tagelharpa",tag_text,re.I) and "tagelharpa" not in inst:
-            inst=(inst+["tagelharpa"])[:5]
-        res=self.freq.resonance(tlp); res["recommended_octaves"]=self.safe.clamp(res["recommended_octaves"])
-        mode=self._decide_mode(emotions,tlp)
-        philosophy="Truth × Love × Pain → Conscious Frequency. Healing-first, clarity over loudness."
-        style_words=self.style.recommend(emotions,tlp,author_style,sections)
-        prompt=build_prompt(genre,style_words,vox,inst,bpm,philosophy,self.cfg.get("suno_version","v5"))
-        skeleton=make_skeleton(raw)
-        return PipelineResult(genre,bpm,ton,vox,inst,tlp,emotions,res,sections,mode,prompt,skeleton)
+        raw0 = normalize_text_preserve_symbols(lyrics)
+        raw = soft_autopunct(raw0)  # щадящая расстановка знаков
+        sections = extract_sections(raw)
 
-    # удобный текстовый вывод
-    def format_text_output(self, pr:PipelineResult)->str:
-        lines=[]
-        lines.append("# VOCAL DELIVERY (guide)")
-        lines.append("(whisper → speak → sing → belt → release; breath marks: / )\n")
-        lines.append(pr.skeleton)
-        lines.append("\n# STYLE PROMPT")
-        lines.append(pr.prompt + f" | Mode: {pr.mode} | Key: {pr.tonality}")
-        return "\n".join(lines).strip()
+        tlp = self.tlp.analyze(raw)
+        emotions = self.emo.analyze(raw)
+        bpm = max(60, min(160, self.meter.bpm_from_density(raw)))
+        genre = genre_hint.strip().lower() if genre_hint else self.style.genre(emotions, tlp)
+        ton = self.style.tonality(emotions)
+
+        vox, inst = self.vocals.get(genre, preferred_gender=prefer_gender, force_voice=force_voice)
+        # подсказка из тегов — инструмент
+        tag_text = " ".join([s["tag"] for s in sections])
+        if re.search(r"tagelharpa", tag_text, flags=re.I) and "tagelharpa" not in inst:
+            inst = (inst + ["tagelharpa"])[:5]
+
+        res = self.freq.resonance_profile(tlp)
+        res["recommended_octaves"] = self.rns.clamp_octaves(res["recommended_octaves"])
+        integ = self.integrity.analyze(raw)
+        ts = self.tsync.sync(raw, emotions)
+
+        version = self.config.get("suno_version", "v5")
+        philosophy = "Truth × Love × Pain → Conscious Frequency. Healing-first, clarity over loudness."
+        sw = self.style.recommend(emotions, tlp, author_style=author_style, sections=sections)
+        prompt = build_suno_prompt(genre, sw, vox, inst, bpm, philosophy, version)
+
+        formatted = build_skeleton_text(raw, vox)
+
+        return PipelineResult(genre, bpm, ton, vox, inst, tlp, emotions, res, integ, ts, sections, prompt, formatted)
