@@ -1,3 +1,6 @@
+---
+sdk: docker
+---
 # 🎧 StudioCore API v4.3
 Truth × Love × Pain = Conscious Frequency  
 Built by Bauer Synesthetic Studio
