@@ -1,27 +1,61 @@
-from fastapi import FastAPI, Request
-from StudioCore_Complete_v4_3 import analyze_and_style
+from fastapi import FastAPI, Body
+from StudioCore_Complete_v4_3 import (
+    normalize_text_preserve_symbols,
+    extract_sections,
+    TruthLovePainEngine,
+    AutoEmotionalAnalyzer,
+    LyricMeter,
+    UniversalFrequencyEngine,
+    IntegrityScanEngine,
+    StyleMatrix,
+    VocalProfileRegistry,
+    ToneSyncEngine,
+    load_config,
+    RNSSafety,
+)
 
-app = FastAPI()
+app = FastAPI(title="StudioCore API", version="4.3")
+
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "StudioCore API v4.3 is running"}
 
 @app.post("/analyze")
-async def analyze(request: Request):
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-    # Принимаем также query-параметры
-    query = dict(request.query_params)
-    text = data.get("text") or query.get("text")
-    preferred_gender = data.get("preferred_gender") or query.get("preferred_gender", "auto")
+def analyze_text(data: dict = Body(...)):
+    text = data.get("text", "")
+    config = load_config()
 
-    if not text:
-        return {"error": "Missing required field: text"}
+    tlp = TruthLovePainEngine().analyze(text)
+    emo = AutoEmotionalAnalyzer().analyze(text)
+    bpm = LyricMeter().bpm_from_density(text)
+    freq = UniversalFrequencyEngine().resonance_profile(tlp)
+    integrity = IntegrityScanEngine().analyze(text)
+    genre = StyleMatrix().genre(emo, tlp, text, bpm)
+    tonality = StyleMatrix().tonality(emo)
+    vox, inst = VocalProfileRegistry().get(genre, "auto", text, extract_sections(text))
+    tone = ToneSyncEngine()
+    audio_prof = tone.audio_profile(emo)
+    visual_prof = tone.visual_profile(emo)
+    sync = tone.sync_score(audio_prof, visual_prof)
+    safety = RNSSafety(config).mix_notes()
 
-    result = analyze_and_style(text, preferred_vocal=preferred_gender)
     return {
-        "engine": "StudioCore v4.3",
-        "genre": result.genre,
-        "bpm": result.bpm,
-        "tonality": result.tonality,
-        "style": result.prompt
+        "tlp": tlp,
+        "emotion": emo,
+        "bpm": bpm,
+        "genre": genre,
+        "tonality": tonality,
+        "frequency_profile": freq,
+        "vocal_instruments": {"voices": vox, "instruments": inst},
+        "tone_sync": {
+            "audio": audio_prof,
+            "visual": visual_prof,
+            "sync_score": sync
+        },
+        "integrity": integrity,
+        "safety": safety
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app_fastapi:app", host="0.0.0.0", port=8000, reload=True)
