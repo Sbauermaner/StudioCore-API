@@ -1,19 +1,20 @@
-# Use Python base
+# ===============================
+# StudioCore Pilgrim API v4.3
+# ===============================
+
 FROM python:3.10-slim
 
-# Set working directory
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Copy requirements
+# Копируем зависимости
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all sources
-COPY StudioCore_Complete_v4_3.py /app/StudioCore_Complete_v4_3.py
-COPY app_fastapi.py /app/app_fastapi.py
-COPY pilgrim_layer.py /app/pilgrim_layer.py
+# Копируем всё содержимое проекта в контейнер
+COPY . /app
 
-# Auto-create default config
+# Создаём конфиг StudioCore (если его нет)
 RUN echo '{ \
   "suno_version": "v5", \
   "safety": { \
@@ -27,8 +28,8 @@ RUN echo '{ \
   } \
 }' > /app/studio_config.json
 
-# Expose FastAPI port
+# Указываем порт
 EXPOSE 7860
 
-# Start app
-CMD ["uvicorn", "app_fastapi:app", "--host", "0.0.0.0", "--port", "7860"]
+# Запуск FastAPI приложения
+CMD ["python", "app_fastapi.py"]
