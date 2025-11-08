@@ -1,7 +1,5 @@
 ---
 SDK: Docker
-Expose port: 8000
-Main file: Dockerfile
 ---
 # 🎧 StudioCore API v4.3
 Truth × Love × Pain = Conscious Frequency  
