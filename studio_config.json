@@ -1,0 +1,12 @@
+{
+  "suno_version": "v5",
+  "safety": {
+    "max_peak_db": -1.0,
+    "max_rms_db": -14.0,
+    "avoid_freq_bands_hz": [18.0, 30.0],
+    "safe_octaves": [2, 3, 4, 5],
+    "max_session_minutes": 20,
+    "fade_in_ms": 1000,
+    "fade_out_ms": 1500
+  }
+}
