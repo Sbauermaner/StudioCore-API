@@ -1,3 +1,9 @@
+---
+sdk: docker
+sdk_version: 0.0.1
+app_port: 7860
+entrypoint: Dockerfile
+---
 # 🎧 StudioCore Pilgrim API v4.3
 
 Author: Bauer Synesthetic Studio  
