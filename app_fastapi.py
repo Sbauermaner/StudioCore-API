@@ -1,37 +1,27 @@
 from fastapi import FastAPI, Request
-from pydantic import BaseModel
-from StudioCore_Complete_v4_3 import analyze_and_style  # ✅ Исправленный импорт
+from StudioCore_Complete_v4_3 import analyze_and_style
 
-app = FastAPI(title="StudioCore Pilgrim API v4.3", version="4.3")
-
-class InputPayload(BaseModel):
-    text: str
-    preferred_vocal: str | None = "auto"
-    author_style_hint: str | None = None
-
-@app.get("/")
-def root():
-    return {"status": "ok", "engine": "StudioCore v4.3", "author": "Bauer Synesthetic Studio"}
+app = FastAPI()
 
 @app.post("/analyze")
-async def analyze(payload: InputPayload):
-    result = analyze_and_style(
-        raw_text=payload.text,
-        preferred_vocal=payload.preferred_vocal,
-        author_style_hint=payload.author_style_hint
-    )
+async def analyze(request: Request):
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    # Принимаем также query-параметры
+    query = dict(request.query_params)
+    text = data.get("text") or query.get("text")
+    preferred_gender = data.get("preferred_gender") or query.get("preferred_gender", "auto")
+
+    if not text:
+        return {"error": "Missing required field: text"}
+
+    result = analyze_and_style(text, preferred_vocal=preferred_gender)
     return {
+        "engine": "StudioCore v4.3",
         "genre": result.genre,
         "bpm": result.bpm,
         "tonality": result.tonality,
-        "vocals": result.vocals,
-        "instruments": result.instruments,
-        "techniques": result.techniques,
-        "prompt": result.prompt,
-        "tlp": result.tlp,
-        "emotions": result.emotions,
-        "resonance": result.resonance,
-        "tonesync": result.tonesync,
-        "integrity": result.integrity,
-        "safety_notes": result.safety_notes,
+        "style": result.prompt
     }
