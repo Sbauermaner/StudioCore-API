@@ -1,39 +1,29 @@
----
-title: StudioCore Pilgrim API
-emoji: 🎧
-colorFrom: purple
-colorTo: pink
-sdk: docker
-app_file: app_fastapi.py
-pinned: false
-license: mit
----
+# 🎧 StudioCore Pilgrim API v4.3
 
-# 🎵 StudioCore Pilgrim API
-
-AI-композитор и философское ядро **StudioCore Pilgrim** —  
-проект, соединяющий музыку, эмоции и осознанность через алгоритмы Truth × Love × Pain.  
-Развёрнуто в Hugging Face Spaces (Docker SDK).
+**Author:** Bauer Synesthetic Studio  
+**Engine:** StudioCore Complete v4.3 — Expressive Adaptive Engine  
+**Purpose:** Analyze lyrics, detect genre, tonality, emotional range, and auto-generate prompt styles for Suno AI.
 
 ---
 
-## 🚀 Как использовать
-
-### 🖥 Через Web UI
-Перейди по ссылке:
-👉 [https://sbauer8-studiocore-api.hf.space/ui](https://sbauer8-studiocore-api.hf.space/ui)
-
-Вставь свою лирику — система автоматически:
-- расставит пунктуацию и структуру (`[Verse]`, `[Chorus]`, `[Bridge]`)
-- подберёт вокал, тембр, BPM, тональность
-- создаст готовый **Style Prompt** для SunoAI или других генераторов
+## 🧠 Features
+- Adaptive emotion detection (`Truth × Love × Pain`)
+- Auto genre, BPM, tonality, vocal & instrument mapping
+- Harmonic frequency and safety (RNS)
+- Integrated Pilgrim Layer (meta interpretation)
+- JSON output for AI music generation
 
 ---
 
-### 💡 Через API (cURL)
+## 🚀 API Endpoints
 
+| Method | Endpoint | Description |
+| ------- | -------- | ----------- |
+| `GET` | `/` | Health check |
+| `POST` | `/analyze` | Analyze lyrics text |
+
+### Example request
 ```bash
-# Анализ лирики (JSON)
-curl -X POST "https://sbauer8-studiocore-api.hf.space/analyze?prefer_gender=auto" \
-     -H "Content-Type: text/plain" \
-     --data-binary "Cold snow, warm fire, a stark divide..."
+curl -X POST "https://sbauer8-studiocore-api.hf.space/analyze" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Cold snow, warm fire, a stark divide...", "preferred_gender":"auto"}'
