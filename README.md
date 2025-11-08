@@ -1,3 +1,10 @@
+---
+dk: docker
+sdk_version: 1.0
+app_file: app_fastapi.py
+python_version: 3.10
+port: 7860
+---
 # 🎧 StudioCore Pilgrim v4.3
 
 Expressive Adaptive Engine — "Truth × Love × Pain = Conscious Frequency"  
