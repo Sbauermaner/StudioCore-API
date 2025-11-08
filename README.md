@@ -1,24 +1,39 @@
-# 🎧 StudioCore Pilgrim API
+---
+title: StudioCore Pilgrim API
+emoji: 🎧
+colorFrom: purple
+colorTo: pink
+sdk: docker
+app_file: app_fastapi.py
+pinned: false
+license: mit
+---
 
-AI-композитор и аналитическое ядро на базе **StudioCore**, адаптированное для Hugging Face Spaces.  
-Производит полный анализ лирики: эмоции, жанр, BPM, тональность, инструменты, философию текста и генерирует готовый **Style Prompt**.
+# 🎵 StudioCore Pilgrim API
+
+AI-композитор и философское ядро **StudioCore Pilgrim** —  
+проект, соединяющий музыку, эмоции и осознанность через алгоритмы Truth × Love × Pain.  
+Развёрнуто в Hugging Face Spaces (Docker SDK).
 
 ---
 
-### 🚀 Как использовать
+## 🚀 Как использовать
 
-#### Вариант 1 — Через Web UI
-Открой:
-👉 https://sbauer8-studiocore-api.hf.space/ui  
-Вставь свою лирику и нажми **Analyze** или **Build**.
+### 🖥 Через Web UI
+Перейди по ссылке:
+👉 [https://sbauer8-studiocore-api.hf.space/ui](https://sbauer8-studiocore-api.hf.space/ui)
+
+Вставь свою лирику — система автоматически:
+- расставит пунктуацию и структуру (`[Verse]`, `[Chorus]`, `[Bridge]`)
+- подберёт вокал, тембр, BPM, тональность
+- создаст готовый **Style Prompt** для SunoAI или других генераторов
 
 ---
 
-#### Вариант 2 — Через API (cURL)
+### 💡 Через API (cURL)
 
 ```bash
 # Анализ лирики (JSON)
-curl -X POST \
-  'https://sbauer8-studiocore-api.hf.space/analyze?prefer_gender=auto' \
-  -H 'Content-Type: text/plain' \
-  --data-binary $'Cold snow, warm fire, a stark divide...'
+curl -X POST "https://sbauer8-studiocore-api.hf.space/analyze?prefer_gender=auto" \
+     -H "Content-Type: text/plain" \
+     --data-binary "Cold snow, warm fire, a stark divide..."
