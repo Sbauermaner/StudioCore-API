@@ -1,16 +1,25 @@
+# ================================
+# StudioCore Pilgrim v4.3 — Dockerfile
+# ================================
+
+# Базовый образ с Python 3.10 (совместим с Hugging Face docker runtime)
 FROM python:3.10-slim
 
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
+# Копируем файл зависимостей
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем ядро и API
+# Устанавливаем зависимости
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Копируем исходные файлы проекта
 COPY StudioCore_Complete_v4_3.py /app/StudioCore_Complete_v4_3.py
 COPY pilgrim_layer.py /app/pilgrim_layer.py
 COPY app_fastapi.py /app/app_fastapi.py
 
-# Конфигурация студии
+# Создаём стандартный файл конфигурации (если не существует)
 RUN echo '{ \
   "suno_version": "v5", \
   "safety": { \
@@ -24,5 +33,12 @@ RUN echo '{ \
   } \
 }' > /app/studio_config.json
 
+# Указываем порт (должен совпадать с README.md)
 EXPOSE 7860
-CMD ["python", "app_fastapi.py"]
+
+# Устанавливаем переменные среды
+ENV PYTHONUNBUFFERED=1
+ENV PORT=7860
+
+# Запуск FastAPI через uvicorn
+CMD ["uvicorn", "app_fastapi:app", "--host", "0.0.0.0", "--port", "7860"]
