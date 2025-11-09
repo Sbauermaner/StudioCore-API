@@ -1,3 +1,16 @@
+def soft_trim(text: str, max_len: int = 1000) -> str:
+    """
+    Softly trims text to max_len characters without breaking words.
+    """
+    text = text.strip()
+    if len(text) <= max_len:
+        return text
+    cutoff = text[:max_len]
+    if " " in cutoff:
+        cutoff = cutoff[:cutoff.rfind(" ")]
+    return cutoff + "…"
+
+
 def build_suno_prompt(genre: str,
                       style_words: str,
                       voices: list,
