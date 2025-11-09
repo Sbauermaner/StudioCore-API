@@ -1,4 +1,3 @@
-# app.py
 import gradio as gr
 from studiocore import StudioCore
 
