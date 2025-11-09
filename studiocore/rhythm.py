@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Lyric rhythm and BPM estimation.
-"""
 from typing import List
 from .emotion import PUNCT_WEIGHTS
 
