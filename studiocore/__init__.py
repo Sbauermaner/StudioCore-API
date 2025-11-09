@@ -36,7 +36,7 @@ class StudioCore:
         self.tone = ToneSyncEngine()
 
     # ========================================
-    # 🧩 Встроенный парсер аннотаций ядра
+    # 🧩 Построение семантических аннотаций
     # ========================================
     def _build_semantic_sections(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int) -> Dict[str, Any]:
         """
@@ -47,7 +47,6 @@ class StudioCore:
         cf = tlp.get("conscious_frequency", 0)
         avg_emo = mean(abs(v) for v in emo.values()) if emo else 0.0
 
-        # Формируем сценарий эмоциональных фаз
         intro = {
             "section": "Intro",
             "mood": "calm" if cf < 0.5 else "mystic",
@@ -79,7 +78,6 @@ class StudioCore:
             "focus": "closure",
         }
 
-        # Воздействие на параметры
         bpm_adj = int(bpm + (avg_emo * 8) + (cf * 4))
         overlay = {
             "depth": round((truth + pain) / 2, 2),
@@ -88,6 +86,37 @@ class StudioCore:
             "sections": [intro, verse, bridge, chorus, outro],
         }
         return {"bpm": bpm_adj, "overlay": overlay}
+
+    # ========================================
+    # 🧠 Автоматическая аннотация текста
+    # ========================================
+    def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any], vocals: list, bpm: int) -> str:
+        """
+        Возвращает текст с автоматической аннотацией секций и параметров ядра.
+        """
+        lines = [l for l in text.strip().split("\n") if l.strip()]
+        sections = overlay.get("sections", [])
+        if not sections:
+            return text
+
+        # Делим текст на логические блоки по длине
+        block_size = max(1, len(lines) // len(sections))
+        annotated = []
+        idx = 0
+
+        for sec in sections:
+            tag = f"[{sec['section']} – {sec['mood'].capitalize()}, focus={sec['focus']}]"
+            annotated.append(tag)
+            block_lines = lines[idx: idx + block_size]
+            annotated.extend(block_lines)
+            idx += block_size
+
+        annotated.append(f"[End – BPM≈{bpm}, Vocal={style.get('vocal_form','auto')}, Tone={style.get('key','auto')}]")
+
+        # Добавляем информацию о вокалах
+        tech = ", ".join([v for v in vocals if v not in ["male", "female"]])
+        annotated.append(f"[Vocal Techniques: {tech or 'neutral tone'}]")
+        return "\n".join(annotated)
 
     # ========================================
     # 🔬 Основной анализ
@@ -103,41 +132,32 @@ class StudioCore:
         Full adaptive emotional-semantic analysis + self-generated annotation overlay.
         """
         version = version or self.cfg.get("suno_version", "v5")
-
-        # --- Normalize and parse text ---
         txt = normalize_text_preserve_symbols(text)
         sections = extract_sections(txt)
 
-        # --- Emotional layers ---
+        # --- Эмоции и TLP ---
         emo = self.emotion.analyze(txt)
         tlp = self.tlp.analyze(txt)
 
-        # --- Rhythm & Frequency ---
+        # --- Ритм и частоты ---
         bpm = self.rhythm.bpm_from_density(txt)
         resonance = self.freq.resonance_profile(tlp)
-        resonance["recommended_octaves"] = self.safety.clamp_octaves(
-            resonance.get("recommended_octaves", [2, 3, 4, 5])
-        )
+        resonance["recommended_octaves"] = self.safety.clamp_octaves(resonance.get("recommended_octaves", [2, 3, 4, 5]))
 
-        # --- Semantic annotation map ---
+        # --- Семантические фазы ---
         semantic = self._build_semantic_sections(emo, tlp, bpm)
         bpm = semantic["bpm"]
 
-        # --- Style & instrumentation ---
+        # --- Стиль и инструменты ---
         style_data = self.style.build(emo, tlp, txt, bpm)
-        vox, inst, vocal_form = self.vocals.get(
-            style_data["genre"],
-            preferred_gender or "auto",
-            txt,
-            sections
-        )
+        vox, inst, vocal_form = self.vocals.get(style_data["genre"], preferred_gender or "auto", txt, sections)
         style_data["vocal_form"] = vocal_form
 
-        # --- Tone & Integrity ---
+        # --- Цвет и структура ---
         integrity = self.integrity.analyze(txt)
         tonesync = self.tone.colors_for_primary(emo, tlp, style_data.get("key", "auto"))
 
-        # --- Conscious formula ---
+        # --- Философия ---
         philosophy = (
             f"Truth={tlp.get('truth', 0):.2f}, "
             f"Love={tlp.get('love', 0):.2f}, "
@@ -145,7 +165,7 @@ class StudioCore:
             f"Conscious Frequency={tlp.get('conscious_frequency', 0):.2f}"
         )
 
-        # --- Prompt build ---
+        # --- Промты ---
         prompt_full = build_suno_prompt(style_data, vox, inst, bpm, philosophy, version, mode="full")
         prompt_suno = build_suno_prompt(style_data, vox, inst, bpm, philosophy, version, mode="suno")
         prompt_suno += (
@@ -155,12 +175,15 @@ class StudioCore:
             f"resonance={tonesync['resonance_hz']}Hz"
         )
 
-        # --- Final result ---
+        # --- Авто-аннотированный текст ---
+        annotated_text = self.annotate_text(txt, semantic["overlay"], style_data, vox, bpm)
+
+        # --- Результат ---
         return {
             "emotions": emo,
             "tlp": tlp,
             "bpm": bpm,
-            "overlay": semantic["overlay"],   # ⬅️ встроенный слой аннотаций
+            "overlay": semantic["overlay"],
             "style": style_data,
             "vocals": vox,
             "instruments": inst,
@@ -170,6 +193,7 @@ class StudioCore:
             "philosophy": philosophy,
             "prompt_full": prompt_full,
             "prompt_suno": prompt_suno,
+            "annotated_text": annotated_text,   # ⬅️ добавлен возврат аннотированного текста
             "version": version
         }
 
