@@ -1,5 +1,4 @@
 from typing import List, Dict, Any, Tuple
-import re
 from .emotion import AutoEmotionalAnalyzer
 
 VALID_VOICES = [
@@ -14,122 +13,85 @@ VALID_INSTRUMENTS = [
 ]
 
 DEFAULT_VOCAL_MAP = {
-    "rock": {"female":["female","emotional","alto"], "male":["male","raspy","tenor"], "inst":["guitar","drums","bass","piano"]},
-    "pop": {"female":["female","clear","soprano"], "male":["male","soft","tenor"], "inst":["piano","synth","bass","drums"]},
-    "folk": {"female":["female","warm","alto"], "male":["male","emotional","baritone"], "inst":["guitar","strings","flute"]},
-    "orchestral": {"female":["female","angelic"], "male":["male","deep","baritone"], "inst":["strings","choir","horns","percussion"]},
-    "jazz": {"female":["female","warm"], "male":["male","soft"], "inst":["piano","saxophone","bass","drums"]},
+    "rock":       {"female":["female","emotional","alto"], "male":["male","raspy","tenor"], "inst":["guitar","drums","bass","piano"]},
+    "pop":        {"female":["female","clear","soprano"],  "male":["male","soft","tenor"],   "inst":["piano","synth","bass","drums"]},
+    "folk":       {"female":["female","warm","alto"],      "male":["male","emotional","baritone"], "inst":["guitar","strings","flute"]},
+    "cinematic":  {"female":["female","angelic"],          "male":["male","deep"],          "inst":["strings","piano","choir","drums"]},
+    "electronic": {"female":["female","breathy"],          "male":["male","soft"],          "inst":["synth","pad","bass","drums"]},
+    "ambient":    {"female":["female","whispered"],        "male":["male","soft"],          "inst":["pad","piano","strings"]},
+    "orchestral": {"female":["female","angelic"],          "male":["male","deep"],          "inst":["strings","choir","horns","percussion"]},
 }
 
-
 class VocalProfileRegistry:
-    """Adaptive multi-gender ensemble and instrument selector."""
+    """Suggests appropriate vocal and instrumental settings based on genre, emotion, and text."""
 
     def __init__(self):
         self.map = DEFAULT_VOCAL_MAP
 
-    # ----------------------------------------------------------
-    # 1️⃣ Определение пола по контексту
-    # ----------------------------------------------------------
-    def _detect_gender_from_text(self, text: str) -> str:
-        text_low = text.lower()
-        female_tokens = ["она","ей","её","девушка","женщина","мама","дочь","сестра","любила","ушла"]
-        male_tokens = ["он","его","ему","мужчина","отец","сын","брат","любил","ушёл"]
-        female_score = sum(t in text_low for t in female_tokens)
-        male_score = sum(t in text_low for t in male_tokens)
+    def _detect_ensemble_hints(self, text: str, sections: List[Dict[str,Any]]) -> Dict[str, bool]:
+        s = (text + " " + " ".join(s.get("tag", "") for s in sections)).lower()
+        return {
+            "wants_choir": any(k in s for k in ["choir","хор","group","chorus","anthem"]),
+            "wants_duet":  any(k in s for k in ["duet","дуэт","duo","вместе"]),
+            "wants_trio":  any(k in s for k in ["trio","трио"]),
+            "wants_quartet": any(k in s for k in ["quartet","квартет"]),
+            "wants_quintet": any(k in s for k in ["quintet","квинтет"]),
+        }
 
-        if female_score > male_score:
-            return "female"
-        elif male_score > female_score:
-            return "male"
-        else:
-            return "mixed"
+    def auto_vocal_form(self, emo: Dict[str,float], tlp: Dict[str,float], text: str) -> str:
+        """
+        Auto-selects best vocal form (solo, duet, trio, quartet, choir)
+        based on emotional energy and complexity of text.
+        """
+        wc = len(text.split())
+        cf = tlp.get("conscious_frequency", 0)
+        love, pain, truth = tlp.get("love",0), tlp.get("pain",0), tlp.get("truth",0)
+        energy = (love + pain + truth) / 3
 
-    # ----------------------------------------------------------
-    # 2️⃣ Определение формы ансамбля и состава
-    # ----------------------------------------------------------
-    def _detect_ensemble_form(self, text: str) -> Tuple[str, int, int]:
-        s = text.lower()
-        M = F = 0
+        # Формула вокальной насыщенности
+        if wc < 40 and energy < 0.3:
+            return "solo"
+        elif 40 <= wc < 80 or cf > 0.5:
+            return "duet"
+        elif 80 <= wc < 150 or (energy > 0.4 and cf > 0.6):
+            return "trio"
+        elif 150 <= wc < 250 or energy > 0.6:
+            return "quartet"
+        elif wc >= 250 or cf > 0.75:
+            return "choir"
+        return "solo"
 
-        if "два" in s or "две" in s:
-            n = 2
-        elif "три" in s or "втроем" in s:
-            n = 3
-        elif "четыре" in s or "вчетвером" in s:
-            n = 4
-        elif "пять" in s or "впятером" in s:
-            n = 5
-        elif any(k in s for k in ["хор","толпа","все вместе","голоса","choir"]):
-            n = 10
-        else:
-            n = 1
-
-        if "муж" in s or "парн" in s or "юноши" in s:
-            M = max(1, n // 2)
-        if "жен" in s or "девуш" in s or "голос жен" in s:
-            F = max(1, n // 2)
-        if M == 0 and F == 0:
-            if n == 1: F = 1
-            elif n == 2: M, F = 1, 1
-            elif n == 3: M, F = 1, 2
-            elif n == 4: M, F = 2, 2
-            elif n >= 5: M, F = 3, 2
-
-        if n == 1:
-            form = "solo"
-        elif n == 2:
-            form = "duet"
-        elif n == 3:
-            form = "trio"
-        elif n == 4:
-            form = "quartet"
-        elif n == 5:
-            form = "quintet"
-        else:
-            form = "choir"
-
-        return form, M, F
-
-    # ----------------------------------------------------------
-    # 3️⃣ Генерация ансамблевого тега
-    # ----------------------------------------------------------
-    def _ensemble_label(self, base: str, M: int, F: int) -> str:
-        if base == "choir":
-            if M > 0 and F > 0:
-                return "choir_mixed"
-            elif M > 0:
-                return "choir_male"
-            else:
-                return "choir_female"
-        else:
-            tag = base + "_" + ("m" * M) + ("f" * F)
-            return tag
-
-    # ----------------------------------------------------------
-    # 4️⃣ Основной метод
-    # ----------------------------------------------------------
-    def get(self, genre: str, preferred_gender: str, text: str, sections: List[Dict[str,Any]]) -> Tuple[List[str], List[str], str]:
+    def get(self, genre: str, preferred_gender: str, text: str, sections: List[Dict[str,Any]]) -> Tuple[List[str], List[str]]:
         g = genre if genre in self.map else "rock"
+        hints = self._detect_ensemble_hints(text, sections)
 
-        detected_gender = self._detect_gender_from_text(text)
-        base_form, M, F = self._detect_ensemble_form(text)
-        vocal_form = self._ensemble_label(base_form, M, F)
+        # Определяем базовую вокальную форму
+        form = self.auto_vocal_form(AutoEmotionalAnalyzer().analyze(text), {"conscious_frequency": 0.5}, text)
 
-        if M and F:
-            vox = ["male","female"]
-        elif F and not M:
+        if preferred_gender == "female":
             vox = self.map[g]["female"]
-        elif M and not F:
+        elif preferred_gender == "male":
             vox = self.map[g]["male"]
+        elif preferred_gender == "auto":
+            vox = self.map[g]["female"] if "love" in text.lower() else self.map[g]["male"]
         else:
-            vox = ["male","female"]
+            vox = self.map[g]["female"]
 
-        if "choir" in vocal_form and "choir" not in vox:
-            vox = ["choir"] + vox
+        # Добавляем форму (solo, duet, trio, choir и т.д.)
+        if hints["wants_choir"]:
+            form = "choir"
+        elif hints["wants_quintet"]:
+            form = "quintet"
+        elif hints["wants_quartet"]:
+            form = "quartet"
+        elif hints["wants_trio"]:
+            form = "trio"
+        elif hints["wants_duet"]:
+            form = "duet"
 
-        inst = list(self.map[g]["inst"])
+        vox = [form] + vox
+        inst = self.map[g]["inst"]
+
         vox = [v for v in vox if v in VALID_VOICES][:6]
         inst = [i for i in inst if i in VALID_INSTRUMENTS][:6]
-
-        return vox, inst, vocal_form
+        return vox, inst
