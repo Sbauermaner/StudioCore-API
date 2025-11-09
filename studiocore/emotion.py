@@ -4,7 +4,7 @@ from typing import Dict, List
 PUNCT_WEIGHTS = {",":0.10,".":0.30,"!":0.50,"?":0.40,"…":0.60,"—":0.20,"–":0.20,":":0.25,";":0.20,'"':0.05,"'":0.05,"(":0.05,")":0.05,"[":0.05,"]":0.05}
 EMOJI_WEIGHTS = {ch: 0.40 for ch in "♡♥❤❥❣☀☁☂☮☯☾☽★☆✨⚡☼⚔⚖⚙⚗⚛✝✟✞✡☠☢☣❄☃"}
 
-class TruthLovePainEngine:
+class class TruthLovePainEngine:
     _truth = ['truth','true','real','authentic','honest','истина','честно','реально','правда']
     _love  = ['love','care','heart','soul','compassion','unity','любовь','сердце','душа','забота','единство']
     _pain  = ['pain','hurt','loss','tears','cry','grief','страдание','боль','печаль','слёзы','горе']
@@ -12,10 +12,7 @@ class TruthLovePainEngine:
     def analyze(self, text: str) -> Dict[str, float]:
         words = re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text.lower())
         n = max(1, len(words))
-        def score(bag):
-    # ищет вхождение подстроки, а не только точное совпадение
-    return sum(1 for w in words for b in bag if b in w) / n
-
+        def score(bag): return sum(1 for w in words if w in bag) / n
         t, l, p = score(self._truth), score(self._love), score(self._pain)
         cf = (t * l * max(p, 0.05)) * 10.0
         return {
@@ -24,6 +21,7 @@ class TruthLovePainEngine:
             "pain": min(p * 5, 1.0),
             "conscious_frequency": min(cf, 1.0)
         }
+
 
 class AutoEmotionalAnalyzer:
     base_dicts = {
