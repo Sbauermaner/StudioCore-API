@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any
 
-# --- Import all internal modules ---
+# --- Internal modules ---
 from .config import load_config
 from .text_utils import normalize_text_preserve_symbols, extract_sections
 from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
@@ -17,7 +17,11 @@ from .adapter import build_suno_prompt
 
 
 class StudioCore:
-    """Full analysis pipeline from lyrics → emotional → style logic."""
+    """
+    StudioCore v5 — Self-adaptive lyrical interpretation engine.
+    No fixed styles: every output is generated uniquely from lyrical semantics,
+    emotional ratios (Truth × Love × Pain), and rhythmic density.
+    """
 
     def __init__(self, config_path: str | None = None):
         self.cfg = load_config(config_path or "studio_config.json")
@@ -31,84 +35,54 @@ class StudioCore:
         self.style = StyleMatrix()
         self.tone = ToneSyncEngine()
 
-    def analyze(self, text: str,
-                author_style: str | None = None,
-                preferred_gender: str | None = None,
-                version: str | None = None) -> Dict[str, Any]:
-        """
-        Full analysis pipeline — with safety guards and detailed debug output.
-        Compresses (not trims) long prompts for Suno without loss of meaning.
-        """
+    def analyze(
+        self,
+        text: str,
+        author_style: str | None = None,
+        preferred_gender: str | None = None,
+        version: str | None = None
+    ) -> Dict[str, Any]:
+        """Adaptive analysis — no pre-defined genres, pure emergent logic."""
         try:
             version = version or self.cfg.get("suno_version", "v5")
-            print("✅ StudioCore analyze started")
+            print("✅ StudioCore v5: analyze() started")
 
+            # --- Stage 1. Text normalization ---
             txt = normalize_text_preserve_symbols(text)
             sections = extract_sections(txt)
-            print("Text normalized OK")
 
-            # === Analytical layers ===
+            # --- Stage 2. Emotional & Semantic scan ---
             emo = self.emotion.analyze(txt)
-            print("Emotion OK:", emo)
-
             tlp = self.tlp.analyze(txt)
-            print("TLP OK:", tlp)
-
             bpm = self.rhythm.bpm_from_density(txt)
-            print("BPM OK:", bpm)
 
+            # --- Stage 3. Self-adaptive style generation ---
+            # StyleMatrix.build() не берёт жанры из списка, а выводит их из лирики
             style_data = self.style.build(emo, tlp, txt, bpm)
-            print("Style OK:", style_data)
+            # Например: {'genre': 'adaptive emotional', 'style': 'text-driven cinematic', ...}
 
-            vox, inst = self.vocals.get(style_data.get("genre", "unknown"),
-                                        preferred_gender or "auto", txt, sections)
-            print("Vocals/Inst OK:", vox, inst)
+            # --- Stage 4. Vocals & Instruments prediction ---
+            vox, inst = self.vocals.get(style_data.get("genre", "auto"), preferred_gender or "auto", txt, sections)
 
+            # --- Stage 5. Frequency & safety ---
             resonance = self.freq.resonance_profile(tlp)
-            resonance["recommended_octaves"] = self.safety.clamp_octaves(
-                resonance.get("recommended_octaves", [2, 3, 4, 5])
-            )
-            print("Resonance OK:", resonance)
+            resonance["recommended_octaves"] = self.safety.clamp_octaves(resonance.get("recommended_octaves", [2,3,4,5]))
 
+            # --- Stage 6. Integrity + ToneColor ---
             integrity = self.integrity.analyze(txt)
-            print("Integrity OK:", integrity)
-
             tonesync = self.tone.colors_for_primary(emo)
-            print("ToneSync OK:", tonesync)
 
-            # === Philosophy (Truth × Love × Pain) ===
+            # --- Stage 7. Philosophical layer ---
             philosophy = (
-                f"Truth={tlp.get('truth', 0):.2f}, "
-                f"Love={tlp.get('love', 0):.2f}, "
-                f"Pain={tlp.get('pain', 0):.2f}, "
-                f"Conscious Frequency={tlp.get('conscious_frequency', 0):.2f}"
-            )
-            print("Philosophy OK:", philosophy)
-
-            # === Prompt building ===
-            prompt_full = (
-                f"Genre: {style_data.get('genre','unknown')} | "
-                f"Style: {style_data.get('style','adaptive expressive')} | "
-                f"Vocals: {', '.join(vox)} | "
-                f"Instruments: {', '.join(inst)} | "
-                f"Vocal techniques: {', '.join(style_data.get('techniques', []))} | "
-                f"Tempo: {bpm} BPM | "
-                f"{philosophy} | "
-                f"Engine: StudioCore {version} adaptive emotional system"
+                f"Truth={tlp.get('truth',0):.2f}, "
+                f"Love={tlp.get('love',0):.2f}, "
+                f"Pain={tlp.get('pain',0):.2f}, "
+                f"Conscious Frequency={tlp.get('conscious_frequency',0):.2f}"
             )
 
-            prompt_suno = build_suno_prompt(
-                style_data.get("genre", "unknown"),
-                style_data.get("style", ""),
-                vox,
-                inst,
-                bpm,
-                philosophy,
-                style_data.get("techniques", []),
-                version
-            )
-
-            print("✅ Prompts built successfully")
+            # --- Stage 8. Prompt assembly ---
+            prompt_full = build_suno_prompt(style_data, vox, inst, bpm, philosophy, version, mode="full")
+            prompt_suno = build_suno_prompt(style_data, vox, inst, bpm, philosophy, version, mode="suno")
 
             return {
                 "emotions": emo,
@@ -121,9 +95,9 @@ class StudioCore:
                 "integrity": integrity,
                 "tonesync": tonesync,
                 "philosophy": philosophy,
-                "prompt_full": prompt_full,
+                "prompt": prompt_full,
                 "prompt_suno": prompt_suno,
-                "version": version
+                "version": version,
             }
 
         except Exception as e:
@@ -135,6 +109,6 @@ class StudioCore:
             }
 
     def save_report(self, result: Dict[str, Any], path: str = "studio_report.json"):
-        """Exports full analysis report for external visualization."""
+        """Exports full adaptive analysis report."""
         Path(path).write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
