@@ -11,7 +11,7 @@ def analyze_text(text):
 
 demo = gr.Interface(
     fn=analyze_text,
-    inputs=gr.Textbox(label="Введите текст песни или стихотворения", lines=8, placeholder="Например: Мир, любовь и свобода..."),
+    inputs=gr.Textbox(label="Введите текст песни или стихотворения", lines=8),
     outputs=gr.Textbox(label="Сгенерированный Suno prompt"),
     title="🎧 StudioCore v4.3 — Expressive Adaptive Engine",
     description="AI-движок анализа эмоций и структуры текста (Truth × Love × Pain = Conscious Frequency)"
