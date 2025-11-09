@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Resonance and frequency mapping (RNS safety layer).
-"""
 from typing import Dict, Any, List
 from .config import load_config
 
