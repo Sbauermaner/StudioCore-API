@@ -9,6 +9,7 @@ app_file: app.py
 pinned: false
 ---
 
+
 # 🎵 StudioCore v4.3 — Expressive Adaptive Engine
 AI ядро для анализа текста, эмоций и генерации музыкальных промтов под Suno AI.
 
