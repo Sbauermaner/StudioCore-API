@@ -18,8 +18,9 @@ from .adapter import build_suno_prompt
 
 class StudioCore:
     """
-    Central AI pipeline: text → emotion → frequency → structure → style.
-    No predefined genres. Style forms itself from emotional architecture.
+    Central AI pipeline:
+    text → emotion → frequency → structure → tone → style.
+    No predefined genres — all parameters form adaptively.
     """
 
     def __init__(self, config_path: str | None = None):
@@ -42,12 +43,12 @@ class StudioCore:
         version: str | None = None
     ) -> Dict[str, Any]:
         """
-        Full emotional-semantic analysis pipeline.
-        Automatically detects structure, tone, BPM, resonance, and adaptive style.
+        Full adaptive emotional-semantic analysis.
+        Detects structure, tone, BPM, resonance, colors, and builds a synesthetic style.
         """
         version = version or self.cfg.get("suno_version", "v5")
 
-        # --- Normalize and extract structure ---
+        # --- Normalize and parse text ---
         txt = normalize_text_preserve_symbols(text)
         sections = extract_sections(txt)
 
@@ -55,22 +56,22 @@ class StudioCore:
         emo = self.emotion.analyze(txt)
         tlp = self.tlp.analyze(txt)
 
-        # --- Rhythmic and tonal analysis ---
+        # --- Rhythmic and frequency analysis ---
         bpm = self.rhythm.bpm_from_density(txt)
         resonance = self.freq.resonance_profile(tlp)
         resonance["recommended_octaves"] = self.safety.clamp_octaves(
             resonance.get("recommended_octaves", [2, 3, 4, 5])
         )
 
-        # --- Build adaptive style ---
+        # --- Style and instrumentation ---
         style_data = self.style.build(emo, tlp, txt, bpm)
         vox, inst = self.vocals.get(style_data["genre"], preferred_gender or "auto", txt, sections)
 
-        # --- Integrity & color harmony ---
+        # --- Integrity & tone sync ---
         integrity = self.integrity.analyze(txt)
-        tonesync = self.tone.colors_for_primary(emo)
+        tonesync = self.tone.colors_for_primary(emo, tlp, style_data.get("key", "auto"))
 
-        # --- Conscious balance formula ---
+        # --- Conscious formula ---
         philosophy = (
             f"Truth={tlp.get('truth', 0):.2f}, "
             f"Love={tlp.get('love', 0):.2f}, "
@@ -81,6 +82,14 @@ class StudioCore:
         # --- Build prompts ---
         prompt_full = build_suno_prompt(style_data, vox, inst, bpm, philosophy, version, mode="full")
         prompt_suno = build_suno_prompt(style_data, vox, inst, bpm, philosophy, version, mode="suno")
+
+        # Добавляем цветовой слой ToneSync в финальный prompt
+        prompt_suno += (
+            f"\nToneSync: primary={tonesync['primary_color']}, "
+            f"accent={tonesync['accent_color']}, "
+            f"mood={tonesync['mood_temperature']}, "
+            f"resonance={tonesync['resonance_hz']}Hz"
+        )
 
         return {
             "emotions": emo,
@@ -102,3 +111,4 @@ class StudioCore:
         """Exports full analysis report for external visualization."""
         Path(path).write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
+
