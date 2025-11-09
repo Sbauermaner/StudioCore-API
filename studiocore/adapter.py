@@ -1,34 +1,50 @@
-def soft_trim(text: str, max_len: int = 1000) -> str:
+mport re
+
+def semantic_compress(text: str, max_len: int = 1000) -> str:
     """
-    Softly trims text to max_len characters without breaking words.
+    Compresses text meaningfully, keeping structure and key terms.
+    Strategy:
+      - Keep only first phrase of each section
+      - Remove filler adjectives/adverbs
+      - Preserve keywords like Genre, Style, BPM, Engine
     """
-    text = text.strip()
     if len(text) <= max_len:
-        return text
-    cutoff = text[:max_len]
-    if " " in cutoff:
-        cutoff = cutoff[:cutoff.rfind(" ")]
-    return cutoff + "…"
+        return text.strip()
+
+    # Убираем повторы, длинные прилагательные
+    text = re.sub(r"\b(beautiful|incredible|powerful|very|extremely|deeply|really|highly)\b", "", text, flags=re.I)
+    text = re.sub(r"\s{2,}", " ", text).strip()
+
+    # Если всё ещё длинно — оставляем начало каждой смысловой линии
+    parts = [p.strip() for p in text.split("\n") if p.strip()]
+    compressed = []
+    total = 0
+    for p in parts:
+        if total + len(p) < max_len - 50:
+            compressed.append(p)
+            total += len(p)
+        else:
+            break
+    return " ".join(compressed).strip() + "…"
 
 
-def build_suno_prompt(genre: str,
-                      style_words: str,
-                      voices: list,
-                      instruments: list,
-                      bpm: int,
-                      philosophy: str,
-                      techniques: list,
-                      version: str) -> str:
+def build_suno_prompt(style_data: dict, vocals: list, instruments: list, bpm: int, philosophy: str, version: str, mode: str = "full") -> str:
     """
-    Собирает финальный Suno prompt на основе анализа StudioCore.
+    Builds full StudioCore prompt or compressed Suno version.
     """
+    s = style_data
     prompt = (
-        f"Style: {genre}, {style_words}. "
-        f"Vocals: {', '.join(voices)}. "
-        f"Instruments: {', '.join(instruments)}. "
-        f"Vocal techniques: {', '.join(techniques)}. "
-        f"Tempo: {bpm} BPM. "
-        f"{philosophy}. "
-        f"Engine: StudioCore {version} adaptive emotional system."
+        f"Genre: {s['genre']} | Key: {s['key']} | BPM: {bpm}\n"
+        f"Structure: {s['structure']}\n"
+        f"Vocals: {', '.join(vocals)} | Techniques: {', '.join(s['techniques'])}\n"
+        f"Instruments: {', '.join(instruments)}\n"
+        f"Visual: {s['visual']}\n"
+        f"Narrative: {s['narrative']}\n"
+        f"Atmosphere: {s['atmosphere']}\n"
+        f"Philosophy: {philosophy}\n"
+        f"Engine: StudioCore {version} adaptive emotional system"
     )
-    return soft_trim(prompt, 1000)
+
+    if mode == "suno":
+        return semantic_compress(prompt, 1000)
+    return prompt
