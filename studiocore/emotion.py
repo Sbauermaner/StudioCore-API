@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Emotion and philosophical analyzers.
-"""
 import re
 from typing import Dict, List
 
