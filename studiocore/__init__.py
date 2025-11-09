@@ -1,8 +1,3 @@
-# studiocore/__init__.py
-# StudioCore v4.3 — Expressive Adaptive Engine
-# Author: Bauer Synesthetic Studio
-# License: Creative Commons BY-NC-SA 4.0
-
 from __future__ import annotations
 import json
 from pathlib import Path
