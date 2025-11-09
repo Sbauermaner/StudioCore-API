@@ -1,0 +1,22 @@
+# app.py
+import gradio as gr
+from studiocore import StudioCore
+
+core = StudioCore()
+
+def analyze_text(text):
+    if not text.strip():
+        return "Введите текст для анализа."
+    result = core.analyze(text)
+    return result["prompt"]
+
+demo = gr.Interface(
+    fn=analyze_text,
+    inputs=gr.Textbox(label="Введите текст песни или стихотворения", lines=8, placeholder="Например: Мир, любовь и свобода..."),
+    outputs=gr.Textbox(label="Сгенерированный Suno prompt"),
+    title="🎧 StudioCore v4.3 — Expressive Adaptive Engine",
+    description="AI-движок анализа эмоций и структуры текста (Truth × Love × Pain = Conscious Frequency)"
+)
+
+if __name__ == "__main__":
+    demo.launch()
