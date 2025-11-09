@@ -1,57 +1,88 @@
 import math
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 class ToneSyncEngine:
-    """Создаёт аудио-визуальный профиль по эмоциональной карте текста."""
+    """
+    Converts emotional frequency (Truth × Love × Pain) and Key into
+    visual–resonant color data for unified synesthetic representation.
+    """
 
-    def colors_for_primary(self, emo: Dict[str, float]) -> List[str]:
-        """Возвращает 2-цветную палитру по доминирующей эмоции."""
-        primary = max(emo, key=emo.get) if emo else "peace"
-        cmap = {
-            "joy": ["#FFD700", "#FF6B6B"],
-            "sadness": ["#4169E1", "#87CEEB"],
-            "anger": ["#DC143C", "#8B0000"],
-            "love": ["#FF69B4", "#FF1493"],
-            "peace": ["#98FB98", "#F0FFF0"],
-            "epic": ["#FFA500", "#FF4500"],
-            "fear": ["#6A5ACD", "#2F4F4F"]
-        }
-        return cmap.get(primary, ["#808080", "#A9A9A9"])
+    BASE_COLOR_MAP = {
+        "C": "red",
+        "C#": "orange-red",
+        "D": "golden",
+        "D#": "amber",
+        "E": "yellow",
+        "F": "green",
+        "F#": "turquoise",
+        "G": "blue",
+        "G#": "indigo",
+        "A": "violet",
+        "A#": "magenta",
+        "B": "crimson",
+    }
 
-    def audio_profile(self, emo: Dict[str, float]) -> Dict[str, float]:
-        """Создаёт аудио-профиль эмоций."""
+    RESONANCE_MAP = {
+        "C": 256.0,
+        "C#": 271.0,
+        "D": 288.0,
+        "D#": 305.0,
+        "E": 324.0,
+        "F": 341.0,
+        "F#": 360.0,
+        "G": 384.0,
+        "G#": 405.0,
+        "A": 432.0,   # Earth harmony
+        "A#": 455.0,
+        "B": 480.0,
+    }
+
+    def _derive_mood_temperature(self, tlp: Dict[str, float]) -> str:
+        """Defines 'warm' or 'cold' emotional temperature."""
+        love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
+        if love >= max(pain, truth):
+            return "warm"
+        elif pain > love:
+            return "cold"
+        else:
+            return "neutral"
+
+    def _select_key_color(self, key: str) -> str:
+        """Returns base color by musical key."""
+        if not key or key == "auto":
+            return "white"
+        base = key.replace(" minor", "").replace(" major", "").replace(" modal", "").strip()
+        return self.BASE_COLOR_MAP.get(base, "white")
+
+    def _resonance_from_key(self, key: str) -> float:
+        """Returns base frequency in Hz associated with the key."""
+        if not key or key == "auto":
+            return 432.0
+        base = key.replace(" minor", "").replace(" major", "").replace(" modal", "").strip()
+        return self.RESONANCE_MAP.get(base, 432.0)
+
+    def colors_for_primary(self, emo: Dict[str, float], tlp: Dict[str, float], key: str = "auto") -> Dict[str, Any]:
+        """
+        Generates the full tone–color–frequency profile.
+        """
+        color = self._select_key_color(key)
+        resonance = self._resonance_from_key(key)
+        temp = self._derive_mood_temperature(tlp)
+
+        dom = max(emo, key=emo.get)
+        accent = {
+            "joy": "golden glow",
+            "sadness": "blue haze",
+            "anger": "red flash",
+            "fear": "gray mist",
+            "peace": "soft white aura",
+            "epic": "purple light"
+        }.get(dom, "silver reflection")
+
         return {
-            "brightness": emo.get("joy", 0) + emo.get("truth", 0),
-            "warmth": emo.get("love", 0) + emo.get("peace", 0),
-            "depth": emo.get("sadness", 0) + emo.get("fear", 0),
-            "intensity": emo.get("anger", 0) + emo.get("epic", 0)
+            "primary_color": color,
+            "accent_color": accent,
+            "mood_temperature": temp,
+            "resonance_hz": resonance,
+            "synesthetic_signature": f"{color} + {accent} ({temp}, {resonance}Hz)"
         }
-
-    def visual_profile(self, emo: Dict[str, float]) -> Dict[str, Any]:
-        """Формирует визуальный профиль: палитра, движение, баланс."""
-        return {
-            "palette": self.colors_for_primary(emo),
-            "movement": (
-                "sharp" if emo.get("anger", 0) > 0.3
-                else ("flow" if emo.get("joy", 0) > 0.3 else "calm")
-            ),
-            "balance": 1.0 - (
-                sum(abs(v - (sum(emo.values()) / max(1, len(emo))))
-                    for v in emo.values()) / max(1, len(emo))
-            )
-        }
-
-    def sync_score(self, audio: Dict[str, float], visual: Dict[str, Any]) -> float:
-        """Вычисляет синхронность аудио- и визуальных параметров (0-1)."""
-        a = [audio["brightness"], audio["warmth"], audio["depth"], audio["intensity"]]
-        mv = visual["movement"]
-        b = [
-            1.0 if mv == "flow" else 0.6,
-            1.0 if mv == "flow" else 0.6,
-            0.8 if mv == "calm" else 0.6,
-            1.0 if mv == "sharp" else 0.6
-        ]
-        dot = sum(x * y for x, y in zip(a, b))
-        na = math.sqrt(sum(x * x for x in a)) or 1.0
-        nb = math.sqrt(sum(x * x for x in b)) or 1.0
-        return max(0.0, min(1.0, dot / (na * nb)))
