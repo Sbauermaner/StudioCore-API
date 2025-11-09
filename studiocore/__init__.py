@@ -65,7 +65,15 @@ class StudioCore:
 
         # --- Style and instrumentation ---
         style_data = self.style.build(emo, tlp, txt, bpm)
-        vox, inst = self.vocals.get(style_data["genre"], preferred_gender or "auto", txt, sections)
+
+        # ⬇️ Обновлённый вызов — с поддержкой формы ансамбля
+        vox, inst, vocal_form = self.vocals.get(
+            style_data["genre"],
+            preferred_gender or "auto",
+            txt,
+            sections
+        )
+        style_data["vocal_form"] = vocal_form
 
         # --- Integrity & tone sync ---
         integrity = self.integrity.analyze(txt)
@@ -80,8 +88,12 @@ class StudioCore:
         )
 
         # --- Build prompts ---
-        prompt_full = build_suno_prompt(style_data, vox, inst, bpm, philosophy, version, mode="full")
-        prompt_suno = build_suno_prompt(style_data, vox, inst, bpm, philosophy, version, mode="suno")
+        prompt_full = build_suno_prompt(
+            style_data, vox, inst, bpm, philosophy, version, mode="full"
+        )
+        prompt_suno = build_suno_prompt(
+            style_data, vox, inst, bpm, philosophy, version, mode="suno"
+        )
 
         # Добавляем цветовой слой ToneSync в финальный prompt
         prompt_suno += (
@@ -111,4 +123,3 @@ class StudioCore:
         """Exports full analysis report for external visualization."""
         Path(path).write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
-
