@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Style matrix: жанр, тональность, техники вокала и аранжировочные подсказки.
-"""
 from typing import Dict, List, Optional, Any
 
 class StyleMatrix:
