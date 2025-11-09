@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-StudioCore v5 — Adaptive Prompt Adapter
-Converts analytical data into Suno-compatible text prompts.
-Preserves semantics even when compressed to 1000 chars.
-"""
-
 import re
 from typing import Dict, Any
 
