@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Configuration and defaults for StudioCore Engine.
-"""
-
 import os, json
 
 STUDIOCORE_VERSION = "v4.3"
