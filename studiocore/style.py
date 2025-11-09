@@ -72,37 +72,35 @@ class StyleMatrix:
     # 3. Автоматический подбор тональности (Key)
     # -------------------------------------------------------
     def _derive_key(self, tlp: Dict[str, float], bpm: int) -> str:
-        """Подбирает тональность по эмоциям и ритму."""
+        """
+        Подбирает музыкальную тональность по эмоциям и ритму.
+        Love → Major, Pain → Minor, Anger/Fear → Harmonic Minor.
+        BPM влияет на светлоту или темноту ключа.
+        """
         t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
+        cf = tlp.get("conscious_frequency", 0.0)
 
-        # Лад
-        if p > 0.45:
-            mode = "minor"
-        elif l > 0.55:
+        # Определяем лад
+        if l > p and l > 0.4:
             mode = "major"
+        elif p > l and p > 0.3:
+            mode = "minor"
+        elif p > 0.4 and t > 0.2:
+            mode = "harmonic minor"
         else:
             mode = "modal"
 
-        # Подбор ноты по пропорциям и ритму
-        if t > 0.6 and l > 0.5:
-            key = "E"
-        elif l > 0.7:
-            key = "G"
-        elif p > 0.6:
-            key = "A"
-        elif t < 0.3 and l > 0.4:
-            key = "D"
-        elif p > 0.5 and l < 0.3:
-            key = "F"
-        elif bpm > 140 and l > 0.5:
-            key = "C"
-        else:
-            key = "C#"
+        # Базовая шкала (по кругу квинт)
+        scale = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+        # Индекс зависит от BPM и эмоциональной яркости
+        index_shift = int(((bpm / 10) + (l * 6) - (p * 4) + cf * 5) % 12)
+        key = scale[index_shift]
 
         return f"{key} {mode}"
 
     # -------------------------------------------------------
-    # 4. Формирование визуального слоя
+    # 4. Формирование визуального слоя (ToneSync совместимо)
     # -------------------------------------------------------
     def _derive_visual(self, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
         t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
@@ -148,7 +146,7 @@ class StyleMatrix:
     # -------------------------------------------------------
     def _derive_atmosphere(self, emo: Dict[str, float]) -> str:
         dominant = max(emo, key=emo.get)
-        if dominant in ("joy", "peace"):
+        if dominant in ("joy", "peace", "love"):
             return "serene and hopeful"
         elif dominant in ("sadness", "pain"):
             return "introspective and melancholic"
@@ -156,6 +154,8 @@ class StyleMatrix:
             return "intense and cathartic"
         elif dominant == "epic":
             return "monumental and triumphant"
+        elif dominant == "fear":
+            return "mystic and suspenseful"
         else:
             return "mysterious and reflective"
 
