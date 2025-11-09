@@ -1,8 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-ToneSyncEngine — связывает эмоции с аудио- и визуальными параметрами:
-цвет, движение, баланс и синхронизация.
-"""
 import math
 from typing import Dict, Any, List
 
