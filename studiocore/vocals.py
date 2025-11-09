@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Vocal and instrument profile suggestions.
-"""
 from typing import List, Dict, Any, Tuple
 from .emotion import AutoEmotionalAnalyzer
 
