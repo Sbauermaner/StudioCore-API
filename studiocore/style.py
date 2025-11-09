@@ -1,23 +1,23 @@
 import re
-import math
 from typing import Dict, Any
+
 
 class StyleMatrix:
     """
-    Dynamically derives 'genre', 'style', 'visual', 'narrative', and 'atmosphere'
-    from emotional ratios (Truth × Love × Pain) and linguistic/structural patterns.
-    No fixed genres or templates.
+    Формирует полное стилевое описание из лирики.
+    Работает по принципу самообучающегося ядра — без закреплённых жанров.
     """
 
-    # вспомогательные весовые коэффициенты
     EMO_GROUPS = {
         "soft": ["love", "peace", "joy"],
         "dark": ["sadness", "pain", "fear"],
         "epic": ["anger", "epic"],
     }
 
+    # -------------------------------------------------------
+    # 1. Определение тонального профиля (лад)
+    # -------------------------------------------------------
     def _tone_profile(self, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
-        """Определяет тональность по эмоциональному спектру."""
         dominant = max(emo, key=emo.get)
         cf = tlp.get("conscious_frequency", 0.0)
 
@@ -30,16 +30,17 @@ class StyleMatrix:
         else:
             return "neutral modal"
 
+    # -------------------------------------------------------
+    # 2. Определение жанра (по структуре текста)
+    # -------------------------------------------------------
     def _derive_genre(self, text: str, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
-        """Самостоятельно формирует 'жанр' из структуры речи и эмоциональных волн."""
         word_count = len(re.findall(r"\b\w+\b", text))
-        avg_sent_len = sum(len(s.split()) for s in re.split(r"[.!?]", text) if s.strip()) / max(1, len(re.split(r"[.!?]", text)))
+        sentences = [s for s in re.split(r"[.!?]", text) if s.strip()]
+        avg_sent_len = sum(len(s.split()) for s in sentences) / max(1, len(sentences))
 
-        # плотность ритма
         density = min(word_count / 100.0, 10)
         emotional_range = (tlp.get("love", 0) + tlp.get("pain", 0) + tlp.get("truth", 0)) / 3
 
-        # вычисляем жанровый архетип
         if emotional_range > 0.7 and density < 2:
             base = "orchestral poetic"
         elif density > 6 and tlp.get("pain", 0) > 0.4:
@@ -51,7 +52,6 @@ class StyleMatrix:
         else:
             base = "lyrical adaptive"
 
-        # корректировка по доминирующему чувству
         dominant = max(emo, key=emo.get)
         if dominant == "anger":
             mood = "dramatic"
@@ -68,8 +68,43 @@ class StyleMatrix:
 
         return f"{base} {mood}".strip()
 
+    # -------------------------------------------------------
+    # 3. Автоматический подбор тональности (Key)
+    # -------------------------------------------------------
+    def _derive_key(self, tlp: Dict[str, float], bpm: int) -> str:
+        """Подбирает тональность по эмоциям и ритму."""
+        t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
+
+        # Основной лад
+        if p > 0.45:
+            mode = "minor"
+        elif l > 0.55:
+            mode = "major"
+        else:
+            mode = "modal"
+
+        # Сетка тональностей по доминирующему параметру
+        if t > 0.6 and l > 0.5:
+            key = "E"
+        elif l > 0.7:
+            key = "G"
+        elif p > 0.6:
+            key = "A"
+        elif t < 0.3 and l > 0.4:
+            key = "D"
+        elif p > 0.5 and l < 0.3:
+            key = "F"
+        elif bpm > 140 and l > 0.5:
+            key = "C"
+        else:
+            key = "C#"
+
+        return f"{key} {mode}"
+
+    # -------------------------------------------------------
+    # 4. Формирование визуального слоя
+    # -------------------------------------------------------
     def _derive_visual(self, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
-        """Формирует визуальный слой из эмоциональных центров."""
         t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
         if p > l and p > t:
             return "rain, fog, silhouettes, slow motion"
@@ -80,8 +115,10 @@ class StyleMatrix:
         else:
             return "shifting colors, abstract movement"
 
+    # -------------------------------------------------------
+    # 5. Формирование смысловой дуги
+    # -------------------------------------------------------
     def _derive_narrative(self, text: str, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
-        """Собирает смысловую дугу — нарратив."""
         if tlp.get("pain", 0) > 0.6:
             return "suffering → awakening → transcendence"
         elif tlp.get("love", 0) > 0.6:
@@ -91,8 +128,10 @@ class StyleMatrix:
         else:
             return "search → struggle → transformation"
 
+    # -------------------------------------------------------
+    # 6. Подбор вокальных техник
+    # -------------------------------------------------------
     def _derive_techniques(self, emo: Dict[str, float], tlp: Dict[str, float]) -> list[str]:
-        """Подбирает вокальные техники по эмоциональному диапазону."""
         tech = []
         if emo.get("anger", 0) > 0.4:
             tech += ["belt", "rasp", "grit"]
@@ -104,8 +143,10 @@ class StyleMatrix:
             tech += ["choral layering"]
         return tech or ["neutral tone"]
 
+    # -------------------------------------------------------
+    # 7. Атмосфера
+    # -------------------------------------------------------
     def _derive_atmosphere(self, emo: Dict[str, float]) -> str:
-        """Формирует описание атмосферы."""
         dominant = max(emo, key=emo.get)
         if dominant in ("joy", "peace"):
             return "serene and hopeful"
@@ -118,10 +159,13 @@ class StyleMatrix:
         else:
             return "mysterious and reflective"
 
+    # -------------------------------------------------------
+    # 8. Главный метод
+    # -------------------------------------------------------
     def build(self, emo: Dict[str, float], tlp: Dict[str, float], text: str, bpm: int) -> Dict[str, Any]:
-        """Главная функция — собирает весь стилевой профиль без шаблонов."""
         genre = self._derive_genre(text, emo, tlp)
-        tone = self._tone_profile(emo, tlp)
+        style = self._tone_profile(emo, tlp)
+        key = self._derive_key(tlp, bpm)
         visual = self._derive_visual(emo, tlp)
         narrative = self._derive_narrative(text, emo, tlp)
         atmosphere = self._derive_atmosphere(emo)
@@ -129,11 +173,11 @@ class StyleMatrix:
 
         return {
             "genre": genre,
-            "style": tone,
+            "style": style,
+            "key": key,
+            "structure": "intro-verse-chorus-outro",
             "visual": visual,
             "narrative": narrative,
             "atmosphere": atmosphere,
             "techniques": techniques,
-            "structure": "intro-verse-chorus-outro",
-            "key": "auto",  # подбирается динамически, не фиксируется
         }
