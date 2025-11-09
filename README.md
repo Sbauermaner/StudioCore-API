@@ -3,8 +3,8 @@ title: StudioCore v4.3 — Expressive Adaptive Engine
 emoji: 🎧
 colorFrom: blue
 colorTo: pink
-sdk: gradio
-sdk_version: "5.49.1"
+sdk: docker
+sdk_version: 5.49.1
 app_file: app.py
 pinned: false
 ---
