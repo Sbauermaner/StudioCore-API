@@ -12,7 +12,10 @@ class TruthLovePainEngine:
     def analyze(self, text: str) -> Dict[str, float]:
         words = re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text.lower())
         n = max(1, len(words))
-        def score(bag): return sum(1 for w in words if w in bag) / n
+        def score(bag):
+    # ищет вхождение подстроки, а не только точное совпадение
+    return sum(1 for w in words for b in bag if b in w) / n
+
         t, l, p = score(self._truth), score(self._love), score(self._pain)
         cf = (t * l * max(p, 0.05)) * 10.0
         return {
