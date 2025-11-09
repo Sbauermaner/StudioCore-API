@@ -1,124 +1,78 @@
-from typing import List, Dict, Any, Tuple
 import re
-from .emotion import AutoEmotionalAnalyzer
+from typing import Dict, Any
 
-VALID_VOICES = [
-    "male","female","duet","choir","tenor","soprano","alto","baritone","bass",
-    "raspy","breathy","powerful","soft","emotional","angelic","deep","whispered","warm","clear"
-]
+def semantic_compress(text: str, max_len: int = 1000) -> str:
+    """
+    Compresses text meaningfully, keeping structure and key context.
+    Does NOT trim blindly — removes redundancy, keeps essence.
+    """
+    if len(text) <= max_len:
+        return text.strip()
 
-VALID_INSTRUMENTS = [
-    "guitar","piano","synth","bass","drums","strings","violin","cello","trumpet",
-    "saxophone","organ","harp","choir","vocals","pad","flute","horns","percussion","tagelharpa"
-]
+    # 1️⃣ Убираем избыточные слова
+    text = re.sub(
+        r"\b(beautiful|amazing|very|extremely|really|truly|highly|deeply|incredibly|wonderful)\b",
+        "",
+        text,
+        flags=re.I
+    )
+    text = re.sub(r"\s{2,}", " ", text).strip()
 
-DEFAULT_VOCAL_MAP = {
-    "metal":      {"female":["female","powerful","alto"],  "male":["male","powerful","baritone"], "inst":["guitar","drums","strings","choir"]},
-    "rock":       {"female":["female","emotional","alto"], "male":["male","raspy","tenor"],       "inst":["guitar","drums","bass","piano"]},
-    "pop":        {"female":["female","clear","soprano"],  "male":["male","soft","tenor"],       "inst":["piano","synth","bass","drums"]},
-    "folk":       {"female":["female","warm","alto"],      "male":["male","emotional","baritone"],"inst":["guitar","strings","flute"]},
-    "classical":  {"female":["soprano","angelic"],         "male":["tenor","baritone"],          "inst":["strings","piano","choir"]},
-    "electronic": {"female":["female","breathy"],          "male":["male","soft"],               "inst":["synth","pad","bass","drums"]},
-    "ambient":    {"female":["female","whispered"],        "male":["male","soft"],               "inst":["pad","piano","strings"]},
-    "orchestral": {"female":["female","angelic"],          "male":["male","deep"],               "inst":["strings","choir","horns","percussion"]},
-    "hip hop":    {"female":["female","clear"],            "male":["male","deep"],               "inst":["drums","bass","synth","piano"]},
-    "rap":        {"female":["female","clear"],            "male":["male","deep"],               "inst":["drums","bass","synth","piano"]},
-    "jazz":       {"female":["female","warm"],             "male":["male","soft"],               "inst":["piano","saxophone","bass","drums"]},
-    "blues":      {"female":["female","emotional"],        "male":["male","raspy"],              "inst":["guitar","piano","bass","drums"]},
-}
-
-
-class VocalProfileRegistry:
-    """Adaptive vocal+instrument selector with gender and ensemble detection."""
-
-    def __init__(self):
-        self.map = DEFAULT_VOCAL_MAP
-
-    # ----------------------------------------------------------
-    # 1️⃣ Определение пола по тексту
-    # ----------------------------------------------------------
-    def _detect_gender_from_text(self, text: str) -> str:
-        """
-        Определяет предполагаемый пол исполнителя по местоимениям, окончаниям и эмоциональной окраске.
-        """
-        text_low = text.lower()
-
-        # Женские маркеры
-        female_tokens = [
-            "она", "ей", "её", "девушка", "женщина", "мама", "дочь",
-            "любила", "ушла", "смотрела", "грустила", "плакала"
-        ]
-
-        # Мужские маркеры
-        male_tokens = [
-            "он", "ему", "его", "мужчина", "отец", "сын",
-            "любил", "ушёл", "смотрел", "грустил", "плакал"
-        ]
-
-        female_score = sum(t in text_low for t in female_tokens)
-        male_score = sum(t in text_low for t in male_tokens)
-
-        if female_score > male_score:
-            return "female"
-        elif male_score > female_score:
-            return "male"
+    # 2️⃣ Если всё ещё длинно — оставляем логические части
+    parts = re.split(r"[|;]", text)
+    compressed = []
+    total = 0
+    for p in parts:
+        p = p.strip()
+        if not p:
+            continue
+        if total + len(p) < max_len - 50:
+            compressed.append(p)
+            total += len(p)
         else:
-            return "auto"
+            break
 
-    # ----------------------------------------------------------
-    # 2️⃣ Определение ансамбля по контексту
-    # ----------------------------------------------------------
-    def _detect_ensemble_hints(self, text: str, sections: List[Dict[str,Any]]) -> Dict[str, bool]:
-        s = (text + " " + " ".join(s.get("tag", "") for s in sections)).lower()
-        return {
-            "wants_choir": any(k in s for k in ["choir","chorus","хор","сканд","толпа","group","voices"]),
-            "wants_duet":  any(k in s for k in ["duet","дуэт","duo","вместе","вдвоём"]),
-        }
+    return " | ".join(compressed).strip() + "…"
 
-    # ----------------------------------------------------------
-    # 3️⃣ Основной метод получения вокала и инструментов
-    # ----------------------------------------------------------
-    def get(self, genre: str, preferred_gender: str, text: str, sections: List[Dict[str,Any]]) -> Tuple[List[str], List[str]]:
-        g = genre if genre in self.map else "rock"
-        hints = self._detect_ensemble_hints(text, sections)
-        detected_gender = self._detect_gender_from_text(text)
 
-        # Определяем форму вокала
-        if hints["wants_choir"]:
-            vocal_form = "choir"
-        elif hints["wants_duet"]:
-            vocal_form = "duet_mf"
-        elif preferred_gender in ("male", "female"):
-            vocal_form = f"solo_{preferred_gender}"
-        elif detected_gender in ("male", "female"):
-            vocal_form = f"solo_{detected_gender}"
-        else:
-            vocal_form = "solo_auto"
+def build_suno_prompt(
+    style_data: Dict[str, Any],
+    vocals: list,
+    instruments: list,
+    bpm: int,
+    philosophy: str,
+    version: str,
+    mode: str = "full"
+) -> str:
+    """
+    Builds a detailed or compact adaptive prompt from full StudioCore analysis.
+    Mode:
+      - "full" → для визуализаций, отчётов, AI-композеров
+      - "suno" → для музыкальных генераторов (≤1000 символов)
+    """
+    genre = style_data.get("genre", "adaptive emotional")
+    style = style_data.get("style", "free-form tonal flow")
+    key = style_data.get("key", "auto")
+    structure = style_data.get("structure", "intro-verse-chorus-outro")
+    visual = style_data.get("visual", "")
+    narrative = style_data.get("narrative", "")
+    atmosphere = style_data.get("atmosphere", "")
+    techniques = style_data.get("techniques", [])
+    vocal_form = style_data.get("vocal_form", "solo_auto")
 
-        # Определяем профиль вокала
-        if "duet" in vocal_form:
-            vox = ["duet"] + self.map[g]["female"][:1] + self.map[g]["male"][:1]
-        elif "choir" in vocal_form:
-            vox = ["choir", "male", "female"]
-        elif "female" in vocal_form:
-            vox = self.map[g]["female"]
-        elif "male" in vocal_form:
-            vox = self.map[g]["male"]
-        else:
-            # fallback — по эмоциям
-            emo = AutoEmotionalAnalyzer().analyze(text)
-            if (emo.get("love",0)+emo.get("peace",0)) > (emo.get("anger",0)+emo.get("epic",0)):
-                vox = self.map[g]["female"]
-            else:
-                vox = self.map[g]["male"]
+    # === Полная форма ===
+    prompt = (
+        f"Genre: {genre} | Style: {style} | Vocal Form: {vocal_form} | Key: {key} | BPM: {bpm} | Structure: {structure}\n"
+        f"Vocals: {', '.join(vocals)} | Techniques: {', '.join(techniques)} | "
+        f"Instruments: {', '.join(instruments)}\n"
+        f"Visual: {visual}\n"
+        f"Narrative: {narrative}\n"
+        f"Atmosphere: {atmosphere}\n"
+        f"Philosophy: {philosophy}\n"
+        f"Engine: StudioCore {version} adaptive emotional system"
+    )
 
-        # Инструменты
-        inst = list(self.map[g]["inst"])
-        tag_text = " ".join([s["tag"] for s in sections]).lower()
-        if "tagelharpa" in tag_text and "tagelharpa" not in inst:
-            inst.append("tagelharpa")
-
-        vox = [v for v in vox if v in VALID_VOICES][:6]
-        inst = [i for i in inst if i in VALID_INSTRUMENTS][:6]
-
-        return vox, inst, vocal_form
+    # === Если требуется Suno-режим — сжимаем, не обрезаем ===
+    if mode == "suno":
+        return semantic_compress(prompt, 1000)
+    return prompt
