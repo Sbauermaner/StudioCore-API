@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Text normalization and section parsing utilities.
-"""
 import re
 from typing import List, Dict, Any
 
