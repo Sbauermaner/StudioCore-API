@@ -14,13 +14,12 @@ from .vocals import VocalProfileRegistry
 from .style import StyleMatrix
 from .tone import ToneSyncEngine
 from .adapter import build_suno_prompt
-
+from .sections import SectionTagAnalyzer   # ⬅️ добавлен новый слой
 
 class StudioCore:
     """
     Central AI pipeline:
-    text → emotion → frequency → structure → tone → style.
-    No predefined genres — all parameters form adaptively.
+    text → emotion → frequency → structure → tone → style → adaptive annotations.
     """
 
     def __init__(self, config_path: str | None = None):
@@ -34,6 +33,7 @@ class StudioCore:
         self.vocals = VocalProfileRegistry()
         self.style = StyleMatrix()
         self.tone = ToneSyncEngine()
+        self.sections = SectionTagAnalyzer()   # ⬅️ инициализация нового парсера
 
     def analyze(
         self,
@@ -43,8 +43,7 @@ class StudioCore:
         version: str | None = None
     ) -> Dict[str, Any]:
         """
-        Full adaptive emotional-semantic analysis.
-        Detects structure, tone, BPM, resonance, colors, and builds a synesthetic style.
+        Full adaptive emotional-semantic analysis with annotation overlay.
         """
         version = version or self.cfg.get("suno_version", "v5")
 
@@ -66,7 +65,7 @@ class StudioCore:
         # --- Style and instrumentation ---
         style_data = self.style.build(emo, tlp, txt, bpm)
 
-        # ⬇️ Обновлённый вызов — с поддержкой формы ансамбля
+        # --- Ensemble logic (solo/duet/trio/choir etc.)
         vox, inst, vocal_form = self.vocals.get(
             style_data["genre"],
             preferred_gender or "auto",
@@ -87,23 +86,8 @@ class StudioCore:
             f"Conscious Frequency={tlp.get('conscious_frequency', 0):.2f}"
         )
 
-        # --- Build prompts ---
-        prompt_full = build_suno_prompt(
-            style_data, vox, inst, bpm, philosophy, version, mode="full"
-        )
-        prompt_suno = build_suno_prompt(
-            style_data, vox, inst, bpm, philosophy, version, mode="suno"
-        )
-
-        # Добавляем цветовой слой ToneSync в финальный prompt
-        prompt_suno += (
-            f"\nToneSync: primary={tonesync['primary_color']}, "
-            f"accent={tonesync['accent_color']}, "
-            f"mood={tonesync['mood_temperature']}, "
-            f"resonance={tonesync['resonance_hz']}Hz"
-        )
-
-        return {
+        # --- Base result before annotation overlay ---
+        result = {
             "emotions": emo,
             "tlp": tlp,
             "bpm": bpm,
@@ -114,10 +98,33 @@ class StudioCore:
             "integrity": integrity,
             "tonesync": tonesync,
             "philosophy": philosophy,
-            "prompt_full": prompt_full,
-            "prompt_suno": prompt_suno,
-            "version": version
+            "version": version,
         }
+
+        # --- Annotation Overlay (SectionTagAnalyzer) ---
+        annotations = self.sections.parse(txt)
+        result = self.sections.integrate_with_core(result, annotations)
+
+        # --- Prompt build after annotation influence ---
+        prompt_full = build_suno_prompt(
+            result["style"], result["vocals"], result["instruments"],
+            result["bpm"], result["philosophy"], version, mode="full"
+        )
+        prompt_suno = build_suno_prompt(
+            result["style"], result["vocals"], result["instruments"],
+            result["bpm"], result["philosophy"], version, mode="suno"
+        )
+        prompt_suno += (
+            f"\nToneSync: primary={tonesync['primary_color']}, "
+            f"accent={tonesync['accent_color']}, "
+            f"mood={tonesync['mood_temperature']}, "
+            f"resonance={tonesync['resonance_hz']}Hz"
+        )
+
+        result["prompt_full"] = prompt_full
+        result["prompt_suno"] = prompt_suno
+
+        return result
 
     def save_report(self, result: Dict[str, Any], path: str = "studio_report.json"):
         """Exports full analysis report for external visualization."""
