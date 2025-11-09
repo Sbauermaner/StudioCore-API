@@ -1,0 +1,58 @@
+# studiocore/emotion.py
+
+import re
+from typing import Dict, List
+
+PUNCT_WEIGHTS = {...}  # import or define once in a constants.py
+EMOJI_WEIGHTS = {...}
+
+class AutoEmotionalAnalyzer:
+    """
+    Heuristic-based emotional classifier.
+    Uses keyword matching and punctuation/emoji-based modulation.
+    """
+    _dicts: Dict[str, List[str]] = {
+        "joy": ['joy','happy','счаст','радость','улыб','smile','laugh'],
+        ...
+    }
+
+    def analyze(self, text: str) -> Dict[str, float]:
+        s = text.lower()
+        raw = {
+            k: sum(1 for word in v if word in s) / max(1, len(v))
+            for k, v in self._dicts.items()
+        }
+
+        punct_intensity = sum(
+            PUNCT_WEIGHTS.get(ch, 0.0) + EMOJI_WEIGHTS.get(ch, 0.0)
+            for ch in s
+        )
+
+        if punct_intensity > 0:
+            raw["anger"] += 0.3 * punct_intensity
+            raw["epic"]  += 0.4 * punct_intensity
+            raw["joy"]   += 0.3 * punct_intensity
+
+        total = sum(raw.values()) or 1.0
+        return {k: v / total for k, v in raw.items()}
+
+class TruthLovePainEngine:
+    _truth = {'truth','true','real',...}
+    _love = {'love','care','heart',...}
+    _pain = {'pain','hurt','loss',...}
+
+    def analyze(self, text: str) -> Dict[str, float]:
+        words = re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text.lower())
+        n = max(1, len(words))
+
+        def score(bag): return sum(1 for w in words if w in bag) / n
+
+        t, l, p = score(self._truth), score(self._love), score(self._pain)
+        cf = (t * l * max(p, 0.05)) * 10.0
+
+        return {
+            "truth": min(t * 5, 1.0),
+            "love": min(l * 5, 1.0),
+            "pain": min(p * 5, 1.0),
+            "conscious_frequency": min(cf, 1.0)
+        }
