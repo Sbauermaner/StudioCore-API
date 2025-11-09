@@ -1,6 +1,11 @@
+# studiocore/adapter.py
 import re
 from typing import Dict, Any
 
+
+# ==========================================================
+# 🧠 SEMANTIC COMPRESSION ENGINE (Safe + Meaningful)
+# ==========================================================
 def semantic_compress(text: str, max_len: int = 1000) -> str:
     """
     Compresses text meaningfully, keeping structure and key context.
@@ -9,8 +14,13 @@ def semantic_compress(text: str, max_len: int = 1000) -> str:
     if len(text) <= max_len:
         return text.strip()
 
-    # 1️⃣ убираем избыточные слова, усиливающие, но не несущие смысла
-    text = re.sub(r"\b(beautiful|amazing|very|extremely|really|truly|highly|deeply|incredibly|wonderful)\b", "", text, flags=re.I)
+    # 1️⃣ убираем избыточные слова, не влияющие на смысл
+    text = re.sub(
+        r"\b(beautiful|amazing|very|extremely|really|truly|highly|deeply|incredibly|wonderful)\b",
+        "",
+        text,
+        flags=re.I,
+    )
     text = re.sub(r"\s{2,}", " ", text).strip()
 
     # 2️⃣ если текст длиннее лимита — оставляем логические блоки по смыслу
@@ -30,6 +40,9 @@ def semantic_compress(text: str, max_len: int = 1000) -> str:
     return " | ".join(compressed).strip() + "…"
 
 
+# ==========================================================
+# 🎛️ PROMPT BUILDER — SUNO & FULL MODES
+# ==========================================================
 def build_suno_prompt(
     style_data: Dict[str, Any],
     vocals: list,
@@ -46,6 +59,7 @@ def build_suno_prompt(
       - "suno" → для музыкальных генераторов (≤1000 символов)
     """
 
+    # === основные данные ===
     genre = style_data.get("genre", "adaptive emotional")
     style = style_data.get("style", "free-form tonal flow")
     key = style_data.get("key", "auto")
@@ -54,10 +68,12 @@ def build_suno_prompt(
     narrative = style_data.get("narrative", "")
     atmosphere = style_data.get("atmosphere", "")
     techniques = style_data.get("techniques", [])
+    vocal_form = style_data.get("vocal_form", "solo_auto").replace("_", " ")
 
-    # === Полная форма ===
+    # === построение промта ===
     prompt = (
-        f"Genre: {genre} | Style: {style} | Key: {key} | BPM: {bpm} | Structure: {structure}\n"
+        f"Genre: {genre} | Style: {style} | Vocal Form: {vocal_form} | "
+        f"Key: {key} | BPM: {bpm} | Structure: {structure}\n"
         f"Vocals: {', '.join(vocals)} | Techniques: {', '.join(techniques)} | "
         f"Instruments: {', '.join(instruments)}\n"
         f"Visual: {visual}\n"
@@ -67,7 +83,8 @@ def build_suno_prompt(
         f"Engine: StudioCore {version} adaptive emotional system"
     )
 
-    # === Если требуется Suno-режим — сжимаем, не обрезаем ===
+    # === при режиме Suno — сжимаем, не обрезаем ===
     if mode == "suno":
         return semantic_compress(prompt, 1000)
+
     return prompt
