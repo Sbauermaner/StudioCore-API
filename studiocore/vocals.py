@@ -39,16 +39,12 @@ class VocalProfileRegistry:
         }
 
     def auto_vocal_form(self, emo: Dict[str,float], tlp: Dict[str,float], text: str) -> str:
-        """
-        Auto-selects best vocal form (solo, duet, trio, quartet, choir)
-        based on emotional energy and complexity of text.
-        """
+        """Auto-selects best vocal form (solo, duet, trio, quartet, choir)."""
         wc = len(text.split())
         cf = tlp.get("conscious_frequency", 0)
         love, pain, truth = tlp.get("love",0), tlp.get("pain",0), tlp.get("truth",0)
         energy = (love + pain + truth) / 3
 
-        # Формула вокальной насыщенности
         if wc < 40 and energy < 0.3:
             return "solo"
         elif 40 <= wc < 80 or cf > 0.5:
@@ -61,23 +57,27 @@ class VocalProfileRegistry:
             return "choir"
         return "solo"
 
-    def get(self, genre: str, preferred_gender: str, text: str, sections: List[Dict[str,Any]]) -> Tuple[List[str], List[str]]:
+    def get(self, genre: str, preferred_gender: str, text: str, sections: List[Dict[str,Any]]) -> Tuple[List[str], List[str], str]:
+        """
+        Returns: (vox, inst, vocal_form)
+        """
         g = genre if genre in self.map else "rock"
         hints = self._detect_ensemble_hints(text, sections)
 
-        # Определяем базовую вокальную форму
-        form = self.auto_vocal_form(AutoEmotionalAnalyzer().analyze(text), {"conscious_frequency": 0.5}, text)
+        emo = AutoEmotionalAnalyzer().analyze(text)
+        form = self.auto_vocal_form(emo, {"conscious_frequency": 0.5}, text)
 
+        # Базовый выбор пола
         if preferred_gender == "female":
             vox = self.map[g]["female"]
         elif preferred_gender == "male":
             vox = self.map[g]["male"]
         elif preferred_gender == "auto":
-            vox = self.map[g]["female"] if "love" in text.lower() else self.map[g]["male"]
+            vox = self.map[g]["female"] if emo.get("love", 0) > emo.get("anger", 0) else self.map[g]["male"]
         else:
             vox = self.map[g]["female"]
 
-        # Добавляем форму (solo, duet, trio, choir и т.д.)
+        # Учитываем текстовые подсказки
         if hints["wants_choir"]:
             form = "choir"
         elif hints["wants_quintet"]:
@@ -89,9 +89,43 @@ class VocalProfileRegistry:
         elif hints["wants_duet"]:
             form = "duet"
 
+        # Собираем состав
         vox = [form] + vox
         inst = self.map[g]["inst"]
 
+        # --- Определение формы ансамбля (поддержка смешанных составов) ---
+        if "choir" in vox:
+            if "male" in vox and "female" in vox:
+                vocal_form = "choir_mixed"
+            elif "female" in vox:
+                vocal_form = "choir_female"
+            elif "male" in vox:
+                vocal_form = "choir_male"
+            else:
+                vocal_form = "choir_auto"
+        elif "quintet" in vox:
+            vocal_form = "quintet_mixed"
+        elif "quartet" in vox:
+            vocal_form = "quartet_mixed"
+        elif "trio" in vox:
+            vocal_form = "trio_mixed"
+        elif "duet" in vox:
+            if "male" in vox and "female" in vox:
+                vocal_form = "duet_mf"
+            elif "male" in vox:
+                vocal_form = "duet_mm"
+            elif "female" in vox:
+                vocal_form = "duet_ff"
+            else:
+                vocal_form = "duet_auto"
+        elif "female" in vox and "male" not in vox:
+            vocal_form = "solo_female"
+        elif "male" in vox and "female" not in vox:
+            vocal_form = "solo_male"
+        else:
+            vocal_form = "solo_auto"
+
+        # Обрезаем и возвращаем
         vox = [v for v in vox if v in VALID_VOICES][:6]
         inst = [i for i in inst if i in VALID_INSTRUMENTS][:6]
-        return vox, inst
+        return vox, inst, vocal_form
