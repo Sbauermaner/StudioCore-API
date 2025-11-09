@@ -1,4 +1,4 @@
-mport re
+import re
 
 def semantic_compress(text: str, max_len: int = 1000) -> str:
     """
