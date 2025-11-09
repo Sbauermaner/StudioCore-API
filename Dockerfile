@@ -13,6 +13,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ==== Expose Gradio default port ====
 EXPOSE 7860
 
-# ==== Run the app (absolute path) ====
-CMD ["python", "/workspace/app.py"]
-
+# ==== Run the app ====
+CMD ["python", "studiocore/app.py"]
