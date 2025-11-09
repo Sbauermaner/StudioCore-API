@@ -75,7 +75,7 @@ class StyleMatrix:
         """Подбирает тональность по эмоциям и ритму."""
         t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
 
-        # Основной лад
+        # Лад
         if p > 0.45:
             mode = "minor"
         elif l > 0.55:
@@ -83,7 +83,7 @@ class StyleMatrix:
         else:
             mode = "modal"
 
-        # Сетка тональностей по доминирующему параметру
+        # Подбор ноты по пропорциям и ритму
         if t > 0.6 and l > 0.5:
             key = "E"
         elif l > 0.7:
@@ -116,7 +116,7 @@ class StyleMatrix:
             return "shifting colors, abstract movement"
 
     # -------------------------------------------------------
-    # 5. Формирование смысловой дуги
+    # 5. Формирование смысловой дуги (нарратив)
     # -------------------------------------------------------
     def _derive_narrative(self, text: str, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
         if tlp.get("pain", 0) > 0.6:
