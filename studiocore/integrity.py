@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Text integrity and reflection analyzer.
-"""
 import re
 from typing import Dict, Any
 from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
