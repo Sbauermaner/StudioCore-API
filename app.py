@@ -8,7 +8,7 @@ import gradio as gr
 import traceback
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from studiocore import StudioCore
+from studiocore import StudioCore, STUDIOCORE_VERSION
 
 # === Инициализация ядра ===
 core = StudioCore()
@@ -37,14 +37,14 @@ def analyze_text(text: str):
             f"Вокальная форма: {result['style'].get('vocal_form', '—')}\n"
             f"Темп: {result.get('bpm', '—')} BPM\n"
             f"Философия: {result.get('philosophy', '—')}\n"
-            f"Версия: {result.get('version', '—')}"
+            f"Версия ядра: {result.get('version', '—')}"
         )
 
         # --- Проверяем аннотацию ядра ---
         if result.get("annotated_text"):
             annotated_text = result["annotated_text"]
         else:
-            # --- fallback-аннотация через ядро с передачей эмоций и TLP ---
+            # fallback-аннотация через ядро с передачей эмоций и TLP
             annotated_text = core.annotate_text(
                 text,
                 result.get("overlay", {}),
@@ -55,7 +55,7 @@ def analyze_text(text: str):
                 result.get("tlp", {}),
             )
 
-        # --- VOCAL ANNOTATION LAYER (надстройка) ---
+        # --- VOCAL ANNOTATION LAYER ---
         tlp = result.get("tlp", {})
         love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
         cf = tlp.get("conscious_frequency", 0)
@@ -99,7 +99,7 @@ def analyze_text(text: str):
             annotated_lines.append(tone_line)
             annotated_lines.append("")
 
-        # Комбинируем полную аннотацию ядра и вокальный слой
+        # --- Комбинированная аннотация ---
         annotated_text = (
             "🎙️ **Core Annotation + Vocal Layer**\n\n"
             + annotated_text
@@ -142,7 +142,22 @@ iface = gr.Interface(
 # === Healthcheck endpoint ===
 @app.get("/status")
 async def status():
-    return JSONResponse(content={"status": "ok", "engine": "StudioCore v5", "ready": True})
+    return JSONResponse(content={"status": "ok", "engine": "StudioCore", "ready": True})
+
+# === Version endpoint (верификация ядра) ===
+@app.get("/version")
+async def version_info():
+    """
+    Проверка версии активного ядра (для CI/CD и HuggingFace Space)
+    """
+    return JSONResponse(
+        content={
+            "status": "ok",
+            "engine": "StudioCore",
+            "version": STUDIOCORE_VERSION,
+            "signature": core.__class__.__name__,
+        }
+    )
 
 # === API endpoint ===
 @app.post("/api/predict")
