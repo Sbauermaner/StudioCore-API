@@ -42,23 +42,38 @@ def analyze_text(text: str):
 
         # --- Автоматическая аннотация текста с секциями ---
         overlay = result.get("overlay", {}).get("sections", [])
-        lines = text.strip().split("\n")
+        lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
         annotated_lines = []
         section_index = 0
 
+        # обработка повторяющихся секций (например, Chorus x2)
+        repeat_map = {}
+        for sec in overlay:
+            key = sec["section"].lower().strip()
+            repeat_map[key] = repeat_map.get(key, 0) + 1
+
         for i, line in enumerate(lines):
-            # вставляем секцию перед каждой смысловой частью (по порядку)
             if section_index < len(overlay):
                 sec = overlay[section_index]
+                sec_name = sec["section"].lower().strip()
+
+                # если секция повторяется — добавляем x2, x3...
+                repeat_suffix = ""
+                if repeat_map.get(sec_name, 0) > 1:
+                    count = repeat_map[sec_name]
+                    repeat_suffix = f" x{count}"
+                    repeat_map[sec_name] = 0  # чтобы не повторять надпись повторно
+
                 tag = (
                     f"[{sec['section']} – {sec['mood']}, focus={sec['focus']}] "
-                    f"(intensity={sec['intensity']})"
+                    f"(intensity={sec['intensity']}){repeat_suffix}"
                 )
                 annotated_lines.append(tag)
                 section_index += 1
-            annotated_lines.append(line.strip())
 
-        # если секций меньше строк, просто выводим остаток текста без потери
+            annotated_lines.append(line)
+
+        # если секций меньше строк — добавляем остаток
         if len(lines) > len(overlay):
             annotated_lines.extend(lines[len(overlay):])
 
