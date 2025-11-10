@@ -14,6 +14,16 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from studiocore import StudioCore, STUDIOCORE_VERSION
 
+# === 🔄 Автоматическая синхронизация OpenAPI ===
+try:
+    if os.path.exists("auto_sync_openapi.py"):
+        print("🔄 Синхронизирую OpenAPI (JSON → YAML)...")
+        subprocess.call([sys.executable, "auto_sync_openapi.py"])
+    else:
+        print("ℹ️ auto_sync_openapi.py не найден, пропускаю синхронизацию.")
+except Exception as e:
+    print("⚠️ Ошибка при автосинхронизации OpenAPI:", e)
+
 # === Проверка и установка requests (для self-check) ===
 if importlib.util.find_spec("requests") is None:
     try:
@@ -224,7 +234,6 @@ async def version_info():
         }
     )
 
-# === COMPATIBILITY CHECKS ===
 @app.get("/compat/core")
 async def compat_core():
     """Сравнивает openapi_main.yaml и openapi_studiocore.yaml"""
