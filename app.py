@@ -24,6 +24,17 @@ try:
 except Exception as e:
     print("⚠️ Ошибка при автосинхронизации OpenAPI:", e)
 
+# === 📘 Автоматическое обновление README ===
+try:
+    if os.path.exists("update_readme_status.py"):
+        print("🪶 Обновляю README.md (API статус, версия, OpenAPI ссылки)...")
+        import update_readme_status
+        update_readme_status.update_readme()
+    else:
+        print("ℹ️ update_readme_status.py не найден, пропускаю обновление README.")
+except Exception as e:
+    print("⚠️ Ошибка при обновлении README:", e)
+
 # === Проверка и установка requests (для self-check) ===
 if importlib.util.find_spec("requests") is None:
     try:
@@ -234,9 +245,9 @@ async def version_info():
         }
     )
 
+# === COMPATIBILITY CHECKS ===
 @app.get("/compat/core")
 async def compat_core():
-    """Сравнивает openapi_main.yaml и openapi_studiocore.yaml"""
     try:
         from compat_check_core import run_check as run_core
         report = run_core()
@@ -246,7 +257,6 @@ async def compat_core():
 
 @app.get("/compat/remote")
 async def compat_remote():
-    """Проверяет удалённый API /api/predict"""
     try:
         from compat_check_remote import run_check as run_remote
         run_remote()
@@ -259,7 +269,6 @@ async def compat_remote():
 
 @app.get("/compat-check")
 async def compat_check():
-    """Проверка совместимости ядра без HTTP-запроса"""
     text = (
         "Вся моя жизнь — как быль или небыль,\n"
         "Вся моя жизнь — по краю скользить.\n"
