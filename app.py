@@ -6,16 +6,19 @@ Truth × Love × Pain = Conscious Frequency
 
 import gradio as gr
 import traceback
-import importlib, subprocess, sys, threading, requests, json, time
+import importlib, subprocess, sys, threading, json, time
 from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from studiocore import StudioCore, STUDIOCORE_VERSION
 
-# === Проверка наличия requests ===
+# === Проверка и установка requests ===
 if importlib.util.find_spec("requests") is None:
     print("⚙️ Устанавливаю 'requests' для self-check...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
+
+# Теперь можно безопасно импортировать
+import requests
 
 # === Инициализация ядра ===
 core = StudioCore()
@@ -128,7 +131,7 @@ def analyze_text(text: str):
             annotated_text,
         )
     except Exception as e:
-        print("❌ Ошибка при анализе:", traceback.format_exc())
+        print("❌ Ошибка при анализе:\n", traceback.format_exc())
         return f"❌ Исключение: {str(e)}", "", "", ""
 
 # === PUBLIC UI ===
@@ -177,7 +180,8 @@ with gr.Blocks(title="🎧 StudioCore Admin Access") as iface_admin:
 
 # === API ===
 @app.get("/status")
-async def status(): return {"status": "ok", "engine": "StudioCore", "ready": True}
+async def status():
+    return {"status": "ok", "engine": "StudioCore", "ready": True}
 
 @app.get("/version")
 async def version_info():
@@ -208,6 +212,7 @@ async def predict_api(request: Request):
 app = gr.mount_gradio_app(app, iface_public, path="/")
 app = gr.mount_gradio_app(app, iface_admin, path="/admin")
 
+# === Запуск ===
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=7860)
