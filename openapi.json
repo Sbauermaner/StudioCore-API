@@ -1,9 +1,9 @@
 {
-  "openapi": "3.1.0",
+  "openapi": "3.0.1",
   "info": {
-    "title": "StudioCore Adaptive API",
+    "title": "StudioCore API",
     "version": "v5.0",
-    "description": "Expressive Adaptive Engine — Truth × Love × Pain = Conscious Frequency. Выполняет анализ текста и возвращает краткий результат, полный музыкальный промт, Suno-промт и аннотированный текст."
+    "description": "🎧 StudioCore — Expressive Adaptive Engine by Bauer Synesthetic Studio.\n\nAI ядро для анализа текста, эмоций и структуры. Возвращает жанр, BPM, философию, промты и аннотированный текст.\n\nFormula: Truth × Love × Pain = Conscious Frequency."
   },
   "servers": [
     {
@@ -13,8 +13,9 @@
   "paths": {
     "/predict": {
       "post": {
-        "summary": "Выполняет полный анализ текста через StudioCore Engine.",
+        "summary": "Analyze text with StudioCore",
         "operationId": "analyzeText",
+        "description": "Выполняет полный анализ текста через ядро StudioCore. Возвращает краткий результат, Full Prompt, Suno Prompt и аннотированный текст.",
         "requestBody": {
           "required": true,
           "content": {
@@ -24,7 +25,7 @@
                 "properties": {
                   "text": {
                     "type": "string",
-                    "description": "Текст для анализа (песня, стихотворение, манифест)."
+                    "description": "Текст песни, стихотворения или манифеста для анализа."
                   }
                 },
                 "required": ["text"]
@@ -34,50 +35,50 @@
         },
         "responses": {
           "200": {
-            "description": "Успешный результат анализа.",
+            "description": "Успешный анализ текста.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "example": [
-                      "✅ Анализ завершён успешно.",
-                      "Genre: cinematic narrative reflective | Style: majestic major | Key: F# modal | BPM: 137",
-                      "ToneSync: primary=turquoise, accent=gray mist, mood=warm, resonance=360Hz",
-                      "[Intro – Mystic, focus=tone_establish] Я стою на краю между прошлым и светом..."
-                    ]
+                  "type": "object",
+                  "properties": {
+                    "summary": { "type": "string" },
+                    "prompt_full": { "type": "string" },
+                    "prompt_suno": { "type": "string" },
+                    "annotated_text": { "type": "string" }
                   }
                 }
               }
             }
-          },
-          "400": {
-            "description": "Ошибка в запросе (некорректные данные)."
-          },
-          "500": {
-            "description": "Ошибка сервера при анализе текста."
           }
         }
       }
-    }
-  },
-  "components": {
-    "schemas": {
-      "AnalyzeRequest": {
-        "type": "object",
-        "properties": {
-          "text": {
-            "type": "string",
-            "example": "Я стою на краю между прошлым и светом..."
+    },
+    "/status": {
+      "get": {
+        "summary": "Healthcheck",
+        "operationId": "checkStatus",
+        "description": "Проверяет, что StudioCore API готов к работе.",
+        "responses": {
+          "200": {
+            "description": "API доступен.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "engine": { "type": "string" },
+                    "ready": { "type": "boolean" }
+                  }
+                },
+                "example": {
+                  "status": "ok",
+                  "engine": "StudioCore v5",
+                  "ready": true
+                }
+              }
+            }
           }
-        },
-        "required": ["text"]
-      },
-      "AnalyzeResponse": {
-        "type": "array",
-        "items": {
-          "type": "string"
         }
       }
     }
