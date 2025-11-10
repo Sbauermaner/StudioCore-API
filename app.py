@@ -18,18 +18,18 @@ app = FastAPI(title="StudioCore API")
 def analyze_text(text: str):
     """
     Основная функция анализа текста.
-    Возвращает: summary, full_prompt, suno_prompt, annotated_text
+    Возвращает: summary, full_prompt, suno_prompt, annotated_text (дополнение)
     """
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
 
     try:
+        # --- Запуск основного анализа ядра ---
         result = core.analyze(text)
-
         if "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
 
-        # --- Краткое резюме анализа ---
+        # --- Краткое резюме ---
         summary = (
             f"✅ Анализ завершён успешно.\n"
             f"Жанр: {result['style'].get('genre', '—')}\n"
@@ -40,50 +40,62 @@ def analyze_text(text: str):
             f"Версия: {result.get('version', '—')}"
         )
 
-        # --- Автоматическая аннотация текста с секциями ---
+        # --- Получаем основные параметры ядра для модуля вокальной аннотации ---
+        tlp = result.get("tlp", {})
+        emo = result.get("emotions", {})
+        bpm = result.get("bpm", 120)
+        love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
+        cf = tlp.get("conscious_frequency", 0)
+
+        # --- Базовая аннотация от ядра (overlay) ---
         overlay = result.get("overlay", {}).get("sections", [])
         lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
         annotated_lines = []
-        section_index = 0
 
-        # обработка повторяющихся секций (например, Chorus x2)
-        repeat_map = {}
-        for sec in overlay:
-            key = sec["section"].lower().strip()
-            repeat_map[key] = repeat_map.get(key, 0) + 1
+        # --- VOCAL ANNOTATION LAYER — ДОПОЛНЕНИЕ К ОСНОВНОМУ АНАЛИЗУ ---
+        def describe_tone(idx, total):
+            """Адаптивное описание вокала в зависимости от эмоций и позиции."""
+            if idx < total * 0.25:
+                tone_desc = "(soft whisper, emotional intro, close-mic vocal)"
+                tone_tag = "fragile, intimate, trembling"
+            elif idx < total * 0.6:
+                tone_desc = "(warm mid-voice, storytelling tone, slight tension)"
+                tone_tag = "balanced, grounded, expressive"
+            elif love > pain and cf > 0.6:
+                tone_desc = "(gentle falsetto mixed with vibrato, tender resonance)"
+                tone_tag = "open, lyrical, emotional"
+            else:
+                tone_desc = "(strong emotional release, warm full voice, slight cry in tone)"
+                tone_tag = "bright, soaring, cathartic"
+            return tone_desc, tone_tag
 
         for i, line in enumerate(lines):
-            if section_index < len(overlay):
-                sec = overlay[section_index]
-                sec_name = sec["section"].lower().strip()
+            tone_desc, tone_tag = describe_tone(i, len(lines))
 
-                # если секция повторяется — добавляем x2, x3...
-                repeat_suffix = ""
-                if repeat_map.get(sec_name, 0) > 1:
-                    count = repeat_map[sec_name]
-                    repeat_suffix = f" x{count}"
-                    repeat_map[sec_name] = 0  # чтобы не повторять надпись повторно
+            if i == 0:
+                header = f"[Verse 1 – {tone_desc}]"
+            elif i == len(lines) - 1:
+                header = f"[Outro – {tone_desc}]"
+            elif "люб" in line.lower() or "you" in line.lower():
+                header = f"[Chorus – {tone_desc}]"
+            else:
+                header = f"[Verse – {tone_desc}]"
 
-                tag = (
-                    f"[{sec['section']} – {sec['mood']}, focus={sec['focus']}] "
-                    f"(intensity={sec['intensity']}){repeat_suffix}"
-                )
-                annotated_lines.append(tag)
-                section_index += 1
+            tone_line = f"(tone: {tone_tag}, Truth={truth:.2f}, Love={love:.2f}, Pain={pain:.2f}, CF={cf:.2f})"
 
+            annotated_lines.append(header)
             annotated_lines.append(line)
+            annotated_lines.append(tone_line)
+            annotated_lines.append("")
 
-        # если секций меньше строк — добавляем остаток
-        if len(lines) > len(overlay):
-            annotated_lines.extend(lines[len(overlay):])
+        annotated_text = "\n".join(annotated_lines)
 
-        annotated_text = "\n".join(annotated_lines) if annotated_lines else "⚠️ Аннотация не найдена."
-
+        # --- Возврат результатов без изменения логики ядра ---
         return (
             summary,
             result.get("prompt_full", "⚠️ Нет данных"),
             result.get("prompt_suno", "⚠️ Нет данных"),
-            annotated_text,
+            annotated_text
         )
 
     except Exception as e:
@@ -104,23 +116,20 @@ iface = gr.Interface(
         gr.Textbox(label="📊 Результат анализа", lines=6),
         gr.Textbox(label="🎼 Полный промт (Full Prompt)", lines=8),
         gr.Textbox(label="🎧 Suno-промт (до 1000 символов)", lines=8),
-        gr.Textbox(label="📜 Автоматическая аннотация (структура секций)", lines=15)
+        gr.Textbox(label="🎙️ Вокально-эмоциональная аннотация (Vocal Layer)", lines=20)
     ],
     title="🎧 StudioCore v4.3–v5 — Expressive Adaptive Engine",
-    description="AI-движок анализа эмоций, структуры и смысловой архитектуры текста.\nФормула ядра: Truth × Love × Pain = Conscious Frequency.",
+    description="AI-движок анализа эмоций, структуры и вокальной выразительности текста.\nФормула ядра: Truth × Love × Pain = Conscious Frequency.",
 )
 
-# === Healthcheck endpoint для GPT Builder ===
+# === Healthcheck endpoint ===
 @app.get("/status")
 async def status():
-    """Healthcheck для GPT Builder и Hugging Face."""
     return JSONResponse(content={"status": "ok", "engine": "StudioCore v5", "ready": True})
 
-
-# === API endpoint /api/predict (для GPT Builder, cURL, Python, JS) ===
+# === API endpoint ===
 @app.post("/api/predict")
 async def predict_api(request: Request):
-    """Реальный JSON API для интеграций."""
     try:
         payload = await request.json()
         text = payload.get("text", "")
@@ -137,8 +146,7 @@ async def predict_api(request: Request):
         print("❌ Ошибка API /api/predict:", e)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-
-# === Монтируем Gradio-интерфейс в FastAPI ===
+# === Монтируем Gradio-интерфейс ===
 app = gr.mount_gradio_app(app, iface, path="/")
 
 # === Запуск ===
