@@ -14,22 +14,74 @@ from studiocore import StudioCore, STUDIOCORE_VERSION
 core = StudioCore()
 app = FastAPI(title="StudioCore API")
 
+# === 🔎 Автоматическая проверка ядра после старта ===
+import threading, requests, json, time
+from datetime import datetime
+
+def auto_core_check():
+    """Выполняет внутренний self-check ядра после старта Space."""
+    time.sleep(5)  # ждём пока API поднимется
+    api_url = "http://0.0.0.0:7860/api/predict"
+    test_text = """Вся моя жизнь — как быль или небыль,
+Вся моя жизнь — по краю скользить.
+Но я молю открыть в сердце двери,
+Я так хочу твоей женщиной быть…"""
+
+    print("\n🧠 [StudioCore Self-Check] Запуск теста совместимости...\n")
+    try:
+        r = requests.post(api_url, json={"text": test_text}, timeout=30)
+        if r.status_code != 200:
+            print(f"❌ [Self-Check] API вернул {r.status_code}: {r.text}")
+            return
+        data = r.json()
+        summary = data.get("summary", "")
+        annotated = data.get("annotated_text", "")
+        tlp_ok = any(tag in summary for tag in ["Truth", "Love", "Pain"])
+        tonesync_ok = "ToneSync" in data.get("prompt_suno", "")
+        ann_ok = "[" in annotated
+
+        print("📊 Жанр и стиль:", "OK" if "Жанр" in summary or "Genre" in summary else "⚠️ нет")
+        print("🩵 TLP:", "OK" if tlp_ok else "⚠️ нет")
+        print("🎨 ToneSync:", "OK" if tonesync_ok else "⚠️ нет")
+        print("🎙️ Аннотация:", "OK" if ann_ok else "⚠️ нет")
+
+        status = (
+            "✅ StudioCore v5 совместимо и активно."
+            if all([tlp_ok, tonesync_ok, ann_ok])
+            else "⚠️ Проверка выявила неполное совпадение с монолитом."
+        )
+        print("\n" + status)
+
+        report = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "status": status,
+            "summary": summary[:400],
+            "has_tlp": tlp_ok,
+            "has_tonesync": tonesync_ok,
+            "annotated_preview": "\n".join(annotated.splitlines()[:6]),
+        }
+        with open("startup_selfcheck_report.json", "w", encoding="utf-8") as f:
+            json.dump(report, f, ensure_ascii=False, indent=2)
+        print("📁 Self-check report сохранён → startup_selfcheck_report.json\n")
+
+    except Exception as e:
+        print("❌ [Self-Check] Ошибка при тесте:", e)
+
+# Запуск в фоне, чтобы не мешать Gradio
+threading.Thread(target=auto_core_check, daemon=True).start()
+
+
 # === Основная функция анализа ===
 def analyze_text(text: str):
-    """
-    Основная функция анализа текста.
-    Возвращает: summary, full_prompt, suno_prompt, annotated_text (дополнение)
-    """
+    """Основная функция анализа текста."""
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
 
     try:
-        # --- Запуск основного анализа ядра ---
         result = core.analyze(text)
         if "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
 
-        # --- Краткое резюме ---
         summary = (
             f"✅ Анализ завершён успешно.\n"
             f"Жанр: {result['style'].get('genre', '—')}\n"
@@ -40,11 +92,9 @@ def analyze_text(text: str):
             f"Версия ядра: {result.get('version', '—')}"
         )
 
-        # --- Проверяем аннотацию ядра ---
         if result.get("annotated_text"):
             annotated_text = result["annotated_text"]
         else:
-            # fallback-аннотация через ядро с передачей эмоций и TLP
             annotated_text = core.annotate_text(
                 text,
                 result.get("overlay", {}),
@@ -63,7 +113,6 @@ def analyze_text(text: str):
         annotated_lines = []
 
         def describe_tone(idx, total):
-            """Адаптивное описание вокала в зависимости от эмоций и позиции."""
             if idx < total * 0.25:
                 tone_desc = "(soft whisper, emotional intro, close-mic vocal)"
                 tone_tag = "fragile, intimate, trembling"
@@ -93,13 +142,8 @@ def analyze_text(text: str):
                 f"(tone: {tone_tag}, "
                 f"Truth={truth:.2f}, Love={love:.2f}, Pain={pain:.2f}, CF={cf:.2f})"
             )
+            annotated_lines += [header, line, tone_line, ""]
 
-            annotated_lines.append(header)
-            annotated_lines.append(line)
-            annotated_lines.append(tone_line)
-            annotated_lines.append("")
-
-        # --- Комбинированная аннотация ---
         annotated_text = (
             "🎙️ **Core Annotation + Vocal Layer**\n\n"
             + annotated_text
@@ -107,7 +151,6 @@ def analyze_text(text: str):
             + "\n".join(annotated_lines)
         )
 
-        # --- Возврат ---
         return (
             summary,
             result.get("prompt_full", "⚠️ Нет данных"),
@@ -139,17 +182,14 @@ iface = gr.Interface(
     description="AI-движок анализа эмоций, структуры и вокальной выразительности текста.\nФормула ядра: Truth × Love × Pain = Conscious Frequency.",
 )
 
-# === Healthcheck endpoint ===
+# === Healthcheck ===
 @app.get("/status")
 async def status():
     return JSONResponse(content={"status": "ok", "engine": "StudioCore", "ready": True})
 
-# === Version endpoint (верификация ядра) ===
+# === Version endpoint ===
 @app.get("/version")
 async def version_info():
-    """
-    Проверка версии активного ядра (для CI/CD и HuggingFace Space)
-    """
     return JSONResponse(
         content={
             "status": "ok",
@@ -178,7 +218,7 @@ async def predict_api(request: Request):
         print("❌ Ошибка API /api/predict:", e)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-# === Монтируем Gradio-интерфейс ===
+# === Монтируем Gradio ===
 app = gr.mount_gradio_app(app, iface, path="/")
 
 # === Запуск ===
