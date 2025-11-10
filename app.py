@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""
+🎧 StudioCore v4.3–v5 — Expressive Adaptive Engine
+Truth × Love × Pain = Conscious Frequency
+"""
+
 import gradio as gr
 import traceback
 from studiocore import StudioCore
@@ -24,7 +30,7 @@ def analyze_text(text: str):
         if "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
 
-        # --- Формируем читаемое резюме анализа ---
+        # --- Формируем краткое резюме анализа ---
         summary = (
             f"✅ Анализ завершён успешно.\n"
             f"Жанр: {result['style'].get('genre', '—')}\n"
@@ -35,12 +41,22 @@ def analyze_text(text: str):
             f"Версия: {result.get('version', '—')}"
         )
 
-        # --- Возвращаем 4 окна ---
+        # --- Автоматическая аннотация текста ---
+        annotated = []
+        overlay = result.get("overlay", {}).get("sections", [])
+        for sec in overlay:
+            annotated.append(
+                f"[{sec['section']} – {sec['mood']}, focus={sec['focus']}] "
+                f"(intensity={sec['intensity']})"
+            )
+        annotated_text = "\n".join(annotated) if annotated else "⚠️ Аннотация не найдена."
+
+        # --- Возврат данных ---
         return (
             summary,
             result.get("prompt_full", "⚠️ Нет данных"),
             result.get("prompt_suno", "⚠️ Нет данных"),
-            result.get("annotated_text", "⚠️ Аннотированный текст не найден."),
+            annotated_text,
         )
 
     except Exception as e:
@@ -48,11 +64,12 @@ def analyze_text(text: str):
         print("❌ Ошибка при анализе:\n", tb)
         return f"❌ Исключение: {str(e)}", "", "", ""
 
+
 # === Интерфейс Gradio ===
 demo = gr.Interface(
     fn=analyze_text,
     inputs=gr.Textbox(
-        label="Введите текст песни или стихотворения",
+        label="Введите текст песни, стихотворения или манифеста",
         lines=10,
         placeholder="Например: Под серым небом я шёл один, дождь шептал забытые имена..."
     ),
@@ -60,14 +77,22 @@ demo = gr.Interface(
         gr.Textbox(label="📊 Результат анализа", lines=6),
         gr.Textbox(label="🎼 Полный промт (Full Prompt)", lines=8),
         gr.Textbox(label="🎧 Suno-промт (до 1000 символов)", lines=8),
-        gr.Textbox(label="📜 Аннотированный текст (структура секций после анализа)", lines=15)
+        gr.Textbox(label="📜 Автоматическая аннотация (структура секций)", lines=15)
     ],
     title="🎧 StudioCore v4.3–v5 — Expressive Adaptive Engine",
-    description=(
-        "AI-движок анализа эмоций, структуры и смысловой архитектуры текста.\n"
-        "Формула ядра: Truth × Love × Pain = Conscious Frequency."
-    )
+    description="AI-движок анализа эмоций, структуры и смысловой архитектуры текста.\nФормула ядра: Truth × Love × Pain = Conscious Frequency.",
+    api_name="/predict"  # 🔥 ← этот параметр делает Space API-доступным
 )
+
+
+# === Healthcheck endpoint (для GPT Builder) ===
+def check_status():
+    """Проверка состояния движка."""
+    return {"status": "ok", "engine": "StudioCore v5", "ready": True}
+
+# создаём отдельный endpoint /status
+gr.Interface(fn=check_status, inputs=None, outputs="json", api_name="/status")
+
 
 # === Запуск сервера (для Hugging Face / Docker) ===
 if __name__ == "__main__":
