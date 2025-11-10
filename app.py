@@ -13,7 +13,7 @@ def analyze_text(text: str):
     1. краткий результат (жанр, BPM, философия),
     2. полный промт,
     3. Suno-промт,
-    4. аннотированный текст (структура секций после анализа).
+    4. аннотированный текст.
     """
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
@@ -24,7 +24,6 @@ def analyze_text(text: str):
         if "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
 
-        # --- Формируем краткое резюме анализа ---
         summary = (
             f"✅ Анализ завершён успешно.\n"
             f"Жанр: {result['style'].get('genre', '—')}\n"
@@ -35,7 +34,6 @@ def analyze_text(text: str):
             f"Версия: {result.get('version', '—')}"
         )
 
-        # --- Автоматическая аннотация текста ---
         annotated = []
         overlay = result.get("overlay", {}).get("sections", [])
         for sec in overlay:
@@ -45,7 +43,6 @@ def analyze_text(text: str):
             )
         annotated_text = "\n".join(annotated) if annotated else "⚠️ Аннотация не найдена."
 
-        # --- Возврат данных ---
         return (
             summary,
             result.get("prompt_full", "⚠️ Нет данных"),
@@ -59,8 +56,14 @@ def analyze_text(text: str):
         return f"❌ Исключение: {str(e)}", "", "", ""
 
 
-# === Интерфейс Gradio ===
-demo = gr.Interface(
+# === Проверка статуса ядра ===
+def check_status():
+    """Проверка состояния движка (healthcheck)."""
+    return {"status": "ok", "engine": "StudioCore v5", "ready": True}
+
+
+# === Создаём интерфейсы ===
+iface_predict = gr.Interface(
     fn=analyze_text,
     inputs=gr.Textbox(
         label="Введите текст песни, стихотворения или манифеста",
@@ -75,19 +78,21 @@ demo = gr.Interface(
     ],
     title="🎧 StudioCore v4.3–v5 — Expressive Adaptive Engine",
     description="AI-движок анализа эмоций, структуры и смысловой архитектуры текста.\nФормула ядра: Truth × Love × Pain = Conscious Frequency.",
-    api_name="/predict"  # 🔥 ← этот параметр делает Space API-доступным
+    api_name="/predict",
 )
 
+iface_status = gr.Interface(
+    fn=check_status,
+    inputs=None,
+    outputs="json",
+    api_name="/status",
+)
 
-# === Healthcheck endpoint (для GPT Builder) ===
-def check_status():
-    """Проверка состояния движка."""
-    return {"status": "ok", "engine": "StudioCore v5", "ready": True}
+# === Объединяем оба интерфейса в одно приложение ===
+# Hugging Face Spaces поддерживает только один .launch()
+app = gr.mount_gradio_app(iface_predict, path="/")
+app = gr.mount_gradio_app(iface_status, path="/status", parent=app)
 
-# создаём отдельный endpoint /status
-gr.Interface(fn=check_status, inputs=None, outputs="json", api_name="/status")
-
-
-# === Запуск сервера (для Hugging Face / Docker) ===
+# === Запуск сервера (Hugging Face / Docker) ===
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    app.launch(server_name="0.0.0.0", server_port=7860)
