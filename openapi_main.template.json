@@ -1,0 +1,103 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "StudioCore API",
+    "version": "{{VERSION}}",
+    "description": "🎧 StudioCore — Expressive Adaptive Engine by Bauer Synesthetic Studio.\n\nAI ядро для анализа текста, эмоций и структуры. Возвращает жанр, BPM, философию, промты и аннотированный текст.\n\nFormula: Truth × Love × Pain = Conscious Frequency."
+  },
+  "servers": [
+    { "url": "{{SPACE_URL}}" }
+  ],
+  "paths": {
+    "/status": {
+      "get": {
+        "summary": "Healthcheck",
+        "operationId": "checkStatus",
+        "description": "Проверяет, что StudioCore API готов к работе.",
+        "responses": {
+          "200": {
+            "description": "API доступен.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "engine": { "type": "string" },
+                    "ready": { "type": "boolean" },
+                    "version": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "summary": "Version info",
+        "operationId": "getVersionInfo",
+        "description": "Возвращает текущую версию ядра StudioCore, подпись класса и статус готовности.",
+        "responses": {
+          "200": {
+            "description": "Информация о версии.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "engine": { "type": "string" },
+                    "version": { "type": "string" },
+                    "signature": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/predict": {
+      "post": {
+        "summary": "Analyze text with StudioCore",
+        "operationId": "analyzeText",
+        "description": "Выполняет полный анализ текста через ядро StudioCore. Возвращает краткий результат, Full Prompt, Suno Prompt и аннотированный текст.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": { "type": "string", "description": "Текст песни/стиха/манифеста" }
+                },
+                "required": ["text"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешный анализ текста.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": { "type": "string" },
+                    "prompt_full": { "type": "string" },
+                    "prompt_suno": { "type": "string" },
+                    "annotated_text": { "type": "string" },
+                    "engine_version": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
