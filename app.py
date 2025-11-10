@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from studiocore import StudioCore, STUDIOCORE_VERSION
 
-# === Проверка и установка requests (только для self-check) ===
+# === Проверка и установка requests (для self-check) ===
 if importlib.util.find_spec("requests") is None:
     try:
         print("⚙️ Устанавливаю 'requests' для self-check...")
@@ -31,7 +31,7 @@ except Exception:
 core = StudioCore()
 app = FastAPI(title="StudioCore API")
 
-# === CORS для интеграций ===
+# === CORS ===
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,7 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# === Self-check (опционально) ===
+# === SELF-CHECK ===
 def auto_core_check():
     if os.environ.get("DISABLE_SELF_CHECK") == "1":
         print("🧪 Self-check отключён (DISABLE_SELF_CHECK=1).")
@@ -84,7 +84,7 @@ def auto_core_check():
 
 threading.Thread(target=auto_core_check, daemon=True).start()
 
-# === Анализ текста ===
+# === Основной анализ ===
 def analyze_text(text: str):
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
@@ -224,6 +224,30 @@ async def version_info():
         }
     )
 
+# === COMPATIBILITY CHECKS ===
+@app.get("/compat/core")
+async def compat_core():
+    """Сравнивает openapi_main.yaml и openapi_studiocore.yaml"""
+    try:
+        from compat_check_core import run_check as run_core
+        report = run_core()
+        return JSONResponse(content=report)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.get("/compat/remote")
+async def compat_remote():
+    """Проверяет удалённый API /api/predict"""
+    try:
+        from compat_check_remote import run_check as run_remote
+        run_remote()
+        if os.path.exists("remote_compatibility_full_report.json"):
+            with open("remote_compatibility_full_report.json", "r", encoding="utf-8") as f:
+                return JSONResponse(content=json.load(f))
+        return JSONResponse(content={"status": "no_report"})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
 @app.get("/compat-check")
 async def compat_check():
     """Проверка совместимости ядра без HTTP-запроса"""
@@ -274,13 +298,13 @@ async def predict_api(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
-# === Mount ===
+# === MOUNT ===
 iface_public.queue()
 iface_admin.queue()
 app = gr.mount_gradio_app(app, iface_public, path="/")
 app = gr.mount_gradio_app(app, iface_admin, path="/admin")
 
-# === Запуск ===
+# === RUN ===
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=7860)
