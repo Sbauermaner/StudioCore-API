@@ -1,0 +1,85 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "StudioCore Adaptive API",
+    "version": "v5.0",
+    "description": "Expressive Adaptive Engine — Truth × Love × Pain = Conscious Frequency. Выполняет анализ текста и возвращает краткий результат, полный музыкальный промт, Suno-промт и аннотированный текст."
+  },
+  "servers": [
+    {
+      "url": "https://sbauer8-studiocore-api.hf.space"
+    }
+  ],
+  "paths": {
+    "/predict": {
+      "post": {
+        "summary": "Выполняет полный анализ текста через StudioCore Engine.",
+        "operationId": "analyzeText",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "Текст для анализа (песня, стихотворение, манифест)."
+                  }
+                },
+                "required": ["text"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешный результат анализа.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "example": [
+                      "✅ Анализ завершён успешно.",
+                      "Genre: cinematic narrative reflective | Style: majestic major | Key: F# modal | BPM: 137",
+                      "ToneSync: primary=turquoise, accent=gray mist, mood=warm, resonance=360Hz",
+                      "[Intro – Mystic, focus=tone_establish] Я стою на краю между прошлым и светом..."
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ошибка в запросе (некорректные данные)."
+          },
+          "500": {
+            "description": "Ошибка сервера при анализе текста."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalyzeRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "example": "Я стою на краю между прошлым и светом..."
+          }
+        },
+        "required": ["text"]
+      },
+      "AnalyzeResponse": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
