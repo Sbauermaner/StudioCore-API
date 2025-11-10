@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-🎧 StudioCore v4.3–v5 — Expressive Adaptive Engine
-Truth × Love × Pain = Conscious Frequency
-"""
-
 import gradio as gr
 import traceback
 from studiocore import StudioCore
