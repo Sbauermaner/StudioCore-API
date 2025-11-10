@@ -1,25 +1,35 @@
-📜 Privacy Policy — StudioCoreAPI by Bauer
+# 📜 Privacy Policy — StudioCoreAPI by Bauer
 
-Last updated: November 2025
+Last updated: November 2025  
+Author: Bauer Synesthetic Studio  
+Contact: ssv8240@gmail.com  
 
-StudioCoreAPI by Bauer respects user privacy and does not collect, store, or share any personal data.
+---
+
+## 🔒 Privacy Commitment
+StudioCoreAPI by Bauer respects user privacy and does not collect, store, or share any personal data.  
 All text submissions are processed in-memory only for the purpose of generating emotional and structural analysis using the StudioCore Adaptive Engine (Truth × Love × Pain = Conscious Frequency).
 
-🔹 Data Handling
+---
 
-Submitted texts are analyzed in real time and not stored permanently.
+## 🔹 Data Handling
+- Submitted texts are analyzed in real time and not stored permanently.  
+- No external tracking, cookies, or analytics tools are used.  
+- No user data is shared with third parties.  
 
-No external tracking, cookies, or analytics tools are used.
+---
 
-No information is shared with third parties.
+## 🔹 Security
+The system runs within Hugging Face’s secure containerized environment.  
+All API requests are transmitted via HTTPS, ensuring encrypted communication between client and server.
 
-🔹 Security
+---
 
-The system runs within Hugging Face’s secure containerized environment.
-All API requests are transmitted via HTTPS to ensure encrypted communication between client and server.
+## 🔹 Open Source Transparency
+StudioCoreAPI is built with open-source frameworks (FastAPI, Gradio, Python).  
+Source code and full documentation are publicly available at:  
+🔗 https://huggingface.co/spaces/sbauer8/studiocore-api  
 
-🔹 Open Source Transparency
+---
 
-StudioCoreAPI is built with open-source frameworks (FastAPI / Gradio / Python).
-Source code and documentation are available at:
-👉 https://huggingface.co/spaces/sbauer8/StudioCore-API
+© 2025 Bauer Synesthetic Studio. All rights reserved.
