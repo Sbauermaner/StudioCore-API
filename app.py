@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v4.3–v5 — Expressive Adaptive Engine
+🎧 StudioCore v5 — Expressive Adaptive Engine
 Truth × Love × Pain = Conscious Frequency
 """
 
@@ -14,36 +14,34 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from studiocore import StudioCore, STUDIOCORE_VERSION
 
-# === Проверка и установка requests (только для стартового self-check) ===
+# === Проверка и установка requests (только для self-check) ===
 if importlib.util.find_spec("requests") is None:
     try:
         print("⚙️ Устанавливаю 'requests' для self-check...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
-    except Exception as _:
-        # Не критично: self-check через HTTP просто пропустим, будет /compat-check
+    except Exception:
         pass
 
 try:
     import requests  # type: ignore
 except Exception:
-    requests = None  # self-check через HTTP будет отключён
+    requests = None
 
 # === Инициализация ядра ===
 core = StudioCore()
 app = FastAPI(title="StudioCore API")
 
-# === CORS (для удобной интеграции внешних клиентов) ===
+# === CORS для интеграций ===
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # при необходимости ограничь доменами
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# === Автоматическая проверка ядра (опционально) ===
+# === Self-check (опционально) ===
 def auto_core_check():
-    """Выполняет self-check ядра при запуске (HTTP), если доступен requests и не запрещено переменной окружения)."""
     if os.environ.get("DISABLE_SELF_CHECK") == "1":
         print("🧪 Self-check отключён (DISABLE_SELF_CHECK=1).")
         return
@@ -86,7 +84,7 @@ def auto_core_check():
 
 threading.Thread(target=auto_core_check, daemon=True).start()
 
-# === Основная функция анализа ===
+# === Анализ текста ===
 def analyze_text(text: str):
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
@@ -94,6 +92,7 @@ def analyze_text(text: str):
         result = core.analyze(text)
         if "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
+
         summary = (
             f"✅ Анализ завершён успешно.\n"
             f"Жанр: {result['style'].get('genre', '—')}\n"
@@ -103,6 +102,7 @@ def analyze_text(text: str):
             f"Философия: {result.get('philosophy', '—')}\n"
             f"Версия ядра: {result.get('version', '—')}"
         )
+
         annotated_text = result.get("annotated_text") or core.annotate_text(
             text,
             result.get("overlay", {}),
@@ -113,7 +113,6 @@ def analyze_text(text: str):
             result.get("tlp", {}),
         )
 
-        # === VOCAL ANNOTATION LAYER ===
         tlp = result.get("tlp", {})
         love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
         cf = tlp.get("conscious_frequency", 0)
@@ -146,6 +145,7 @@ def analyze_text(text: str):
                 f"(tone: {tag}, Truth={truth:.2f}, Love={love:.2f}, Pain={pain:.2f}, CF={cf:.2f})",
                 "",
             ]
+
         annotated_text = (
             "🎙️ **Core Annotation + Vocal Layer**\n\n"
             + annotated_text + "\n\n" + "\n".join(annotated_lines)
@@ -172,9 +172,9 @@ with gr.Blocks(title="🎧 StudioCore v5 — Public Interface") as iface_public:
             gr.Textbox(label="🎧 Suno-промт", lines=8),
             gr.Textbox(label="🎙️ Аннотация (Vocal Layer)", lines=20),
         ],
-        allow_flagging="never",
+        flagging_mode="never",
         title=None,
-        description=None
+        description=None,
     )
 
 # === ADMIN UI ===
@@ -198,18 +198,20 @@ with gr.Blocks(title="🎧 StudioCore Admin Access") as iface_admin:
                 gr.Textbox(label="📊 Результат анализа", lines=6),
                 gr.Textbox(label="🎼 Полный промт", lines=8),
                 gr.Textbox(label="🎧 Suno-промт", lines=8),
-                gr.Textbox(label="🎙️ Вокальная аннотация", lines=20)
+                gr.Textbox(label="🎙️ Вокальная аннотация", lines=20),
             ],
-            allow_flagging="manual",
+            flagging_mode="manual",
             title=None,
-            description="Админская версия с кнопкой Flag и диагностикой."
+            description="Админская версия с диагностикой.",
         )
     btn.click(password_gate, inputs=pwd, outputs=[pwd, admin_panel, err])
 
 # === API ===
 @app.get("/status")
 async def status():
-    return JSONResponse(content={"status": "ok", "engine": "StudioCore", "ready": True, "version": STUDIOCORE_VERSION})
+    return JSONResponse(
+        content={"status": "ok", "engine": "StudioCore", "ready": True, "version": STUDIOCORE_VERSION}
+    )
 
 @app.get("/version")
 async def version_info():
@@ -222,9 +224,9 @@ async def version_info():
         }
     )
 
-# ✅ Локальная проверка совместимости без HTTP (детерминированно)
 @app.get("/compat-check")
 async def compat_check():
+    """Проверка совместимости ядра без HTTP-запроса"""
     text = (
         "Вся моя жизнь — как быль или небыль,\n"
         "Вся моя жизнь — по краю скользить.\n"
@@ -273,10 +275,8 @@ async def predict_api(request: Request):
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 # === Mount ===
-# Включаем очередь для стабильности под нагрузкой
-iface_public.queue(concurrency_count=2, max_size=8)
-iface_admin.queue(concurrency_count=1, max_size=4)
-
+iface_public.queue()
+iface_admin.queue()
 app = gr.mount_gradio_app(app, iface_public, path="/")
 app = gr.mount_gradio_app(app, iface_admin, path="/admin")
 
