@@ -1,15 +1,21 @@
+# -*- coding: utf-8 -*-
+"""
+StudioCore v5 LyricMeter — адаптивный анализ ритма текста
+BPM = f(слоговая плотность, пунктуация, эмоциональная энергия)
+"""
+
 import re
 from typing import Dict
 
-# те же веса, что и в emotion.py (короткая копия, чтобы не тянуть импортов)
 PUNCT_WEIGHTS = {
     "!": 0.6, "?": 0.4, ".": 0.1, ",": 0.05, "…": 0.5, "—": 0.2, ":": 0.15, ";": 0.1
 }
 
+
 class LyricMeter:
     """
-    BPM = f(слоговая плотность, энергия пунктуации, эмоции)
-    Возвращает целочисленный BPM в диапазоне 60..168
+    Расчёт BPM на основе плотности слогов, пунктуации и эмоций.
+    Диапазон 60..172 BPM. Подходит для адаптивных музыкальных движков (Suno, StudioCore).
     """
 
     vowels = set("aeiouyауоыиэяюёеAEIOUYАУОЫИЭЯЮЁЕ")
@@ -30,39 +36,40 @@ class LyricMeter:
 
     def bpm_from_density(self, text: str, emotions: Dict[str, float] | None = None) -> int:
         """
-        Если emotions переданы (из AutoEmotionalAnalyzer), учитываем «энергию»:
-        anger/epic → ускоряют, sadness/fear → замедляют, joy/peace → мягкий сдвиг вверх.
+        Если emotions переданы, учитывает эмоциональную энергию:
+        anger/epic → ускоряют, sadness/fear → замедляют, joy/peace → мягко поднимают.
         """
         emotions = emotions or {}
         avg_syll, n_lines = self._line_stats(text)
 
-        # базовая кривая: чем больше слогов в строке — тем медленнее
-        # 8 слогов ~ 140 BPM, 16 слогов ~ 100 BPM, 4 слога ~ 160 BPM
-        base = 140 - min(60, (avg_syll - 8) * 5)
+        # базовая логистическая кривая вместо линейной
+        # (гладкая адаптация для вокальных текстов)
+        base = 60 + 120 / (1 + pow(2.718, (avg_syll - 8) / 2.5 * 0.8))
 
-        # энергия пунктуации
-        p_energy = self._punct_energy(text)  # обычно 0..3
-        base += min(18, p_energy * 4.0)
+        # пунктуационная энергия
+        p_energy = self._punct_energy(text)
+        base += min(18, p_energy * 3.5)
 
-        # эмоциональные коэффициенты (0..1)
+        # эмоции
         anger = emotions.get("anger", 0.0)
-        epic  = emotions.get("epic", 0.0)
-        joy   = emotions.get("joy", 0.0)
+        epic = emotions.get("epic", 0.0)
+        joy = emotions.get("joy", 0.0)
         sadness = emotions.get("sadness", 0.0)
-        fear    = emotions.get("fear", 0.0)
-        peace   = emotions.get("peace", 0.0)
+        fear = emotions.get("fear", 0.0)
+        peace = emotions.get("peace", 0.0)
 
-        # ускоряющие факторы
-        accel = 10.0 * (0.7*anger + 0.6*epic + 0.3*joy)
-        # замедляющие факторы
-        brake = 10.0 * (0.6*sadness + 0.5*fear + 0.2*peace)
+        energy_factor = max(0.8, min(1.4, 1 + (anger + epic + joy - sadness - fear) * 0.6))
 
-        bpm = base + accel - brake
+        accel = 10.0 * (0.7 * anger + 0.6 * epic + 0.3 * joy)
+        brake = 10.0 * (0.6 * sadness + 0.5 * fear + 0.2 * peace)
 
-        # коррекция по длине (очень короткие тексты чуть быстрее, длинные — стабильнее)
+        bpm = (base + accel - brake) * energy_factor
+
+        # коррекция по длине
         if n_lines <= 4:
             bpm += 4
         elif n_lines > 16:
             bpm -= 3
 
-        return max(60, min(168, int(round(bpm))))
+        # диапазон
+        return max(60, min(172, int(round(bpm))))
