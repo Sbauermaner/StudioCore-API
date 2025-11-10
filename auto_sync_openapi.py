@@ -1,41 +1,32 @@
-# -*- coding: utf-8 -*-
-"""
-🧠 StudioCore OpenAPI Auto-Sync Utility
-Синхронизирует openapi.json → openapi_studiocore.yaml
-и проверяет валидность перед пушем в GPT Actions.
-"""
+# auto_sync_openapi.py
+import os, json, re
+from pathlib import Path
 
-import json
-import yaml
-import os
-from datetime import datetime
-from openapi_spec_validator import validate_spec
+# 1) пытаемся взять версию из Python-модуля
+VERSION = None
+try:
+    from studiocore import STUDIOCORE_VERSION
+    VERSION = STUDIOCORE_VERSION
+except Exception:
+    pass
+if not VERSION:
+    VERSION = os.environ.get("STUDIOCORE_VERSION", "v5.0")
 
-JSON_FILE = "openapi.json"
-YAML_FILE = "openapi_studiocore.yaml"
+# 2) определяем URL Space
+SPACE_URL = os.environ.get("SPACE_URL", "http://0.0.0.0:7860")
 
-def sync_openapi():
-    if not os.path.exists(JSON_FILE):
-        print(f"❌ Не найден {JSON_FILE}")
-        return
+def render(src: Path, dst: Path, mapping: dict):
+    txt = src.read_text(encoding="utf-8")
+    for k, v in mapping.items():
+        txt = txt.replace("{{" + k + "}}", v)
+    dst.write_text(txt, encoding="utf-8")
+    print(f"✔️  Rendered {dst.name} (version={mapping['VERSION']}, url={mapping['SPACE_URL']})")
 
-    with open(JSON_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
+root = Path(".")
+mapping = {"VERSION": VERSION, "SPACE_URL": SPACE_URL}
 
-    # Преобразование структуры в YAML
-    yaml_data = yaml.dump(data, allow_unicode=True, sort_keys=False, width=120)
+# JSON для Space
+render(root / "openapi_main.template.json", root / "openapi_main.json", mapping)
 
-    with open(YAML_FILE, "w", encoding="utf-8") as f:
-        f.write(yaml_data)
-
-    # Проверяем корректность
-    try:
-        validate_spec(data)
-        print("✅ OpenAPI схема валидна.")
-    except Exception as e:
-        print("⚠️ Ошибка валидации:", e)
-
-    print(f"🪄 {YAML_FILE} обновлён {datetime.utcnow().isoformat()}")
-
-if __name__ == "__main__":
-    sync_openapi()
+# YAML для GPT
+render(root / "openapi_gpt.template.yaml", root / "openapi_gpt.yaml", mapping)
