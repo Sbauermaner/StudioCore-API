@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from studiocore import StudioCore, STUDIOCORE_VERSION
 
-# === ⚙️ Проверка и установка requests (перед всеми зависимыми модулями) ===
+# === ⚙️ Проверка и установка requests ===
 if importlib.util.find_spec("requests") is None:
     try:
         print("⚙️ Устанавливаю 'requests' для модулей (README, self-check)...")
@@ -37,7 +37,7 @@ try:
 except Exception as e:
     print("⚠️ Ошибка при автосинхронизации OpenAPI:", e)
 
-# === 🧩 Автоматическая генерация README (если отсутствует) ===
+# === 🧩 Генерация README ===
 try:
     if not os.path.exists("README.md") and os.path.exists("readme_template_gen.py"):
         print("🧩 README.md отсутствует — создаю шаблон...")
@@ -46,7 +46,7 @@ try:
 except Exception as e:
     print("⚠️ Ошибка при генерации README:", e)
 
-# === 📘 Автоматическое обновление README ===
+# === 📘 Обновление README ===
 try:
     if os.path.exists("update_readme_status.py"):
         print("🪶 Обновляю README.md (API статус, версия, OpenAPI ссылки)...")
@@ -159,14 +159,18 @@ def analyze_text(text: str):
             else:
                 return "(strong release)", "bright"
 
-        for i, line in enumerate(lines):
+        # ✅ полный вывод текста без обрезки + адаптивный буфер
+        max_preview = len(lines)
+        for i, line in enumerate(lines[:max_preview]):
             desc, tag = tone(i, len(lines))
             if i == 0:
                 header = f"[Verse 1 – {desc}]"
             elif i == len(lines) - 1:
                 header = f"[Outro – {desc}]"
-            elif "люб" in line.lower() or "you" in line.lower():
+            elif any(k in line.lower() for k in ["люб", "love", "you", "бог", "christ"]):
                 header = f"[Chorus – {desc}]"
+            elif "прости" in line.lower():
+                header = f"[Bridge – {desc}]"
             else:
                 header = f"[Verse – {desc}]"
             annotated_lines += [
@@ -180,6 +184,15 @@ def analyze_text(text: str):
             "🎙️ **Core Annotation + Vocal Layer**\n\n"
             + annotated_text + "\n\n" + "\n".join(annotated_lines)
         )
+
+        # 💾 безопасный динамический буфер
+        if len(annotated_text.encode("utf-8")) > 2_000_000:
+            print("⚠️ Warning: annotated_text превышает 2MB, сокращаю для вывода.")
+            annotated_text = (
+                annotated_text[:1_500_000]
+                + "\n\n[... текст обрезан для безопасности вывода ...]"
+            )
+
         return (
             summary,
             result.get("prompt_full", "⚠️ Нет данных"),
