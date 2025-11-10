@@ -18,6 +18,7 @@ from .style import StyleMatrix
 from .tone import ToneSyncEngine
 from .adapter import build_suno_prompt
 
+STUDIOCORE_VERSION = "v4.3.1-adaptive"
 
 # ========================================
 # 🔀 Adaptive Sectioning Utility
@@ -121,10 +122,7 @@ def adaptive_sectioning(lines: List[str], tlp: Dict[str, float], emo: Dict[str, 
 
 
 class StudioCore:
-    """
-    Central AI pipeline:
-    text → emotion → frequency → structure → tone → style → self-adaptive annotations.
-    """
+    """Central AI pipeline: text → emotion → frequency → structure → tone → style → self-adaptive annotations."""
 
     def __init__(self, config_path: str | None = None):
         self.cfg = load_config(config_path or "studio_config.json")
@@ -138,47 +136,39 @@ class StudioCore:
         self.style = StyleMatrix()
         self.tone = ToneSyncEngine()
 
-    # ========================================
-    # 🧩 Построение семантических аннотаций
-    # ========================================
+    # =============================
+    # 🔬 Семантические секции
+    # =============================
     def _build_semantic_sections(self, text: str, emo: Dict[str, float], tlp: Dict[str, float], bpm: int) -> Dict[str, Any]:
-        """
-        Создаёт динамическую карту секций и базовые метрики накрытия.
-        """
         love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
         cf = tlp.get("conscious_frequency", 0)
         avg_emo = mean(abs(v) for v in emo.values()) if emo else 0.0
 
-        # Базовая «аура» трека
         bpm_adj = int(bpm + (avg_emo * 8) + (cf * 4))
         overlay = {
             "depth": round((truth + pain) / 2, 2),
             "warmth": round(love, 2),
             "clarity": round(cf, 2),
-            "sections": []  # заполним ниже адаптивно
+            "sections": adaptive_sectioning(
+                [l for l in text.strip().split("\n") if l.strip()],
+                tlp, emo, bpm_adj
+            )
         }
-
-        lines = [l for l in text.strip().split("\n") if l.strip()]
-        overlay["sections"] = adaptive_sectioning(lines, tlp, emo, bpm_adj)
         return {"bpm": bpm_adj, "overlay": overlay}
 
-    # ========================================
-    # 🎙 Тембральный градиент (описание)
-    # ========================================
-    def _timbral_descriptor(self, sec: Dict[str, Any], emo: Dict[str, float], tlp: Dict[str, float], bpm: int, vocals: List[str]) -> str:
-        """
-        Возвращает тембральное описание секции из интенсивности, эмоций и состава вокала.
-        """
-        level = (sec.get("intensity", bpm) / max(1.0, bpm))  # ~0.7 .. 1.5+
+    # =============================
+    # 🎙 Тембральный дескриптор
+    # =============================
+    def _timbral_descriptor(self, sec: Dict[str, Any], emo: Dict[str, float], tlp: Dict[str, float],
+                            bpm: int, vocals: List[str]) -> str:
+        level = (sec.get("intensity", bpm) / max(1.0, bpm))
         anger, epic, joy, sadness, peace = (
             emo.get("anger", 0), emo.get("epic", 0),
             emo.get("joy", 0), emo.get("sadness", 0), emo.get("peace", 0)
         )
-        love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
-
+        love, pain = tlp.get("love", 0), tlp.get("pain", 0)
         parts = []
 
-        # Базовый регистр по уровню
         if level < 0.9:
             parts.append("soft whisper, close-mic, airy")
         elif level < 1.05:
@@ -188,31 +178,27 @@ class StudioCore:
         else:
             parts.append("full belt, cinematic projection")
 
-        # Эмоциональные добавки
         if sadness > 0.25 or pain > 0.3:
             parts.append("gentle vibrato")
         if anger > 0.35:
             parts.append("rasp / grit accent")
         if joy > 0.3 and love > 0.35:
             parts.append("bright resonance, slight cry")
-        if epic > 0.35 or "choir" in vocals or "trio" in vocals or "quartet" in vocals:
+        if epic > 0.35 or any(x in vocals for x in ["choir", "trio", "quartet"]):
             parts.append("choral layering")
 
-        # Уточнения для Intro/Outro
         if sec["section"].lower().startswith("intro"):
             parts.append("subtle breath, sparse reverb")
         if sec["section"].lower().startswith("outro"):
             parts.append("soft fade, intimate tail")
 
-        return ", ".join(dict.fromkeys(parts))  # убираем повторы
+        return ", ".join(dict.fromkeys(parts))
 
-    # ========================================
-    # 🧠 Автоматическая аннотация текста
-    # ========================================
-    def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any], vocals: list, bpm: int, emo: Dict[str,float], tlp: Dict[str,float]) -> str:
-        """
-        Возвращает текст с автоматической аннотацией секций и параметров ядра (тембр, интенсивность, тон).
-        """
+    # =============================
+    # 🧠 Авто-аннотация
+    # =============================
+    def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any],
+                      vocals: list, bpm: int, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
         sections = overlay.get("sections", [])
         if not sections:
             return text
@@ -220,91 +206,61 @@ class StudioCore:
         annotated: List[str] = []
         for sec in sections:
             timbre = self._timbral_descriptor(sec, emo, tlp, bpm, vocals)
-            tag = (
+            annotated.append(
                 f"[{sec['section']} – ({sec['mood']}, focus={sec['focus']}, "
                 f"tone={sec.get('tone','neutral')}, intensity={sec['intensity']})]\n"
                 f"(timbre: {timbre})"
             )
-            annotated.append(tag)
-            # прикрепляем строки секции
-            for ln in sec.get("lines", []):
-                annotated.append(ln)
+            annotated.extend(sec.get("lines", []))
+            annotated.append("")
 
-            annotated.append("")  # пустая строка-разделитель
-
-        annotated.append(
-            f"[End – BPM≈{bpm}, Vocal={style.get('vocal_form','auto')}, Tone={style.get('key','auto')}]"
-        )
+        annotated.append(f"[End – BPM≈{bpm}, Vocal={style.get('vocal_form','auto')}, Tone={style.get('key','auto')}]")
         return "\n".join(annotated).strip()
 
-    # ========================================
-    # 🔬 Основной анализ
-    # ========================================
-    def analyze(
-        self,
-        text: str,
-        author_style: str | None = None,
-        preferred_gender: str | None = None,
-        version: str | None = None
-    ) -> Dict[str, Any]:
-        """
-        Full adaptive emotional-semantic analysis + self-generated annotation overlay.
-        """
+    # =============================
+    # 🔍 Основной анализ
+    # =============================
+    def analyze(self, text: str, author_style: str | None = None,
+                preferred_gender: str | None = None, version: str | None = None) -> Dict[str, Any]:
         version = version or self.cfg.get("suno_version", "v5")
 
-        # --- Normalize / structure ---
         txt = normalize_text_preserve_symbols(text)
-        sections_proto = extract_sections(txt)  # используется в подборе вокала
+        sections_proto = extract_sections(txt)
 
-        # --- Emotions & TLP ---
         emo = self.emotion.analyze(txt)
         tlp = self.tlp.analyze(txt)
-
-        # --- Rhythm & Frequency ---
         bpm = self.rhythm.bpm_from_density(txt)
         resonance = self.freq.resonance_profile(tlp)
         resonance["recommended_octaves"] = self.safety.clamp_octaves(
             resonance.get("recommended_octaves", [2, 3, 4, 5])
         )
 
-        # --- Semantic phases (adaptive) ---
         semantic = self._build_semantic_sections(txt, emo, tlp, bpm)
         bpm = semantic["bpm"]
 
-        # --- Style & instrumentation ---
         style_data = self.style.build(emo, tlp, txt, bpm)
         vox, inst, vocal_form = self.vocals.get(
             style_data["genre"], preferred_gender or "auto", txt, sections_proto
         )
         style_data["vocal_form"] = vocal_form
 
-        # --- Integrity & tonesync ---
         integrity = self.integrity.analyze(txt)
         tonesync = self.tone.colors_for_primary(emo, tlp, style_data.get("key", "auto"))
 
-        # --- Philosophy ---
         philosophy = (
-            f"Truth={tlp.get('truth', 0):.2f}, "
-            f"Love={tlp.get('love', 0):.2f}, "
-            f"Pain={tlp.get('pain', 0):.2f}, "
-            f"Conscious Frequency={tlp.get('conscious_frequency', 0):.2f}"
+            f"Truth={tlp.get('truth', 0):.2f}, Love={tlp.get('love', 0):.2f}, "
+            f"Pain={tlp.get('pain', 0):.2f}, Conscious Frequency={tlp.get('conscious_frequency', 0):.2f}"
         )
 
-        # --- Prompts ---
         prompt_full = build_suno_prompt(style_data, vox, inst, bpm, philosophy, version, mode="full")
         prompt_suno = build_suno_prompt(style_data, vox, inst, bpm, philosophy, version, mode="suno")
         prompt_suno += (
             f"\nToneSync: primary={tonesync['primary_color']}, "
-            f"accent={tonesync['accent_color']}, "
-            f"mood={tonesync['mood_temperature']}, "
+            f"accent={tonesync['accent_color']}, mood={tonesync['mood_temperature']}, "
             f"resonance={tonesync['resonance_hz']}Hz"
         )
 
-        # --- Annotated text (now with timbral gradient) ---
-        annotated_text = self.annotate_text(txt, semantic["overlay"], style_data, vox, bpm, emo, tlp)
-
-        # --- Result ---
-        return {
+        result = {
             "emotions": emo,
             "tlp": tlp,
             "bpm": bpm,
@@ -318,11 +274,26 @@ class StudioCore:
             "philosophy": philosophy,
             "prompt_full": prompt_full,
             "prompt_suno": prompt_suno,
-            "annotated_text": annotated_text,
             "version": version
         }
 
+        # ✅ diff-дополнение: повторная аннотация при её отсутствии
+        if result.get("annotated_text"):
+            annotated_text = result["annotated_text"]
+        else:
+            annotated_text = self.annotate_text(
+                txt,
+                result.get("overlay", {}),
+                result.get("style", {}),
+                result.get("vocals", []),
+                result.get("bpm") or self.rhythm.bpm_from_density(txt) or 120,
+                result.get("emotions", {}),
+                result.get("tlp", {})
+            )
+
+        result["annotated_text"] = annotated_text
+        return result
+
     def save_report(self, result: Dict[str, Any], path: str = "studio_report.json"):
-        """Exports full analysis report for external visualization."""
         Path(path).write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
