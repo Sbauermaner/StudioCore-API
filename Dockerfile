@@ -1,28 +1,40 @@
-# ================================
-# 🎧 StudioCore v5 — Slim Build
-# ================================
+# ===============================
+# 🎧 StudioCore v5 — Safe Dockerfile
+# Optimized for Hugging Face Spaces (≤2GB RAM)
+# ===============================
+
 FROM python:3.10-slim
 
-# 💡 Ускоряем установку и уменьшаем размер
+# --- 🧹 Минимизируем систему ---
 ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    HF_HUB_DISABLE_CACHE=1 \
+    TRANSFORMERS_CACHE="/tmp" \
+    GRADIO_ANALYTICS_ENABLED="False" \
+    GRADIO_TEMP_DIR="/tmp"
 
-# --- Устанавливаем минимальные системные зависимости ---
+# --- 🔧 Установка системных зависимостей ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg libsndfile1 git && \
-    rm -rf /var/lib/apt/lists/*
+    ffmpeg libsndfile1 git curl tini \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# --- Копируем и устанавливаем зависимости Python ---
-COPY requirements.txt /workspace/requirements.txt
-WORKDIR /workspace
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+WORKDIR /app
 
-# --- Копируем только нужные файлы ядра ---
+# --- 🧩 Копируем requirements и устанавливаем зависимости ---
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# --- 📦 Копируем исходники ---
 COPY studiocore/ ./studiocore/
 COPY app.py auto_sync_openapi.py update_readme_status.py ./
 COPY README.md ./
 
-# --- Порт и команда запуска ---
-EXPOSE 7860
+# --- ⚡ Кеш / временные каталоги ---
+RUN mkdir -p /tmp && chmod -R 777 /tmp
+
+# --- 🧠 Старт приложения через tini (устойчивость процессов) ---
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# --- 🚀 Запуск FastAPI/Gradio ---
 CMD ["python", "app.py"]
