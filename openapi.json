@@ -7,11 +7,71 @@
   },
   "servers": [
     {
-      "url": "https://sbauer8-studiocore-api.hf.space"
+      "url": "http://0.0.0.0:7860"
     }
   ],
   "paths": {
-    "/predict": {
+    "/status": {
+      "get": {
+        "summary": "Healthcheck",
+        "operationId": "checkStatus",
+        "description": "Проверяет, что StudioCore API готов к работе.",
+        "responses": {
+          "200": {
+            "description": "API доступен.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "engine": { "type": "string" },
+                    "ready": { "type": "boolean" }
+                  }
+                },
+                "example": {
+                  "status": "ok",
+                  "engine": "StudioCore v5",
+                  "ready": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "summary": "Version info",
+        "operationId": "getVersionInfo",
+        "description": "Возвращает текущую версию ядра StudioCore, подпись класса и статус готовности.",
+        "responses": {
+          "200": {
+            "description": "Информация о версии.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "engine": { "type": "string" },
+                    "version": { "type": "string" },
+                    "signature": { "type": "string" }
+                  }
+                },
+                "example": {
+                  "status": "ok",
+                  "engine": "StudioCore",
+                  "version": "v5.0",
+                  "signature": "StudioCore"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/predict": {
       "post": {
         "summary": "Analyze text with StudioCore",
         "operationId": "analyzeText",
@@ -44,37 +104,16 @@
                     "summary": { "type": "string" },
                     "prompt_full": { "type": "string" },
                     "prompt_suno": { "type": "string" },
-                    "annotated_text": { "type": "string" }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/status": {
-      "get": {
-        "summary": "Healthcheck",
-        "operationId": "checkStatus",
-        "description": "Проверяет, что StudioCore API готов к работе.",
-        "responses": {
-          "200": {
-            "description": "API доступен.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": { "type": "string" },
-                    "engine": { "type": "string" },
-                    "ready": { "type": "boolean" }
+                    "annotated_text": { "type": "string" },
+                    "engine_version": { "type": "string" }
                   }
                 },
                 "example": {
-                  "status": "ok",
-                  "engine": "StudioCore v5",
-                  "ready": true
+                  "summary": "✅ Анализ завершён успешно. Жанр: lyrical adaptive, Стиль: melancholic minor...",
+                  "prompt_full": "Genre: lyrical adaptive | Style: melancholic minor | ...",
+                  "prompt_suno": "lyrical minor emotional soft tone ...",
+                  "annotated_text": "🎙️ Core Annotation + Vocal Layer ...",
+                  "engine_version": "v5.0"
                 }
               }
             }
