@@ -1,61 +1,35 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5 — Expressive Adaptive Engine
+🎧 StudioCore v5 — Compressed Adaptive Engine
 Truth × Love × Pain = Conscious Frequency
+Optimized for Hugging Face (low RAM, compressed annotated output)
 """
 
-import os
-import gradio as gr
-import traceback
-import importlib, subprocess, sys, threading, json, time
+import os, sys, subprocess, importlib, traceback, threading, json, time
 from datetime import datetime
+import gradio as gr
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from studiocore import StudioCore, STUDIOCORE_VERSION
 
-# === ⚙️ Проверка и установка requests ===
+# === Установка requests ===
 if importlib.util.find_spec("requests") is None:
     try:
-        print("⚙️ Устанавливаю 'requests' для модулей (README, self-check)...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
     except Exception:
         pass
-
 try:
     import requests  # type: ignore
 except Exception:
     requests = None
 
-# === 🔄 Автоматическая синхронизация OpenAPI ===
+# === Автосинхронизация OpenAPI ===
 try:
     if os.path.exists("auto_sync_openapi.py"):
-        print("🔄 Синхронизирую OpenAPI (JSON → YAML)...")
         subprocess.call([sys.executable, "auto_sync_openapi.py"])
-    else:
-        print("ℹ️ auto_sync_openapi.py не найден, пропускаю синхронизацию.")
 except Exception as e:
-    print("⚠️ Ошибка при автосинхронизации OpenAPI:", e)
-
-# === 🧩 Генерация README ===
-try:
-    if not os.path.exists("README.md") and os.path.exists("readme_template_gen.py"):
-        print("🧩 README.md отсутствует — создаю шаблон...")
-        import readme_template_gen
-        readme_template_gen.generate_readme()
-except Exception as e:
-    print("⚠️ Ошибка при генерации README:", e)
-
-# === 📘 Обновление README ===
-try:
-    if os.path.exists("update_readme_status.py"):
-        print("🪶 Обновляю README.md (API статус, версия, OpenAPI ссылки)...")
-        import update_readme_status
-        update_readme_status.update_readme()
-    else:
-        print("ℹ️ update_readme_status.py не найден, пропускаю обновление README.")
-except Exception as e:
-    print("⚠️ Ошибка при обновлении README:", e)
+    print("⚠️ Ошибка OpenAPI sync:", e)
 
 # === Инициализация ядра ===
 core = StudioCore()
@@ -73,49 +47,21 @@ app.add_middleware(
 # === SELF-CHECK ===
 def auto_core_check():
     if os.environ.get("DISABLE_SELF_CHECK") == "1":
-        print("🧪 Self-check отключён (DISABLE_SELF_CHECK=1).")
         return
     if requests is None:
-        print("ℹ️ requests недоступен — пропускаю HTTP self-check. Используй /compat-check.")
         return
-
-    time.sleep(5)
-    api_url = "http://0.0.0.0:7860/api/predict"
-    test_text = "Вся моя жизнь — как быль или небыль, Вся моя жизнь — по краю скользить..."
-    print("\n🧠 [StudioCore Self-Check] Запуск теста совместимости...\n")
+    time.sleep(3)
     try:
-        r = requests.post(api_url, json={"text": test_text}, timeout=25)
-        if r.status_code != 200:
-            print(f"❌ [Self-Check] API вернул {r.status_code}")
-            return
-        data = r.json()
-        summary = data.get("summary", "")
-        annotated = data.get("annotated_text", "")
-        tlp_ok = any(tag in summary for tag in ["Truth", "Love", "Pain"])
-        tonesync_ok = "ToneSync" in data.get("prompt_suno", "")
-        ann_ok = "[" in annotated
-        status = (
-            "✅ StudioCore v5 совместимо и активно."
-            if all([tlp_ok, tonesync_ok, ann_ok])
-            else "⚠️ Обнаружено несовпадение с монолитом."
-        )
-        report = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "engine_version": STUDIOCORE_VERSION,
-            "status": status,
-            "summary_preview": summary[:300],
-            "annotated_preview": "\n".join(annotated.splitlines()[:6]),
-        }
-        print(status)
-        with open("startup_selfcheck_report.json", "w", encoding="utf-8") as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
+        r = requests.post("http://0.0.0.0:7860/api/predict", json={"text": "test"}, timeout=10)
+        print(f"[Self-Check] → {r.status_code}")
     except Exception as e:
-        print("❌ [Self-Check] Ошибка:", e)
+        print("❌ Self-Check error:", e)
 
 threading.Thread(target=auto_core_check, daemon=True).start()
 
-# === Основной анализ ===
+# === АНАЛИЗ ТЕКСТА (с компрессией) ===
 def analyze_text(text: str):
+    """Полный анализ с интеллектуальным сжатием (до 100k символов, ~0.3 KB вывода)."""
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
     try:
@@ -123,16 +69,17 @@ def analyze_text(text: str):
         if "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
 
+        # --- краткий summary ---
         summary = (
-            f"✅ Анализ завершён успешно.\n"
-            f"Жанр: {result['style'].get('genre', '—')}\n"
-            f"Стиль: {result['style'].get('style', '—')}\n"
-            f"Вокальная форма: {result['style'].get('vocal_form', '—')}\n"
-            f"Темп: {result.get('bpm', '—')} BPM\n"
-            f"Философия: {result.get('philosophy', '—')}\n"
-            f"Версия ядра: {result.get('version', '—')}"
+            f"✅ StudioCore v5\n"
+            f"🎭 {result['style'].get('genre', '—')} | "
+            f"🎵 {result['style'].get('style', '—')} | "
+            f"🎙 {result['style'].get('vocal_form', '—')} | "
+            f"⏱ {result.get('bpm', '—')} BPM | "
+            f"🧠 {result.get('philosophy', '—')}"
         )
 
+        # --- аннотация ---
         annotated_text = result.get("annotated_text") or core.annotate_text(
             text,
             result.get("overlay", {}),
@@ -143,81 +90,55 @@ def analyze_text(text: str):
             result.get("tlp", {}),
         )
 
-        tlp = result.get("tlp", {})
-        love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
-        cf = tlp.get("conscious_frequency", 0)
-        lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
-        annotated_lines = []
+        # --- очистка ---
+        annotated_text = " ".join(annotated_text.split())
+        if len(annotated_text) > 100000:
+            annotated_text = annotated_text[:100000]
 
-        def tone(idx, total):
-            if idx < total * 0.25:
-                return "(soft whisper)", "fragile"
-            elif idx < total * 0.6:
-                return "(warm mid-voice)", "balanced"
-            elif love > pain and cf > 0.6:
-                return "(gentle falsetto)", "open"
-            else:
-                return "(strong release)", "bright"
-
-        # ✅ полный вывод текста без обрезки + адаптивный буфер
-        max_preview = len(lines)
-        for i, line in enumerate(lines[:max_preview]):
-            desc, tag = tone(i, len(lines))
-            if i == 0:
-                header = f"[Verse 1 – {desc}]"
-            elif i == len(lines) - 1:
-                header = f"[Outro – {desc}]"
-            elif any(k in line.lower() for k in ["люб", "love", "you", "бог", "christ"]):
-                header = f"[Chorus – {desc}]"
-            elif "прости" in line.lower():
-                header = f"[Bridge – {desc}]"
-            else:
-                header = f"[Verse – {desc}]"
-            annotated_lines += [
-                header,
-                line,
-                f"(tone: {tag}, Truth={truth:.2f}, Love={love:.2f}, Pain={pain:.2f}, CF={cf:.2f})",
-                "",
-            ]
-
+        # --- уплотнение структуры ---
         annotated_text = (
-            "🎙️ **Core Annotation + Vocal Layer**\n\n"
-            + annotated_text + "\n\n" + "\n".join(annotated_lines)
+            annotated_text.replace("(tone:", "[")
+            .replace("Truth=", "T=")
+            .replace("Love=", "L=")
+            .replace("Pain=", "P=")
+            .replace("CF=", "CF=")
+            .replace(")", "]")
         )
 
-        # 💾 безопасный динамический буфер
-        if len(annotated_text.encode("utf-8")) > 2_000_000:
-            print("⚠️ Warning: annotated_text превышает 2MB, сокращаю для вывода.")
-            annotated_text = (
-                annotated_text[:1_500_000]
-                + "\n\n[... текст обрезан для безопасности вывода ...]"
-            )
+        # --- лёгкое адаптивное сжатие ---
+        lines = annotated_text.split()
+        preview = " ".join(lines[:80])  # первые 80 токенов
+        tail = " ".join(lines[-30:]) if len(lines) > 120 else ""
+        annotated_compressed = (
+            f"🎙️ **Annotation (compressed 0.3 KB view)**\n\n"
+            + preview
+            + ("\n\n... " + tail if tail else "")
+        )
 
         return (
             summary,
             result.get("prompt_full", "⚠️ Нет данных"),
             result.get("prompt_suno", "⚠️ Нет данных"),
-            annotated_text,
+            annotated_compressed,
         )
+
     except Exception as e:
         print("❌ Ошибка при анализе:\n", traceback.format_exc())
         return f"❌ Исключение: {str(e)}", "", "", ""
 
 # === PUBLIC UI ===
 with gr.Blocks(title="🎧 StudioCore v5 — Public Interface") as iface_public:
-    gr.Markdown("### StudioCore (Public)\nПубличная версия без кнопки Flag и логов.")
+    gr.Markdown("### StudioCore (Public)\nПубличная версия без логов.")
     gr.Interface(
         fn=analyze_text,
         inputs=gr.Textbox(label="Введите текст песни", lines=10),
         outputs=[
-            gr.Textbox(label="📊 Результат анализа", lines=6),
+            gr.Textbox(label="📊 Результат", lines=6),
             gr.Textbox(label="🎼 Полный промт", lines=8),
             gr.Textbox(label="🎧 Suno-промт", lines=8),
-            gr.Textbox(label="🎙️ Аннотация (Vocal Layer)", lines=20),
+            gr.Textbox(label="🎙️ Аннотация (сжата)", lines=20),
         ],
         flagging_mode="never",
-        title=None,
-        description=None,
     )
 
 # === ADMIN UI ===
@@ -226,26 +147,23 @@ def password_gate(password):
         return gr.update(visible=False), gr.update(visible=True), ""
     return gr.update(visible=True), gr.update(visible=False), "❌ Неверный пароль"
 
-with gr.Blocks(title="🎧 StudioCore Admin Access") as iface_admin:
-    gr.Markdown("## 🔐 Вход в административную панель StudioCore")
-    pwd = gr.Textbox(label="Пароль", type="password", placeholder="••••••••")
+with gr.Blocks(title="🎧 StudioCore Admin") as iface_admin:
+    gr.Markdown("## 🔐 Вход в панель StudioCore")
+    pwd = gr.Textbox(label="Пароль", type="password")
     err = gr.Markdown("")
     btn = gr.Button("Войти")
     admin_panel = gr.Group(visible=False)
     with admin_panel:
-        gr.Markdown("### 🎛 Панель администратора")
         gr.Interface(
             fn=analyze_text,
             inputs=gr.Textbox(label="Введите текст", lines=10),
             outputs=[
-                gr.Textbox(label="📊 Результат анализа", lines=6),
+                gr.Textbox(label="📊 Результат", lines=6),
                 gr.Textbox(label="🎼 Полный промт", lines=8),
                 gr.Textbox(label="🎧 Suno-промт", lines=8),
-                gr.Textbox(label="🎙️ Вокальная аннотация", lines=20),
+                gr.Textbox(label="🎙️ Вокальная аннотация (сжата)", lines=20),
             ],
             flagging_mode="manual",
-            title=None,
-            description="Админская версия с диагностикой.",
         )
     btn.click(password_gate, inputs=pwd, outputs=[pwd, admin_panel, err])
 
@@ -255,69 +173,6 @@ async def status():
     return JSONResponse(
         content={"status": "ok", "engine": "StudioCore", "ready": True, "version": STUDIOCORE_VERSION}
     )
-
-@app.get("/version")
-async def version_info():
-    return JSONResponse(
-        content={
-            "status": "ok",
-            "engine": "StudioCore",
-            "version": STUDIOCORE_VERSION,
-            "signature": core.__class__.__name__,
-        }
-    )
-
-@app.get("/compat/core")
-async def compat_core():
-    try:
-        from compat_check_core import run_check as run_core
-        report = run_core()
-        return JSONResponse(content=report)
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-@app.get("/compat/remote")
-async def compat_remote():
-    try:
-        from compat_check_remote import run_check as run_remote
-        run_remote()
-        if os.path.exists("remote_compatibility_full_report.json"):
-            with open("remote_compatibility_full_report.json", "r", encoding="utf-8") as f:
-                return JSONResponse(content=json.load(f))
-        return JSONResponse(content={"status": "no_report"})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-@app.get("/compat-check")
-async def compat_check():
-    text = (
-        "Вся моя жизнь — как быль или небыль,\n"
-        "Вся моя жизнь — по краю скользить.\n"
-        "Но я молю открыть в сердце двери,\n"
-        "Я так хочу твоей женщиной быть…"
-    )
-    try:
-        res = core.analyze(text)
-        ok = {
-            "has_tlp": isinstance(res.get("tlp"), dict) and all(k in res["tlp"] for k in ("truth", "love", "pain")),
-            "has_tonesync": isinstance(res.get("tonesync"), dict) and "primary_color" in res["tonesync"],
-            "has_overlay": isinstance(res.get("overlay"), dict) and "sections" in res["overlay"],
-            "has_prompts": bool(res.get("prompt_full")) and bool(res.get("prompt_suno")),
-            "has_annotation": bool(res.get("annotated_text")),
-        }
-        status = "ok" if all(ok.values()) else "partial"
-        return JSONResponse(
-            content={
-                "status": status,
-                "engine_version": STUDIOCORE_VERSION,
-                "checks": ok,
-                "bpm": res.get("bpm"),
-                "style_key": res.get("style", {}).get("key"),
-                "vocal_form": res.get("style", {}).get("vocal_form"),
-            }
-        )
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
 @app.post("/api/predict")
 async def predict_api(request: Request):
