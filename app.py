@@ -6,7 +6,7 @@ Truth × Love × Pain = Conscious Frequency
 
 import gradio as gr
 import traceback
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from studiocore import StudioCore
 
@@ -16,6 +16,10 @@ app = FastAPI(title="StudioCore API")
 
 # === Основная функция анализа ===
 def analyze_text(text: str):
+    """
+    Основная функция анализа текста.
+    Возвращает: summary, full_prompt, suno_prompt, annotated_text
+    """
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
 
@@ -25,6 +29,7 @@ def analyze_text(text: str):
         if "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
 
+        # --- Краткое резюме анализа ---
         summary = (
             f"✅ Анализ завершён успешно.\n"
             f"Жанр: {result['style'].get('genre', '—')}\n"
@@ -35,6 +40,7 @@ def analyze_text(text: str):
             f"Версия: {result.get('version', '—')}"
         )
 
+        # --- Автоматическая аннотация ---
         annotated = []
         overlay = result.get("overlay", {}).get("sections", [])
         for sec in overlay:
@@ -73,16 +79,35 @@ iface = gr.Interface(
     ],
     title="🎧 StudioCore v4.3–v5 — Expressive Adaptive Engine",
     description="AI-движок анализа эмоций, структуры и смысловой архитектуры текста.\nФормула ядра: Truth × Love × Pain = Conscious Frequency.",
-    api_name="/predict",
 )
 
-# === Добавляем реальный FastAPI endpoint /status ===
+# === Healthcheck endpoint для GPT Builder ===
 @app.get("/status")
 async def status():
     """Healthcheck для GPT Builder и Hugging Face."""
-    return JSONResponse(
-        content={"status": "ok", "engine": "StudioCore v5", "ready": True}
-    )
+    return JSONResponse(content={"status": "ok", "engine": "StudioCore v5", "ready": True})
+
+
+# === API endpoint /api/predict (для GPT Builder, cURL, Python, JS) ===
+@app.post("/api/predict")
+async def predict_api(request: Request):
+    """Реальный JSON API для интеграций."""
+    try:
+        payload = await request.json()
+        text = payload.get("text", "")
+        summary, full, suno, annotated = analyze_text(text)
+        return JSONResponse(
+            content={
+                "summary": summary,
+                "prompt_full": full,
+                "prompt_suno": suno,
+                "annotated_text": annotated,
+            }
+        )
+    except Exception as e:
+        print("❌ Ошибка API /api/predict:", e)
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
 
 # === Монтируем Gradio-интерфейс в FastAPI ===
 app = gr.mount_gradio_app(app, iface, path="/")
