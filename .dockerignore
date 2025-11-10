@@ -1,0 +1,74 @@
+# ============================
+# 🧹 StudioCore v5 — Docker Ignore Rules
+# Ускоряет сборку и уменьшает размер образа
+# ============================
+
+# --- Python cache & build ---
+pycache/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+build/
+dist/
+
+# --- Logs & reports ---
+*.log
+*.tmp
+*.bak
+*.old
+*.swp
+*.DS_Store
+*.sublime-workspace
+*.sublime-project
+nohup.out
+startup_selfcheck_report.json
+remote_compatibility_full_report.json
+
+# --- Local / dev configs ---
+.env
+.vscode/
+.idea/
+*.iml
+*.code-workspace
+
+# --- Git / HuggingFace internals ---
+.git/
+.gitignore
+.huggingface/
+.hf_cache/
+.huggingface_cache/
+**/.gitkeep
+
+# --- Large or temporary files ---
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.mp3
+*.wav
+*.mp4
+*.mov
+*.avi
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.svg
+
+# --- Cache folders ---
+cache/
+.cache/
+.venv/
+venv/
+pip-wheel-metadata/
+site/
+tmp/
+temp/
+
+# --- Optional HF/Spaces metadata (будет создано заново при билде) ---
+hf-space.json
+hf.lock
