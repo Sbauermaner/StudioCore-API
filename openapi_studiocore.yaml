@@ -1,0 +1,110 @@
+openapi: 3.1.0
+info:
+  title: StudioCore API
+  version: "v5.0"
+  description: |
+    🎧 **StudioCore v5 — Expressive Adaptive Engine**
+    Автор: Bauer Synesthetic Studio
+
+    Формула: **Truth × Love × Pain = Conscious Frequency**
+
+    AI-ядро для анализа текста, эмоций, структуры и философии.
+    Возвращает жанр, BPM, философию, промты (Full и Suno)
+    и аннотированный текст с вокальными слоями.
+
+servers:
+  - url: http://0.0.0.0:7860
+
+paths:
+  /status:
+    get:
+      summary: Проверка состояния API
+      operationId: checkStatus
+      description: Проверяет, что ядро StudioCore активно и готово к работе.
+      responses:
+        "200":
+          description: Состояние API
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  engine:
+                    type: string
+                    example: StudioCore v5
+                  ready:
+                    type: boolean
+                    example: true
+
+  /version:
+    get:
+      summary: Информация о версии
+      operationId: getVersionInfo
+      description: Возвращает текущую версию ядра StudioCore, подпись класса и статус готовности.
+      responses:
+        "200":
+          description: Информация о версии StudioCore.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  engine:
+                    type: string
+                    example: StudioCore
+                  version:
+                    type: string
+                    example: v5.0
+                  signature:
+                    type: string
+                    example: StudioCore
+
+  /api/predict:
+    post:
+      summary: Выполняет полный анализ текста через StudioCore Engine
+      operationId: analyzeText
+      description: |
+        Возвращает структурированный анализ текста, эмоций и философии.
+        Генерирует полный промт и Suno-совместимую сжатую версию.
+        Также включает аннотированный текст с вокальными подсказками.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  description: Текст для анализа (песня, стихотворение, манифест)
+              required:
+                - text
+      responses:
+        "200":
+          description: Успешный результат анализа
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: string
+                    example: "✅ Анализ завершён успешно. Жанр: lyrical adaptive..."
+                  prompt_full:
+                    type: string
+                    example: "Genre: lyrical adaptive | Style: melancholic minor | ..."
+                  prompt_suno:
+                    type: string
+                    example: "melancholic minor emotional tone..."
+                  annotated_text:
+                    type: string
+                    example: "🎙️ Core Annotation + Vocal Layer ..."
+                  engine_version:
+                    type: string
+                    example: v5.0
