@@ -1,6 +1,13 @@
+# -*- coding: utf-8 -*-
+"""
+🎧 StudioCore v4.3–v5 — Expressive Adaptive Engine
+Truth × Love × Pain = Conscious Frequency
+"""
+
 import gradio as gr
 import traceback
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from studiocore import StudioCore
 
 # === Инициализация ядра ===
@@ -50,13 +57,8 @@ def analyze_text(text: str):
         return f"❌ Исключение: {str(e)}", "", "", ""
 
 
-# === Проверка статуса ядра ===
-def check_status():
-    return {"status": "ok", "engine": "StudioCore v5", "ready": True}
-
-
-# === Создание интерфейсов ===
-iface_predict = gr.Interface(
+# === Gradio-интерфейс ===
+iface = gr.Interface(
     fn=analyze_text,
     inputs=gr.Textbox(
         label="Введите текст песни, стихотворения или манифеста",
@@ -74,16 +76,16 @@ iface_predict = gr.Interface(
     api_name="/predict",
 )
 
-iface_status = gr.Interface(
-    fn=check_status,
-    inputs=None,
-    outputs="json",
-    api_name="/status",
-)
+# === Добавляем реальный FastAPI endpoint /status ===
+@app.get("/status")
+async def status():
+    """Healthcheck для GPT Builder и Hugging Face."""
+    return JSONResponse(
+        content={"status": "ok", "engine": "StudioCore v5", "ready": True}
+    )
 
-# === Монтируем интерфейсы в общее FastAPI приложение ===
-gr.mount_gradio_app(app, iface_predict, path="/")
-gr.mount_gradio_app(app, iface_status, path="/status")
+# === Монтируем Gradio-интерфейс в FastAPI ===
+app = gr.mount_gradio_app(app, iface, path="/")
 
 # === Запуск ===
 if __name__ == "__main__":
