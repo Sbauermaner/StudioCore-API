@@ -185,12 +185,16 @@ def analyze_text(text: str):
             + annotated_text + "\n\n" + "\n".join(annotated_lines)
         )
 
-        # 💾 безопасный динамический буфер
-        if len(annotated_text.encode("utf-8")) > 2_000_000:
-            print("⚠️ Warning: annotated_text превышает 2MB, сокращаю для вывода.")
+        # 💾 Расширенный безопасный буфер вывода (до 10 МБ)
+        max_size_mb = 10
+        limit_bytes = max_size_mb * 1_000_000
+        text_bytes = len(annotated_text.encode("utf-8"))
+
+        if text_bytes > limit_bytes:
+            print(f"⚠️ annotated_text превысил {max_size_mb} MB — может замедлить интерфейс.")
             annotated_text = (
-                annotated_text[:1_500_000]
-                + "\n\n[... текст обрезан для безопасности вывода ...]"
+                annotated_text[: limit_bytes - 500_000]
+                + f"\n\n[... часть текста обрезана, превышен лимит {max_size_mb} MB ...]"
             )
 
         return (
