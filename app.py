@@ -40,19 +40,28 @@ def analyze_text(text: str):
             f"Версия: {result.get('version', '—')}"
         )
 
-        # --- Получаем основные параметры ядра для модуля вокальной аннотации ---
+        # --- Проверяем аннотацию ядра ---
+        if result.get("annotated_text"):
+            annotated_text = result["annotated_text"]
+        else:
+            # --- fallback-аннотация через ядро с передачей эмоций и TLP ---
+            annotated_text = core.annotate_text(
+                text,
+                result.get("overlay", {}),
+                result.get("style", {}),
+                result.get("vocals", []),
+                result.get("bpm") or core.rhythm.bpm_from_density(text) or 120,
+                result.get("emotions", {}),
+                result.get("tlp", {}),
+            )
+
+        # --- VOCAL ANNOTATION LAYER (надстройка) ---
         tlp = result.get("tlp", {})
-        emo = result.get("emotions", {})
-        bpm = result.get("bpm", 120)
         love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
         cf = tlp.get("conscious_frequency", 0)
-
-        # --- Базовая аннотация от ядра (overlay) ---
-        overlay = result.get("overlay", {}).get("sections", [])
         lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
         annotated_lines = []
 
-        # --- VOCAL ANNOTATION LAYER — ДОПОЛНЕНИЕ К ОСНОВНОМУ АНАЛИЗУ ---
         def describe_tone(idx, total):
             """Адаптивное описание вокала в зависимости от эмоций и позиции."""
             if idx < total * 0.25:
@@ -71,7 +80,6 @@ def analyze_text(text: str):
 
         for i, line in enumerate(lines):
             tone_desc, tone_tag = describe_tone(i, len(lines))
-
             if i == 0:
                 header = f"[Verse 1 – {tone_desc}]"
             elif i == len(lines) - 1:
@@ -81,21 +89,30 @@ def analyze_text(text: str):
             else:
                 header = f"[Verse – {tone_desc}]"
 
-            tone_line = f"(tone: {tone_tag}, Truth={truth:.2f}, Love={love:.2f}, Pain={pain:.2f}, CF={cf:.2f})"
+            tone_line = (
+                f"(tone: {tone_tag}, "
+                f"Truth={truth:.2f}, Love={love:.2f}, Pain={pain:.2f}, CF={cf:.2f})"
+            )
 
             annotated_lines.append(header)
             annotated_lines.append(line)
             annotated_lines.append(tone_line)
             annotated_lines.append("")
 
-        annotated_text = "\n".join(annotated_lines)
+        # Комбинируем полную аннотацию ядра и вокальный слой
+        annotated_text = (
+            "🎙️ **Core Annotation + Vocal Layer**\n\n"
+            + annotated_text
+            + "\n\n"
+            + "\n".join(annotated_lines)
+        )
 
-        # --- Возврат результатов без изменения логики ядра ---
+        # --- Возврат ---
         return (
             summary,
             result.get("prompt_full", "⚠️ Нет данных"),
             result.get("prompt_suno", "⚠️ Нет данных"),
-            annotated_text
+            annotated_text,
         )
 
     except Exception as e:
