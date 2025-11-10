@@ -40,15 +40,29 @@ def analyze_text(text: str):
             f"Версия: {result.get('version', '—')}"
         )
 
-        # --- Автоматическая аннотация ---
-        annotated = []
+        # --- Автоматическая аннотация текста с секциями ---
         overlay = result.get("overlay", {}).get("sections", [])
-        for sec in overlay:
-            annotated.append(
-                f"[{sec['section']} – {sec['mood']}, focus={sec['focus']}] "
-                f"(intensity={sec['intensity']})"
-            )
-        annotated_text = "\n".join(annotated) if annotated else "⚠️ Аннотация не найдена."
+        lines = text.strip().split("\n")
+        annotated_lines = []
+        section_index = 0
+
+        for i, line in enumerate(lines):
+            # вставляем секцию перед каждой смысловой частью (по порядку)
+            if section_index < len(overlay):
+                sec = overlay[section_index]
+                tag = (
+                    f"[{sec['section']} – {sec['mood']}, focus={sec['focus']}] "
+                    f"(intensity={sec['intensity']})"
+                )
+                annotated_lines.append(tag)
+                section_index += 1
+            annotated_lines.append(line.strip())
+
+        # если секций меньше строк, просто выводим остаток текста без потери
+        if len(lines) > len(overlay):
+            annotated_lines.extend(lines[len(overlay):])
+
+        annotated_text = "\n".join(annotated_lines) if annotated_lines else "⚠️ Аннотация не найдена."
 
         return (
             summary,
