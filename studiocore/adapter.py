@@ -1,7 +1,8 @@
 import re
 from typing import Dict, Any
 
-def semantic_compress(text: str, max_len: int = 1000) -> str:
+
+def semantic_compress(text: str, max_len: int = 1000, preserve_last_line: bool = True) -> str:
     """
     Compresses text meaningfully, keeping structure and key context.
     Does NOT trim blindly — removes redundancy, keeps essence.
@@ -9,19 +10,19 @@ def semantic_compress(text: str, max_len: int = 1000) -> str:
     if len(text) <= max_len:
         return text.strip()
 
-    # 1️⃣ Убираем избыточные слова
+    # 1️⃣ Убираем избыточные слова и шум
     text = re.sub(
         r"\b(beautiful|amazing|very|extremely|really|truly|highly|deeply|incredibly|wonderful)\b",
         "",
         text,
-        flags=re.I
+        flags=re.I,
     )
+    text = re.sub(r"[\[\]{}()]+", "", text)
     text = re.sub(r"\s{2,}", " ", text).strip()
 
-    # 2️⃣ Если всё ещё длинно — оставляем логические части
+    # 2️⃣ Разделяем по логическим частям
     parts = re.split(r"[|;]", text)
-    compressed = []
-    total = 0
+    compressed, total = [], 0
     for p in parts:
         p = p.strip()
         if not p:
@@ -32,17 +33,22 @@ def semantic_compress(text: str, max_len: int = 1000) -> str:
         else:
             break
 
-    return " | ".join(compressed).strip() + "…"
+    compressed_text = " | ".join(compressed).strip()
+    if preserve_last_line and "\n" in text:
+        last_line = text.strip().splitlines()[-1]
+        if last_line not in compressed_text:
+            compressed_text += "\n" + last_line
+    return compressed_text[:max_len].strip() + "…"
 
 
 def build_suno_prompt(
     style_data: Dict[str, Any],
-    vocals: list,
-    instruments: list,
+    vocals: list | None,
+    instruments: list | None,
     bpm: int,
     philosophy: str,
     version: str,
-    mode: str = "full"
+    mode: str = "full",
 ) -> str:
     """
     Builds a detailed or compact adaptive prompt from full StudioCore analysis.
@@ -60,7 +66,9 @@ def build_suno_prompt(
     techniques = style_data.get("techniques", [])
     vocal_form = style_data.get("vocal_form", "solo_auto")
 
-    # === Полная форма ===
+    vocals = vocals or []
+    instruments = instruments or []
+
     prompt = (
         f"Genre: {genre} | Style: {style} | Vocal Form: {vocal_form} | Key: {key} | BPM: {bpm} | Structure: {structure}\n"
         f"Vocals: {', '.join(vocals)} | Techniques: {', '.join(techniques)} | "
@@ -72,7 +80,7 @@ def build_suno_prompt(
         f"Engine: StudioCore {version} adaptive emotional system"
     )
 
-    # === Если требуется Suno-режим — сжимаем, не обрезаем ===
+    # === Suno-режим: безопасное сжатие без потери последней строки
     if mode == "suno":
-        return semantic_compress(prompt, 1000)
+        return semantic_compress(prompt, 1000, preserve_last_line=True)
     return prompt
