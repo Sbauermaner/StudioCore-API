@@ -14,6 +14,19 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from studiocore import StudioCore, STUDIOCORE_VERSION
 
+# === ⚙️ Проверка и установка requests (перед всеми зависимыми модулями) ===
+if importlib.util.find_spec("requests") is None:
+    try:
+        print("⚙️ Устанавливаю 'requests' для модулей (README, self-check)...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
+    except Exception:
+        pass
+
+try:
+    import requests  # type: ignore
+except Exception:
+    requests = None
+
 # === 🔄 Автоматическая синхронизация OpenAPI ===
 try:
     if os.path.exists("auto_sync_openapi.py"):
@@ -23,6 +36,15 @@ try:
         print("ℹ️ auto_sync_openapi.py не найден, пропускаю синхронизацию.")
 except Exception as e:
     print("⚠️ Ошибка при автосинхронизации OpenAPI:", e)
+
+# === 🧩 Автоматическая генерация README (если отсутствует) ===
+try:
+    if not os.path.exists("README.md") and os.path.exists("readme_template_gen.py"):
+        print("🧩 README.md отсутствует — создаю шаблон...")
+        import readme_template_gen
+        readme_template_gen.generate_readme()
+except Exception as e:
+    print("⚠️ Ошибка при генерации README:", e)
 
 # === 📘 Автоматическое обновление README ===
 try:
@@ -34,19 +56,6 @@ try:
         print("ℹ️ update_readme_status.py не найден, пропускаю обновление README.")
 except Exception as e:
     print("⚠️ Ошибка при обновлении README:", e)
-
-# === Проверка и установка requests (для self-check) ===
-if importlib.util.find_spec("requests") is None:
-    try:
-        print("⚙️ Устанавливаю 'requests' для self-check...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
-    except Exception:
-        pass
-
-try:
-    import requests  # type: ignore
-except Exception:
-    requests = None
 
 # === Инициализация ядра ===
 core = StudioCore()
@@ -245,7 +254,6 @@ async def version_info():
         }
     )
 
-# === COMPATIBILITY CHECKS ===
 @app.get("/compat/core")
 async def compat_core():
     try:
