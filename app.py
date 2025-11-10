@@ -1,20 +1,14 @@
 import gradio as gr
 import traceback
+from fastapi import FastAPI
 from studiocore import StudioCore
 
 # === Инициализация ядра ===
 core = StudioCore()
+app = FastAPI(title="StudioCore API")
 
 # === Основная функция анализа ===
 def analyze_text(text: str):
-    """
-    Выполняет полный анализ текста через ядро StudioCore.
-    Возвращает:
-    1. краткий результат (жанр, BPM, философия),
-    2. полный промт,
-    3. Suno-промт,
-    4. аннотированный текст.
-    """
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
 
@@ -58,11 +52,10 @@ def analyze_text(text: str):
 
 # === Проверка статуса ядра ===
 def check_status():
-    """Проверка состояния движка (healthcheck)."""
     return {"status": "ok", "engine": "StudioCore v5", "ready": True}
 
 
-# === Создаём интерфейсы ===
+# === Создание интерфейсов ===
 iface_predict = gr.Interface(
     fn=analyze_text,
     inputs=gr.Textbox(
@@ -88,11 +81,11 @@ iface_status = gr.Interface(
     api_name="/status",
 )
 
-# === Объединяем оба интерфейса в одно приложение ===
-# Hugging Face Spaces поддерживает только один .launch()
-app = gr.mount_gradio_app(iface_predict, path="/")
-app = gr.mount_gradio_app(iface_status, path="/status", parent=app)
+# === Монтируем интерфейсы в общее FastAPI приложение ===
+gr.mount_gradio_app(app, iface_predict, path="/")
+gr.mount_gradio_app(app, iface_status, path="/status")
 
-# === Запуск сервера (Hugging Face / Docker) ===
+# === Запуск ===
 if __name__ == "__main__":
-    app.launch(server_name="0.0.0.0", server_port=7860)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=7860)
