@@ -10,14 +10,21 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from studiocore import StudioCore, STUDIOCORE_VERSION
 
+# === Проверка и установка requests ===
+import importlib, subprocess, sys
+if importlib.util.find_spec("requests") is None:
+    print("⚙️ Устанавливаю 'requests' для self-check...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
+
+# После установки можно безопасно импортировать
+import threading, requests, json, time
+from datetime import datetime
+
 # === Инициализация ядра ===
 core = StudioCore()
 app = FastAPI(title="StudioCore API")
 
 # === 🔎 Автоматическая проверка ядра после старта ===
-import threading, requests, json, time
-from datetime import datetime
-
 def auto_core_check():
     """Выполняет внутренний self-check ядра после старта Space."""
     time.sleep(5)  # ждём пока API поднимется
@@ -54,6 +61,7 @@ def auto_core_check():
 
         report = {
             "timestamp": datetime.utcnow().isoformat(),
+            "engine_version": STUDIOCORE_VERSION,
             "status": status,
             "summary": summary[:400],
             "has_tlp": tlp_ok,
