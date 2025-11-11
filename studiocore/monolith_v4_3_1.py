@@ -127,7 +127,6 @@ class PatchedIntegrityScanEngine:
             "flags": []
         }
 
-
 # ==========================================================
 # StudioCore
 # ==========================================================
@@ -171,14 +170,30 @@ class StudioCore:
         return {"bpm": bpm_adj, "overlay": overlay}
 
     # -------------------------------------------------------
+    def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any],
+                      vocals: List[str], bpm: int, emotions=None, tlp=None) -> str:
+        """
+        Добавляет аннотации к тексту (структура песни, BPM, вокальные техники)
+        """
+        blocks = [b.strip() for b in re.split(r"\n\s*\n", text.strip()) if b.strip()]
+        sections = overlay.get("sections", [])
+        annotated_blocks = []
+        for i, block in enumerate(blocks):
+            sec = sections[i % len(sections)] if sections else {}
+            header = f"[{sec.get('section','Block')} – {sec.get('mood','neutral')}, focus={sec.get('focus','flow')}, intensity≈{sec.get('intensity',bpm)}]"
+            annotated_blocks.append(header)
+            annotated_blocks.append(block)
+            annotated_blocks.append("")
+        vocal_form = style.get("vocal_form", "auto")
+        tone_key = style.get("key", "auto")
+        tech = ", ".join([v for v in vocals if v not in ["male","female"]]) or "neutral tone"
+        annotated_blocks.append(f"[End – BPM≈{bpm}, Vocal={vocal_form}, Tone={tone_key}]")
+        annotated_blocks.append(f"[Vocal Techniques: {tech}]")
+        return "\n".join(annotated_blocks).strip()
+
+    # -------------------------------------------------------
     def analyze(self, text: str, author_style=None, preferred_gender=None, version=None,
                 overlay: Dict[str, Any] | None = None) -> Dict[str, Any]:
-        """
-        Анализ текста:
-        - USER-MODE: если найдено описание вокала (overlay / текст)
-        - AUTO-MODE: если нет — подбор по эмоциям/TLP/BPM
-        - AUTO-DETECT: если найдено автоматически через detect_voice_profile()
-        """
         version = version or self.cfg.get("suno_version", "v5")
         raw = normalize_text_preserve_symbols(text)
         sections = extract_sections(raw)
