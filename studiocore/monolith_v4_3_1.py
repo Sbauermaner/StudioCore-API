@@ -125,7 +125,8 @@ class StudioCore:
         self.safety = PatchedRNSSafety(self.cfg)
         self.integrity = PatchedIntegrityScanEngine()
         self.vocals = VocalProfileRegistry()
-        self.style = __import__("studiocore.monolith_v4_3_1").PatchedStyleMatrix()
+        # ключевая правка: прямой вызов локального класса без __import__
+        self.style = PatchedStyleMatrix()
         self.tone = ToneSyncEngine()
 
     def _build_semantic_sections(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int) -> Dict[str, Any]:
@@ -234,3 +235,25 @@ class StudioCore:
     def save_report(self, result: Dict[str, Any], path="studio_report.json"):
         Path(path).write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
+
+
+# ==========================================================
+# ✅ Auto-Register Patch for Hugging Face / __init__.py
+# ==========================================================
+STUDIOCORE_VERSION = "v4.3.2"
+
+try:
+    from inspect import isclass
+    # Регистрируем класс StudioCore глобально (на случай отложенного импорта)
+    if "StudioCore" not in globals():
+        for name, obj in globals().items():
+            if isclass(obj) and name == "StudioCore":
+                globals()["StudioCore"] = obj
+                print(f"🔹 [StudioCore {STUDIOCORE_VERSION}] Auto-registered successfully.")
+                break
+        else:
+            print("⚠️ [StudioCore] Class not found during auto-registration.")
+    else:
+        print("🔹 [StudioCore] Already registered in globals().")
+except Exception as e:
+    print(f"⚠️ [StudioCore Auto-Register Error] {e}")
