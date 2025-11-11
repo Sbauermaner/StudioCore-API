@@ -9,7 +9,14 @@ StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION
 5. Работа API /api/predict
 """
 
-import os, json, ast, yaml, importlib, requests, traceback
+# === 🔧 Исправление пути импорта (чтобы test видели пакет) ===
+import os, sys
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+# === Импорты после настройки пути ===
+import json, ast, yaml, importlib, requests, traceback
 from statistics import mean
 
 ROOT_DIR = "studiocore"
