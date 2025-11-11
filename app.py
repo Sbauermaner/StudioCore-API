@@ -2,7 +2,7 @@
 """
 🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (Safe Integration)
 Truth × Love × Pain = Conscious Frequency
-Unified core loader with fallback + Gradio + FastAPI + AutoTest
+Unified core loader with fallback + Gradio + FastAPI + AutoTests
 """
 
 import os, sys, subprocess, importlib, traceback, threading, time
@@ -192,22 +192,31 @@ app = gr.mount_gradio_app(app, iface_public, path="/")
 if __name__ == "__main__":
     import uvicorn
 
+    print(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API...")
+
     # ==========================================================
-    # 🧩 Auto Integrity Check (StudioCore v5.2.1)
+    # 🧩 Auto Integrity + Functional Logic Tests
     # ==========================================================
-    def run_integrity_tests():
+    def run_integrity_and_functional_tests():
         time.sleep(2)
         print("\n🧩 Auto-Running StudioCore Full System Test...")
-        try:
-            result = os.system("python3 studiocore/tests/test_all.py > test_log.txt 2>&1")
-            if result == 0:
-                print("✅ Автотесты StudioCore успешно завершены.")
-            else:
-                print("⚠️ Ошибка при выполнении автотестов. См. test_log.txt")
-        except Exception as e:
-            print("❌ Ошибка автотестов:", e)
+        res1 = os.system("python3 studiocore/tests/test_all.py > test_log.txt 2>&1")
+        if res1 == 0:
+            print("✅ test_all.py — системные тесты успешно завершены.")
+        else:
+            print("⚠️ Ошибка в test_all.py — см. test_log.txt")
 
-    threading.Thread(target=run_integrity_tests, daemon=True).start()
+        print("\n🧠 Running Functional Text Logic Test...")
+        res2 = os.system("python3 studiocore/tests/test_functional_texts.py > test_logic.txt 2>&1")
+        if res2 == 0:
+            print("✅ test_functional_texts.py — функциональная логика пройдена.")
+        else:
+            print("⚠️ Ошибка в функциональном тесте — см. test_logic.txt.")
 
-    print(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API...")
+        print("\n📁 Логи сохранены в файлы:")
+        print("   • test_log.txt   — системные тесты")
+        print("   • test_logic.txt — проверка смысловой логики анализа\n")
+
+    threading.Thread(target=run_integrity_and_functional_tests, daemon=True).start()
+
     uvicorn.run(app, host="0.0.0.0", port=7860)
