@@ -4,6 +4,8 @@ StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE + Auto Voice Detect
 Интеграция автоматического распознавания вокальных описаний в текстах.
 Позволяет ядру StudioCore адаптировать жанр, стиль, атмосферу и вокальные техники
 в зависимости от Truth/Love/Pain, Conscious Frequency и пользовательских описаний вокала.
+
+ИСПРАВЛЕНИЕ: Понижены пороги (thresholds) для 'love' и 'pain' в AUTO-MODE.
 """
 
 import re
@@ -23,7 +25,7 @@ def detect_voice_profile(text: str) -> str | None:
     text_low = text.lower()
     # Типичные шаблоны описаний вокала
     patterns = [
-        r"под\s+[а-яa-z\s,]+вокал",              # под хриплый мужской вокал
+        r"под\s+[а-яa-z\s,]+вокал",          # под хриплый мужской вокал
         r"\(.*(вокал|voice|growl|scream).*\)",   # (soft female growl)
         r"(мужск\w+|женск\w+)\s+вокал",
         r"(soft|airy|raspy|grit|growl|scream|whisper)",
@@ -72,22 +74,28 @@ def resolve_style_and_form(
             style, key_mode = "neutral modal", "modal"
     else:
         # AUTO-MODE (эмоциональный анализ)
-        if cf > 0.9 or pain >= 0.08 or mood in ("intense", "angry", "dramatic"):
+        
+        # --- ИСПРАВЛЕНИЕ ЛОГИКИ ЖАНРА ---
+        # Понижаем пороги, чтобы тексты LOVE/PAIN не проваливались в 'cinematic narrative'
+        if cf > 0.9 or pain >= 0.05 or mood in ("intense", "angry", "dramatic"): # Было: pain >= 0.08
             genre = "cinematic adaptive"
-        elif love >= 0.18 and pain < 0.04 and mood in ("peaceful", "hopeful", "romantic"):
+        elif love >= 0.15 and pain < 0.04 and mood in ("peaceful", "hopeful", "romantic"): # Было: love >= 0.18
             genre = "lyrical adaptive"
-        elif mood in ("melancholy", "sad") or (pain >= 0.05 and love < 0.15):
+        elif mood in ("melancholy", "sad") or (pain >= 0.04 and love < 0.15): # Было: pain >= 0.05
             genre = "lyrical adaptive"
         else:
             genre = "cinematic narrative"
 
-        if cf >= 0.92 or (pain >= 0.08 and truth >= 0.05):
+        # --- ИСПРАВЛЕНИЕ ЛОГИКИ СТИЛЯ ---
+        # Понижаем пороги, чтобы тексты LOVE/PAIN не проваливались в 'neutral modal'
+        if cf >= 0.92 or (pain >= 0.05 and truth >= 0.05): # Было: pain >= 0.08
             style, key_mode = "dramatic harmonic minor", "minor"
-        elif pain >= 0.05 and love < 0.15:
+        elif pain >= 0.04 and love < 0.15: # Было: pain >= 0.05
             style, key_mode = "melancholic minor", "minor"
-        elif love >= 0.18 and pain < 0.04:
+        elif love >= 0.15 and pain < 0.04: # Было: love >= 0.18
             style, key_mode = "majestic major", "major"
         else:
+            # Этот блок все еще может срабатывать, если TLP=0, но шансов меньше
             style, key_mode = "neutral modal", "modal"
 
     # Атмосфера
