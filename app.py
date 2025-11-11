@@ -11,6 +11,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+# === Импорты для API ===
+from pydantic import BaseModel
+from typing import Optional, Dict, Any, List
+
 # === Импорт ядра ===
 from studiocore import get_core, STUDIOCORE_VERSION
 
@@ -38,12 +42,51 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# === 🎧 ИСПРАВЛЕНИЕ: ДОБАВЛЕН API ENDPOINT ===
+
+class PredictRequest(BaseModel):
+    """ Модель запроса для API """
+    text: str
+    gender: str = "auto"
+    tlp: Optional[Dict[str, float]] = None
+    overlay: Optional[Dict[str, Any]] = None
+
+@app.post("/api/predict")
+async def api_predict(request_data: PredictRequest):
+    """
+    Эндпоинт, который ищут 'test_all.py' и 'auto_core_check'.
+    Он принимает JSON и возвращает JSON.
+    """
+    try:
+        # Мы сопоставляем данные из запроса с тем, что ожидает core.analyze
+        # TLP не используется в monolith v4.3.9, но overlay используется
+        result = core.analyze(
+            request_data.text,
+            preferred_gender=request_data.gender,
+            overlay=request_data.overlay
+        )
+        
+        if isinstance(result, dict) and "error" in result:
+             # Если ядро вернуло ошибку, передаем ее
+             return JSONResponse(content=result, status_code=400)
+        
+        # Возвращаем полный результат (тесты ожидают 'bpm' и 'style')
+        return JSONResponse(content=result, status_code=200)
+
+    except Exception as e:
+        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА в /api/predict: {traceback.format_exc()}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+# === Конец API ENDPOINT ===
+
+
 # === SELF-CHECK ===
 def auto_core_check():
     if os.environ.get("DISABLE_SELF_CHECK") == "1" or requests is None:
         return
     time.sleep(3)
     try:
+        # Теперь этот запрос должен работать
         r = requests.post("http://0.0.0.0:7860/api/predict", json={"text": "test"}, timeout=10)
         print(f"[Self-Check] → {r.status_code}")
     except Exception as e:
@@ -51,7 +94,7 @@ def auto_core_check():
 
 threading.Thread(target=auto_core_check, daemon=True).start()
 
-# === АНАЛИЗ ТЕКСТА ===
+# === АНАЛИЗ ТЕКСТА (Gradio) ===
 def analyze_text(text: str, gender: str = "auto"):
     """Основная функция анализа текста через StudioCore."""
     if not text.strip():
