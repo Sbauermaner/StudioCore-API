@@ -3,6 +3,8 @@
 🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (Safe Integration + Inline Logs)
 Truth × Love × Pain = Conscious Frequency
 Unified core loader with fallback + Gradio + FastAPI + Inline Log Viewer
+
+ИСПРАВЛЕНИЕ: Добавлен недостающий эндпоинт @app.post("/api/predict")
 """
 
 import os, sys, subprocess, importlib, traceback, threading, time, io
@@ -57,9 +59,15 @@ async def api_predict(request_data: PredictRequest):
     Эндпоинт, который ищут 'test_all.py' и 'auto_core_check'.
     Он принимает JSON и возвращает JSON.
     """
+    # Проверяем, не в режиме ли заглушки
+    if getattr(core, "is_fallback", False):
+        return JSONResponse(
+            content={"error": "StudioCore is in fallback mode, analysis unavailable."}, 
+            status_code=503 # Service Unavailable
+        )
+        
     try:
         # Мы сопоставляем данные из запроса с тем, что ожидает core.analyze
-        # TLP не используется в monolith v4.3.9, но overlay используется
         result = core.analyze(
             request_data.text,
             preferred_gender=request_data.gender,
@@ -84,13 +92,16 @@ async def api_predict(request_data: PredictRequest):
 def auto_core_check():
     if os.environ.get("DISABLE_SELF_CHECK") == "1" or requests is None:
         return
-    time.sleep(3)
+    time.sleep(3) # Даем серверу время на запуск
+    print("[Self-Check] Запуск самопроверки эндпоинта /api/predict...")
     try:
         # Теперь этот запрос должен работать
-        r = requests.post("http://0.0.0.0:7860/api/predict", json={"text": "test"}, timeout=10)
-        print(f"[Self-Check] → {r.status_code}")
+        r = requests.post("http://127.0.0.1:7860/api/predict", json={"text": "test"}, timeout=10)
+        print(f"[Self-Check] → Статус: {r.status_code}")
+        if r.status_code != 200:
+             print(f"[Self-Check] → Ответ: {r.text[:200]}...")
     except Exception as e:
-        print("❌ Self-Check error:", e)
+        print(f"❌ Self-Check ошибка: {e}")
 
 threading.Thread(target=auto_core_check, daemon=True).start()
 
@@ -181,19 +192,34 @@ def run_inline_tests():
 
     try:
         buffer.write("🚀 Running: test_all.py\n")
+        # Убедимся, что используем python3
         res1 = os.system("python3 studiocore/tests/test_all.py > tmp_test_all.txt 2>&1")
-        with open("tmp_test_all.txt", "r", encoding="utf-8", errors="ignore") as f:
-            buffer.write(f.read() + "\n")
+        try:
+            with open("tmp_test_all.txt", "r", encoding="utf-8", errors="ignore") as f:
+                buffer.write(f.read() + "\n")
+        except FileNotFoundError:
+            buffer.write("   ... tmp_test_all.txt не создан.\n")
+
 
         buffer.write("🧠 Running: test_functional_texts.py\n")
         res2 = os.system("python3 studiocore/tests/test_functional_texts.py > tmp_test_logic.txt 2>&1")
-        with open("tmp_test_logic.txt", "r", encoding="utf-8", errors="ignore") as f:
-            buffer.write(f.read() + "\n")
+        try:
+            with open("tmp_test_logic.txt", "r", encoding="utf-8", errors="ignore") as f:
+                buffer.write(f.read() + "\n")
+        except FileNotFoundError:
+             buffer.write("   ... tmp_test_logic.txt не создан.\n")
 
         buffer.write("✅ Inline test session complete.\n")
 
     except Exception as e:
         buffer.write(f"❌ Ошибка при запуске тестов: {e}\n")
+
+    # Очистка временных файлов
+    try:
+        if os.path.exists("tmp_test_all.txt"): os.remove("tmp_test_all.txt")
+        if os.path.exists("tmp_test_logic.txt"): os.remove("tmp_test_logic.txt")
+    except Exception:
+        pass # Не критично
 
     return buffer.getvalue()
 
