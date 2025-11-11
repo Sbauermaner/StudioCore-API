@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — StyleMatrix
-Формирует полное стилевое описание из лирики и эмоций (адаптивное ядро).
+StudioCore v5.0 Adaptive — PatchedStyleMatrix
+Адаптивный модуль стиля для Monolith v4.3.5:
+- Расширенный эмоциональный анализ (TLP + BPM)
+- Подбор жанра, тональности, атмосферы и нарратива
+- Совместим с Suno v5.2 и Vocal Allocation
 """
 
 import re
@@ -9,8 +12,8 @@ from typing import Dict, Any
 from statistics import mean
 
 
-class StyleMatrix:
-    """Adaptive emotional-to-style mapping engine."""
+class PatchedStyleMatrix:
+    """Adaptive emotional-to-style mapping engine (patched for Monolith 4.3.5)."""
 
     EMO_GROUPS = {
         "soft": ["love", "peace", "joy"],
@@ -19,10 +22,10 @@ class StyleMatrix:
     }
 
     # -------------------------------------------------------
-    # 1️⃣ Тональный профиль
+    # 🎼 1. Тональный профиль
     # -------------------------------------------------------
     def _tone_profile(self, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
-        dominant = max(emo, key=emo.get)
+        dominant = max(emo, key=emo.get) if emo else "neutral"
         cf = tlp.get("conscious_frequency", 0.0)
         love, pain = tlp.get("love", 0.0), tlp.get("pain", 0.0)
 
@@ -37,7 +40,7 @@ class StyleMatrix:
         return "neutral modal"
 
     # -------------------------------------------------------
-    # 2️⃣ Определение жанра
+    # 🎧 2. Определение жанра
     # -------------------------------------------------------
     def _derive_genre(self, text: str, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
         word_count = len(re.findall(r"\b\w+\b", text))
@@ -47,7 +50,6 @@ class StyleMatrix:
         emotional_range = (tlp.get("love", 0) + tlp.get("pain", 0) + tlp.get("truth", 0)) / 3
 
         complexity_score = round((density * 0.2 + avg_sent_len * 0.05), 2)
-        emotion_balance = round(1 - abs(tlp.get("love", 0) - tlp.get("pain", 0)), 2)
 
         if emotional_range > 0.7 and density < 2:
             base = "orchestral poetic"
@@ -60,7 +62,7 @@ class StyleMatrix:
         else:
             base = "lyrical adaptive"
 
-        dominant = max(emo, key=emo.get)
+        dominant = max(emo, key=emo.get) if emo else "neutral"
         mood = {
             "anger": "dramatic",
             "fear": "mystic",
@@ -72,7 +74,7 @@ class StyleMatrix:
         return f"{base} {mood}".strip()
 
     # -------------------------------------------------------
-    # 3️⃣ Автоматический подбор тональности (Key)
+    # 🎵 3. Автоматический подбор тональности (Key)
     # -------------------------------------------------------
     def _derive_key(self, tlp: Dict[str, float], bpm: int) -> str:
         t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
@@ -95,7 +97,7 @@ class StyleMatrix:
         return f"{short} ({key} {mode})"
 
     # -------------------------------------------------------
-    # 4️⃣ Визуальный слой (ToneSync)
+    # 🎨 4. Визуальный слой (ToneSync)
     # -------------------------------------------------------
     def _derive_visual(self, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
         t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
@@ -112,7 +114,7 @@ class StyleMatrix:
             return "shifting colors, abstract transitions"
 
     # -------------------------------------------------------
-    # 5️⃣ Нарратив
+    # 📖 5. Нарратив
     # -------------------------------------------------------
     def _derive_narrative(self, text: str, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
         if tlp.get("pain", 0) > 0.6:
@@ -125,7 +127,7 @@ class StyleMatrix:
             return "search → struggle → transformation"
 
     # -------------------------------------------------------
-    # 6️⃣ Вокальные техники
+    # 🎤 6. Вокальные техники
     # -------------------------------------------------------
     def _derive_techniques(self, emo: Dict[str, float], tlp: Dict[str, float]) -> list[str]:
         tech = []
@@ -142,10 +144,10 @@ class StyleMatrix:
         return tech or ["neutral tone"]
 
     # -------------------------------------------------------
-    # 7️⃣ Атмосфера
+    # 🌌 7. Атмосфера
     # -------------------------------------------------------
     def _derive_atmosphere(self, emo: Dict[str, float]) -> str:
-        dominant = max(emo, key=emo.get)
+        dominant = max(emo, key=emo.get) if emo else "neutral"
         if dominant in ("joy", "peace", "love"):
             return "serene and hopeful"
         elif dominant in ("sadness", "pain"):
@@ -160,7 +162,7 @@ class StyleMatrix:
             return "mysterious and reflective"
 
     # -------------------------------------------------------
-    # 8️⃣ Основной метод
+    # 🧩 8. Основной метод сборки
     # -------------------------------------------------------
     def build(self, emo: Dict[str, float], tlp: Dict[str, float], text: str, bpm: int) -> Dict[str, Any]:
         genre = self._derive_genre(text, emo, tlp)
@@ -171,7 +173,7 @@ class StyleMatrix:
         atmosphere = self._derive_atmosphere(emo)
         techniques = self._derive_techniques(emo, tlp)
 
-        complexity_score = round(mean([emo[k] for k in emo]) * 10, 2)
+        complexity_score = round(mean([emo[k] for k in emo]) * 10, 2) if emo else 0.5
         color_temperature = "warm" if tlp.get("love", 0) >= tlp.get("pain", 0) else "cold"
         adaptive_mode = "stable" if tlp.get("conscious_frequency", 0) > 0.6 else "transient"
 
@@ -188,3 +190,10 @@ class StyleMatrix:
             "color_temperature": color_temperature,
             "adaptive_mode": adaptive_mode,
         }
+
+
+# ==========================================================
+# ✅ Meta
+# ==========================================================
+STYLE_VERSION = "v5.0 adaptive"
+print(f"🎨 [PatchedStyleMatrix {STYLE_VERSION}] loaded successfully.")
