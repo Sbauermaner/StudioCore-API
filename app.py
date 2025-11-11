@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5.1 — Adaptive Annotation Engine
+🎧 StudioCore v5.2 — Adaptive Annotation Engine
 Truth × Love × Pain = Conscious Frequency
-Inline annotation mode (for Suno adaptive phrasing)
-Optimized for Hugging Face (low RAM)
+Enhanced adaptive output with vocal gender, style, and instruments
 """
 
 import os, sys, subprocess, importlib, traceback, threading, json, time
@@ -61,37 +60,42 @@ def auto_core_check():
 threading.Thread(target=auto_core_check, daemon=True).start()
 
 # === АНАЛИЗ ТЕКСТА (адаптивная аннотация) ===
-def analyze_text(text: str):
-    """Полный анализ текста с генерацией inline-аннотации над строками."""
+def analyze_text(text: str, gender: str = "auto"):
+    """Полный анализ текста с генерацией inline-аннотации и адаптацией под пол вокала."""
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
     try:
-        result = core.analyze(text)
+        result = core.analyze(text, preferred_gender=gender)
         if "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
 
         # --- краткий summary ---
+        style = result.get("style", {})
+        vocals = result.get("vocals", [])
+        instruments = ", ".join(result.get("instruments", [])) or "no instruments"
+        vocal_form = style.get("vocal_form", "auto")
+
         summary = (
-            f"✅ StudioCore v5.1\n"
-            f"🎭 {result['style'].get('genre', '—')} | "
-            f"🎵 {result['style'].get('style', '—')} | "
-            f"🎙 {result['style'].get('vocal_form', '—')} | "
-            f"⏱ {result.get('bpm', '—')} BPM | "
-            f"🧠 {result.get('philosophy', '—')}"
+            f"✅ StudioCore v5.2\n"
+            f"🎭 {style.get('genre', '—')} | "
+            f"🎵 {style.get('style', '—')} | "
+            f"🎙 {vocal_form} ({gender}) | "
+            f"🎸 {instruments} | "
+            f"⏱ {result.get('bpm', '—')} BPM"
         )
 
         # --- аннотация ---
         annotated_text = result.get("annotated_text") or core.annotate_text(
             text,
             result.get("overlay", {}),
-            result.get("style", {}),
-            result.get("vocals", []),
+            style,
+            vocals,
             result.get("bpm") or core.rhythm.bpm_from_density(text) or 120,
             result.get("emotions", {}),
             result.get("tlp", {}),
         )
 
-        # === Новый блок: inline-аннотация ===
+        # === Inline-аннотация ===
         try:
             sections = result.get("sections", [])
             inline_lines = []
@@ -106,13 +110,24 @@ def analyze_text(text: str):
         except Exception:
             annotated_inline = annotated_text
 
-        # --- лёгкая защита от переполнения ---
+        # --- ограничение размера ---
         if len(annotated_inline) > 100000:
             annotated_inline = annotated_inline[:100000] + "\n\n⚠️ [Truncated]"
 
+        # --- style-prompt для Suno ---
+        style_prompt = (
+            f"[StudioCore v5.2 | BPM: {result.get('bpm', 'auto')}]\n"
+            f"Genre: {style.get('genre', 'unknown')}\n"
+            f"Vocal: {vocal_form} ({gender})\n"
+            f"Instruments: {instruments}\n"
+            f"Tone: {style.get('key', 'auto')}\n"
+            f"Atmosphere: {style.get('atmosphere', 'balanced')}\n"
+            f"Narrative: {style.get('narrative', 'flow')}\n"
+        )
+
         return (
             summary,
-            result.get("prompt_full", "⚠️ Нет данных"),
+            style_prompt,
             result.get("prompt_suno", "⚠️ Нет данных"),
             annotated_inline,
         )
@@ -122,59 +137,36 @@ def analyze_text(text: str):
         return f"❌ Исключение: {str(e)}", "", "", ""
 
 # === PUBLIC UI ===
-with gr.Blocks(title="🎧 StudioCore v5.1 — Public Interface") as iface_public:
+with gr.Blocks(title="🎧 StudioCore v5.2 — Public Interface") as iface_public:
     gr.Markdown("### StudioCore (Public)\nПубличная версия без логов.")
+    gender_input = gr.Radio(
+        ["auto", "male", "female"],
+        value="auto",
+        label="Пол вокала (Gender)"
+    )
     gr.Interface(
-        fn=analyze_text,
-        inputs=gr.Textbox(label="Введите текст песни", lines=10),
+        fn=lambda text, gender: analyze_text(text, gender),
+        inputs=[
+            gr.Textbox(label="Введите текст песни", lines=10),
+            gender_input
+        ],
         outputs=[
             gr.Textbox(label="📊 Результат", lines=6),
-            gr.Textbox(label="🎼 Полный промт", lines=8),
+            gr.Textbox(label="🎼 Стиль и инструменты", lines=8),
             gr.Textbox(label="🎧 Suno-промт", lines=8),
             gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=20),
         ],
         flagging_mode="never",
     )
 
-# === ADMIN UI ===
-def password_gate(password):
-    if password == "Timofej151106":
-        return gr.update(visible=False), gr.update(visible=True), ""
-    return gr.update(visible=True), gr.update(visible=False), "❌ Неверный пароль"
-
-with gr.Blocks(title="🎧 StudioCore Admin") as iface_admin:
-    gr.Markdown("## 🔐 Вход в панель StudioCore")
-    pwd = gr.Textbox(label="Пароль", type="password")
-    err = gr.Markdown("")
-    btn = gr.Button("Войти")
-    admin_panel = gr.Group(visible=False)
-    with admin_panel:
-        gr.Interface(
-            fn=analyze_text,
-            inputs=gr.Textbox(label="Введите текст", lines=10),
-            outputs=[
-                gr.Textbox(label="📊 Результат", lines=6),
-                gr.Textbox(label="🎼 Полный промт", lines=8),
-                gr.Textbox(label="🎧 Suno-промт", lines=8),
-                gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=20),
-            ],
-            flagging_mode="manual",
-        )
-    btn.click(password_gate, inputs=pwd, outputs=[pwd, admin_panel, err])
-
 # === API ===
-@app.get("/status")
-async def status():
-    return JSONResponse(
-        content={"status": "ok", "engine": "StudioCore", "ready": True, "version": STUDIOCORE_VERSION}
-    )
-
 @app.post("/api/predict")
 async def predict_api(request: Request):
     try:
         payload = await request.json()
         text = payload.get("text", "")
-        summary, full, suno, annotated = analyze_text(text)
+        gender = payload.get("gender", "auto")
+        summary, full, suno, annotated = analyze_text(text, gender)
         return JSONResponse(
             content={
                 "summary": summary,
@@ -182,6 +174,7 @@ async def predict_api(request: Request):
                 "prompt_suno": suno,
                 "annotated_text": annotated,
                 "engine_version": STUDIOCORE_VERSION,
+                "gender": gender,
             }
         )
     except Exception as e:
@@ -189,9 +182,7 @@ async def predict_api(request: Request):
 
 # === MOUNT ===
 iface_public.queue()
-iface_admin.queue()
 app = gr.mount_gradio_app(app, iface_public, path="/")
-app = gr.mount_gradio_app(app, iface_admin, path="/admin")
 
 # === RUN ===
 if __name__ == "__main__":
