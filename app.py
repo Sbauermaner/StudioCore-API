@@ -191,21 +191,23 @@ app = gr.mount_gradio_app(app, iface_public, path="/")
 # === RUN ===
 if __name__ == "__main__":
     import uvicorn
-    print(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API...")
-    uvicorn.run(app, host="0.0.0.0", port=7860)
 
     # ==========================================================
-    # 🧩 Auto Integrity Check on Startup (StudioCore v5.2.1)
+    # 🧩 Auto Integrity Check (StudioCore v5.2.1)
     # ==========================================================
-    import threading, os, time
-
     def run_integrity_tests():
         time.sleep(2)
         print("\n🧩 Auto-Running StudioCore Full System Test...")
-        result = os.system("python3 studiocore/tests/test_all.py")
-        if result == 0:
-            print("✅ Автотесты StudioCore успешно завершены.")
-        else:
-            print("⚠️ Ошибка при выполнении автотестов. Проверь логи выше.")
+        try:
+            result = os.system("python3 studiocore/tests/test_all.py > test_log.txt 2>&1")
+            if result == 0:
+                print("✅ Автотесты StudioCore успешно завершены.")
+            else:
+                print("⚠️ Ошибка при выполнении автотестов. См. test_log.txt")
+        except Exception as e:
+            print("❌ Ошибка автотестов:", e)
 
     threading.Thread(target=run_integrity_tests, daemon=True).start()
+
+    print(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API...")
+    uvicorn.run(app, host="0.0.0.0", port=7860)
