@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.2 — Adaptive StyleMatrix Hybrid (USER-MODE Integration)
-Интеграция голосовых подсказок (voice_profile_hint) и нового резолвера стиля (CF + TLP + Mood).
+StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE + Auto Voice Detection)
+Интеграция автоматического распознавания вокальных описаний в текстах.
 Позволяет ядру StudioCore адаптировать жанр, стиль, атмосферу и вокальные техники
 в зависимости от Truth/Love/Pain, Conscious Frequency и пользовательских описаний вокала.
 """
@@ -12,7 +12,33 @@ from statistics import mean
 
 
 # ==========================================================
-# 🧠 Новый адаптивный резолвер стиля (из StudioCore v5.2.2)
+# 🗣️ Автоматическое распознавание вокального описания
+# ==========================================================
+def detect_voice_profile(text: str) -> str | None:
+    """
+    Автоматически определяет вокальные подсказки из текста.
+    Возвращает строку с описанием (например, "под хриплый мужской вокал")
+    или None, если ничего не найдено.
+    """
+    text_low = text.lower()
+    # Типичные шаблоны описаний вокала
+    patterns = [
+        r"под\s+[а-яa-z\s,]+вокал",              # под хриплый мужской вокал
+        r"\(.*(вокал|voice|growl|scream).*\)",   # (soft female growl)
+        r"(мужск\w+|женск\w+)\s+вокал",
+        r"(soft|airy|raspy|grit|growl|scream|whisper)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text_low)
+        if match:
+            hint = match.group(0).strip("() ")
+            print(f"🎙️ [AutoDetect] Найдено описание вокала: {hint}")
+            return hint
+    return None
+
+
+# ==========================================================
+# 🧠 Новый адаптивный резолвер стиля (с поддержкой USER-MODE)
 # ==========================================================
 def resolve_style_and_form(
     tlp: Dict[str, float],
@@ -26,7 +52,6 @@ def resolve_style_and_form(
     pain = tlp.get("pain", 0.0)
     truth = tlp.get("truth", 0.0)
 
-    # 🔹 Проверяем пользовательский голосовой намёк
     user_mode = bool(voice_hint)
     if user_mode:
         hint = voice_hint.lower()
@@ -46,7 +71,7 @@ def resolve_style_and_form(
             genre = "cinematic adaptive"
             style, key_mode = "neutral modal", "modal"
     else:
-        # 🔹 AUTO-MODE — классический алгоритм
+        # AUTO-MODE (эмоциональный анализ)
         if cf > 0.9 or pain >= 0.08 or mood in ("intense", "angry", "dramatic"):
             genre = "cinematic adaptive"
         elif love >= 0.18 and pain < 0.04 and mood in ("peaceful", "hopeful", "romantic"):
@@ -65,7 +90,7 @@ def resolve_style_and_form(
         else:
             style, key_mode = "neutral modal", "modal"
 
-    # 🔹 Атмосфера
+    # Атмосфера
     if style == "majestic major":
         atmosphere = "serene and hopeful"
     elif style == "melancholic minor":
@@ -79,7 +104,7 @@ def resolve_style_and_form(
     else:
         atmosphere = "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
 
-    # 🔹 Нарратив
+    # Нарратив
     if narrative:
         phases = "→".join(narrative)
         if "struggle" in phases and "transformation" in phases and cf >= 0.9:
@@ -96,10 +121,10 @@ def resolve_style_and_form(
 
 
 # ==========================================================
-# 🎨 PatchedStyleMatrix с USER-MODE поддержкой
+# 🎨 PatchedStyleMatrix (v5.2.3) с автоопределением вокала
 # ==========================================================
 class PatchedStyleMatrix:
-    """Adaptive emotional-to-style mapping engine (hybrid v5.2.2, USER-MODE ready)."""
+    """Adaptive emotional-to-style mapping engine (hybrid v5.2.3, USER-MODE + AutoDetect)."""
 
     def build(
         self,
@@ -111,34 +136,34 @@ class PatchedStyleMatrix:
     ) -> Dict[str, Any]:
         cf = tlp.get("conscious_frequency", 0.0)
         dominant = max(emo, key=emo.get) if emo else "neutral"
+
+        # 🔹 Определяем вокальный намёк (из overlay или автоматически)
         voice_hint = None
         if overlay and "voice_profile_hint" in overlay:
             voice_hint = overlay["voice_profile_hint"]
+        else:
+            voice_hint = detect_voice_profile(text)
 
         narrative = ("search", "struggle", "transformation")
         resolved = resolve_style_and_form(tlp, cf, dominant, narrative, voice_hint=voice_hint)
 
-        # 🎼 Формирование ключа
+        # 🎼 Ключ
         t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
         scale = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
         index_shift = int(((bpm / 10) + (l * 6) - (p * 4) + cf * 5) % 12)
         key = f"{scale[index_shift]} ({scale[index_shift]} {resolved['key_mode']})"
 
-        # 🎨 Визуальный слой
-        if resolved["style"] == "majestic major":
-            visual = "warm light, sunrise reflections, hands touching"
-        elif resolved["style"] == "melancholic minor":
-            visual = "rain, fog, silhouettes, slow motion"
-        elif resolved["style"] == "dramatic harmonic minor":
-            visual = "light and shadow interplay, emotional contrasts, dynamic framing"
-        elif resolved["style"] == "aggressive growl":
-            visual = "fire, smoke, chaos, sharp cuts"
-        elif resolved["style"] == "soft whisper tone":
-            visual = "blurred lights, feathers, close-up breathing"
-        else:
-            visual = "shifting colors, abstract transitions"
+        # 🎨 Визуал
+        visuals = {
+            "majestic major": "warm light, sunrise reflections, hands touching",
+            "melancholic minor": "rain, fog, silhouettes, slow motion",
+            "dramatic harmonic minor": "light and shadow interplay, emotional contrasts, dynamic framing",
+            "aggressive growl": "fire, smoke, chaos, sharp cuts",
+            "soft whisper tone": "blurred lights, feathers, close-up breathing",
+        }
+        visual = visuals.get(resolved["style"], "shifting colors, abstract transitions")
 
-        # 🎤 Техники вокала
+        # 🎤 Вокальные техники
         techniques = []
         if resolved["user_mode"] and voice_hint:
             hint = voice_hint.lower()
@@ -184,7 +209,7 @@ class PatchedStyleMatrix:
 # ==========================================================
 # ✅ Meta
 # ==========================================================
-STYLE_VERSION = "v5.2.2 adaptive hybrid (USER-MODE)"
+STYLE_VERSION = "v5.2.3 adaptive hybrid (USER-MODE + AutoDetect)"
 print(f"🎨 [PatchedStyleMatrix {STYLE_VERSION}] loaded successfully.")
 
 
