@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.1 — VocalProfileRegistry
-Адаптивный подбор вокальных и инструментальных профилей по жанру, эмоциям и структуре.
-Теперь включает map_emotion_to_english() для inline-аннотации (Suno adaptive mode)
+StudioCore v5.2 — VocalProfileRegistry (Extended Adaptive Integration)
+Интеграция с AdaptiveVocalAllocator для динамического подбора количества певцов и формы.
 """
 
 from typing import List, Dict, Any, Tuple
@@ -11,12 +10,14 @@ from .emotion import AutoEmotionalAnalyzer
 VALID_VOICES = [
     "male","female","duet","trio","quartet","quintet","choir",
     "tenor","soprano","alto","baritone","bass",
-    "raspy","breathy","powerful","soft","emotional","angelic","deep","whispered","warm","clear"
+    "raspy","breathy","powerful","soft","emotional","angelic",
+    "deep","whispered","warm","clear"
 ]
 
 VALID_INSTRUMENTS = [
-    "guitar","piano","synth","bass","drums","strings","violin","cello","trumpet",
-    "saxophone","organ","harp","choir","vocals","pad","flute","horns","percussion","tagelharpa"
+    "guitar","piano","synth","bass","drums","strings","violin","cello",
+    "trumpet","saxophone","organ","harp","choir","vocals","pad","flute",
+    "horns","percussion","tagelharpa"
 ]
 
 DEFAULT_VOCAL_MAP = {
@@ -37,8 +38,6 @@ class VocalProfileRegistry:
         self.map = DEFAULT_VOCAL_MAP
 
     # --------------------------------------------------------
-    # 🔍 Анализ текста и разделов для определения состава
-    # --------------------------------------------------------
     def _detect_ensemble_hints(self, text: str, sections: List[Dict[str, Any]]) -> Dict[str, bool]:
         s = (text + " " + " ".join(s.get("tag", "") for s in sections)).lower()
         return {
@@ -52,15 +51,12 @@ class VocalProfileRegistry:
         }
 
     # --------------------------------------------------------
-    # 🎙 Автоматическое определение вокальной формы
-    # --------------------------------------------------------
     def auto_vocal_form(self, emo: Dict[str,float], tlp: Dict[str,float], text: str) -> str:
         wc = len(text.split())
         cf = tlp.get("conscious_frequency", 0)
         love, pain, truth = tlp.get("love",0), tlp.get("pain",0), tlp.get("truth",0)
         energy = (love + pain + truth) / 3
         emo_energy = max(emo.values()) if emo else 0.3
-
         ensemble_intensity = round(min(1.0, (energy + emo_energy + cf) / 3), 3)
 
         if wc < 40 and ensemble_intensity < 0.3:
@@ -76,17 +72,26 @@ class VocalProfileRegistry:
         return "solo"
 
     # --------------------------------------------------------
-    # 🧩 Подбор вокала и инструментов
-    # --------------------------------------------------------
-    def get(self, genre: str, preferred_gender: str, text: str, sections: List[Dict[str,Any]]) -> Tuple[List[str], List[str], str]:
+    def get(self, genre: str, preferred_gender: str, text: str, sections: List[Dict[str,Any]],
+            override: Dict[str, Any] | None = None) -> Tuple[List[str], List[str], str]:
+        """
+        override — словарь от AdaptiveVocalAllocator с ключами:
+        { "vocal_form": str, "gender": str, "vocal_count": int }
+        """
         g = genre if genre in self.map else "rock"
         hints = self._detect_ensemble_hints(text, sections)
-
         emo = AutoEmotionalAnalyzer().analyze(text)
-        tlp_stub = {"conscious_frequency": 0.5, "love": emo.get("joy", 0.3), "pain": emo.get("sadness", 0.2), "truth": emo.get("peace", 0.4)}
+        tlp_stub = {"conscious_frequency": 0.5, "love": emo.get("joy", 0.3),
+                    "pain": emo.get("sadness", 0.2), "truth": emo.get("peace", 0.4)}
+
         form = self.auto_vocal_form(emo, tlp_stub, text)
 
-        # Пол/вокал
+        # 🔸 Если есть override — приоритет за ним
+        if override:
+            form = override.get("vocal_form", form)
+            preferred_gender = override.get("gender", preferred_gender)
+
+        # Выбор по полу
         if preferred_gender == "female":
             vox = self.map[g]["female"]
         elif preferred_gender == "male":
@@ -96,7 +101,7 @@ class VocalProfileRegistry:
         else:
             vox = self.map[g]["female"]
 
-        # Подсказки текста
+        # 🔸 Хинты из текста (приоритет ниже override)
         if hints["wants_choir"]:
             form = "choir"
         elif hints["wants_quintet"]:
@@ -108,11 +113,10 @@ class VocalProfileRegistry:
         elif hints["wants_duet"] or hints["dialogue"] or hints["call_response"]:
             form = "duet"
 
-        # Формирование состава
         vox = [form] + vox
         inst = self.map[g]["inst"]
 
-        # --- Определение формы ансамбля ---
+        # Определяем конкретную форму
         if "choir" in vox:
             if "male" in vox and "female" in vox:
                 vocal_form = "choir_mixed"
@@ -151,16 +155,10 @@ class VocalProfileRegistry:
 
 
 # --------------------------------------------------------
-# 🗣️ Адаптивная аннотация по эмоциям (для inline prompt)
-# --------------------------------------------------------
 def map_emotion_to_english(mood: str, tone: str = "mid") -> str:
-    """
-    Converts emotion/tone info into English phrasing hints for Suno inline annotation.
-    Lyrics stay in original language; only annotations are English.
-    """
+    """Converts emotion/tone info into English phrasing hints for Suno inline annotation."""
     mood = (mood or "neutral").lower()
     tone = (tone or "mid").lower()
-
     emotion_map = {
         "calm": "soft whisper, warm tone",
         "peaceful": "gentle flow, smooth phrasing",
@@ -175,7 +173,6 @@ def map_emotion_to_english(mood: str, tone: str = "mid") -> str:
         "intense": "raspy tone, controlled tension",
         "neutral": "balanced tone, natural phrasing"
     }
-
     tone_map = {
         "low": "deep resonance",
         "mid": "mid-range timbre",
@@ -183,7 +180,6 @@ def map_emotion_to_english(mood: str, tone: str = "mid") -> str:
         "whisper": "breathy delivery",
         "belt": "strong projection",
     }
-
     phrase = emotion_map.get(mood, "neutral phrasing, natural tone")
     tone_descr = tone_map.get(tone, "")
     return f"{phrase}, {tone_descr}".strip(", ")
