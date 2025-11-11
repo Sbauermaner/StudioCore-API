@@ -2,11 +2,12 @@
 """
 StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION
 Автоматическая проверка всех модулей, структуры, синтаксиса и API:
-1. Структура папок (ВЕСЬ ПРОЕКТ)
-2. Синтаксис Python / JSON / YAML (ВЕСЬ ПРОЕКТ)
+1. Структура папок
+2. Синтаксис Python / JSON / YAML (ТОЛЬКО ПРОЕКТ)
 3. Импорты и взаимодействие модулей
-4. ЗАПУСК ВСЕХ UNIT-ТЕСТОВ (проверка логики ядра и связей)
-5. Тест API /api/predict
+4. АНАЛИЗ ВНУТРЕННИХ СВЯЗЕЙ (AST)
+5. ЗАПУСК ВСЕХ UNIT-ТЕСТОВ (логика ядра)
+6. Тест API /api/predict
 """
 
 # === 🔧 Исправление пути импорта (чтобы test видели пакет) ===
@@ -19,8 +20,8 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-# ИЗМЕНЕНИЕ 1: Проверяем весь проект, а не только 'studiocore'
-ROOT_DIR = ROOT 
+# Используем ROOT как корень проекта
+ROOT_DIR = ROOT
 
 MODULES = [
     "studiocore.text_utils",
@@ -31,6 +32,11 @@ MODULES = [
     "studiocore.tone",
     "studiocore.adapter"
 ]
+
+# ИСПРАВЛЕНИЕ: Сканируем только эти папки и файлы, чтобы не трогать /usr/lib
+PROJECT_FOLDERS_TO_SCAN = ["studiocore"]
+PROJECT_FILES_TO_SCAN = ["app.py", "studio_config.json"]
+
 
 # ==========================================================
 # 📁 1. Проверка структуры и синтаксиса
@@ -46,36 +52,78 @@ def check_directories():
     print("✅ Структура в порядке.")
     return True
 
-
-def check_python_syntax():
-    print("\n🐍 Проверка синтаксиса Python (весь проект)...")
+# ИСПРАВЛЕНО: Эта функция теперь сканирует только папки проекта
+def check_python_syntax_project():
+    print("\n🐍 Проверка синтаксиса Python (проект)...")
     all_ok = True
-    # Теперь os.walk идет по всему ROOT_DIR (всему проекту)
-    for root, _, files in os.walk(ROOT_DIR):
-        if ".venv" in root or ".git" in root: # Игнорируем ненужные
+    
+    # 1. Сканируем указанные папки
+    for folder in PROJECT_FOLDERS_TO_SCAN:
+        scan_dir = os.path.join(ROOT_DIR, folder)
+        if not os.path.isdir(scan_dir):
+            print(f"⚠️  Папка для сканирования не найдена: {scan_dir}")
             continue
-        for f in files:
-            if f.endswith(".py"):
-                path = os.path.join(root, f)
-                try:
-                    with open(path, "r", encoding="utf-8") as fp:
-                        ast.parse(fp.read(), filename=path)
-                    print(f"✅ OK: {path}")
-                except SyntaxError as e:
-                    print(f"❌ Ошибка синтаксиса: {path} → {e}")
-                    all_ok = False
+        
+        for root, _, files in os.walk(scan_dir):
+            for f in files:
+                if f.endswith(".py"):
+                    path = os.path.join(root, f)
+                    try:
+                        with open(path, "r", encoding="utf-8") as fp:
+                            ast.parse(fp.read(), filename=path)
+                        print(f"✅ OK: {path}")
+                    except SyntaxError as e:
+                        print(f"❌ Ошибка синтаксиса: {path} → {e}")
+                        all_ok = False
+
+    # 2. Проверяем отдельные файлы в корне
+    for f in PROJECT_FILES_TO_SCAN:
+        if not f.endswith(".py"): continue
+        path = os.path.join(ROOT_DIR, f)
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8") as fp:
+                    ast.parse(fp.read(), filename=path)
+                print(f"✅ OK: {path}")
+            except SyntaxError as e:
+                print(f"❌ Ошибка синтаксиса: {path} → {e}")
+                all_ok = False
+                
     return all_ok
 
-
-def check_json_yaml():
-    print("\n🧩 Проверка JSON / YAML (весь проект)...")
+# ИСПРАВЛЕНО: Эта функция теперь сканирует только папки проекта
+def check_json_yaml_project():
+    print("\n🧩 Проверка JSON / YAML (проект)...")
     ok = True
-    # Теперь os.walk идет по всему ROOT_DIR (всему проекту)
-    for root, _, files in os.walk(ROOT_DIR):
-        if ".venv" in root or ".git" in root: # Игнорируем ненужные
-            continue
-        for f in files:
-            path = os.path.join(root, f)
+    
+    # 1. Сканируем указанные папки
+    for folder in PROJECT_FOLDERS_TO_SCAN:
+        scan_dir = os.path.join(ROOT_DIR, folder)
+        if not os.path.isdir(scan_dir): continue
+
+        for root, _, files in os.walk(scan_dir):
+            for f in files:
+                path = os.path.join(root, f)
+                if f.endswith(".json"):
+                    try:
+                        json.load(open(path, "r", encoding="utf-8"))
+                        print(f"✅ JSON OK: {path}")
+                    except Exception as e:
+                        print(f"❌ JSON Error: {path} → {e}")
+                        ok = False
+                elif f.endswith((".yml", ".yaml")):
+                    try:
+                        yaml.safe_load(open(path, "r", encoding="utf-8"))
+                        print(f"✅ YAML OK: {path}")
+                    except Exception as e:
+                        print(f"❌ YAML Error: {path} → {e}")
+                        ok = False
+                        
+    # 2. Проверяем отдельные файлы в корне
+    for f in PROJECT_FILES_TO_SCAN:
+        if not (f.endswith(".json") or f.endswith(".yml") or f.endswith(".yaml")): continue
+        path = os.path.join(ROOT_DIR, f)
+        if os.path.isfile(path):
             if f.endswith(".json"):
                 try:
                     json.load(open(path, "r", encoding="utf-8"))
@@ -109,11 +157,72 @@ def test_imports():
     return all_ok
 
 # ==========================================================
-# 🔬 3. ИЗМЕНЕНИЕ 2: Запуск ВСЕХ Unit-тестов (Логика ядра)
+# 🕸️ 3. ДОБАВЛЕНО: Проверка внутренних связей ядра (AST)
+# ==========================================================
+def check_internal_dependencies():
+    """
+    Сканирует все .py файлы в 'studiocore' и ищет внутренние импорты,
+    чтобы показать "взаимосвязи" ядра.
+    """
+    print("\n🕸️  Проверка внутренних связей (studiocore.*)...")
+    dependencies = {}
+    ok = True
+    
+    scan_dir = os.path.join(ROOT_DIR, "studiocore")
+    
+    for root, _, files in os.walk(scan_dir):
+        for f in files:
+            if not f.endswith(".py"):
+                continue
+            
+            path = os.path.join(root, f)
+            # Превращаем путь в имя модуля (studiocore/rhythm.py -> studiocore.rhythm)
+            rel_path = os.path.relpath(path, ROOT_DIR)
+            module_name = rel_path.replace(os.path.sep, ".").replace(".py", "")
+            
+            # Пропускаем __init__ файлы, если они пустые или для связей
+            if f == "__init__.py":
+                module_name = module_name.replace(".__init__", "")
+
+            dependencies[module_name] = []
+            
+            try:
+                with open(path, "r", encoding="utf-8") as fp:
+                    tree = ast.parse(fp.read(), filename=path)
+                
+                # Ищем все 'import X' и 'from X import Y'
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            if alias.name.startswith("studiocore"):
+                                dependencies[module_name].append(alias.name)
+                    elif isinstance(node, ast.ImportFrom):
+                        # Убеждаемся, что node.module не None (для 'from . import X')
+                        if node.module and node.module.startswith("studiocore"):
+                            dependencies[module_name].append(node.module)
+                            
+            except Exception as e:
+                print(f"❌ Не удалось спарсить {path}: {e}")
+                ok = False
+
+    # Печатаем отчет о связях
+    print("--- Карта зависимостей ядра ---")
+    for module, imports in sorted(dependencies.items()):
+        if imports:
+            # Убираем дубликаты
+            unique_imports = sorted(list(set(imports)))
+            print(f"📄 {module} импортирует:")
+            for imp in unique_imports:
+                print(f"    └── {imp}")
+    print("---------------------------------")
+    return ok
+
+# ==========================================================
+# 🔬 4. (БЫЛ 3) Запуск ВСЕХ Unit-тестов (Логика ядра)
 # ==========================================================
 def run_all_unit_tests():
     """
-    Автоматически находит и запускает все файлы 'test_*.py' 
+    Автоматически находит и запускает все файлы 'test_*.py'
     во всех папках проекта (в ROOT_DIR).
     Это и есть проверка "логики ядра" и "связей".
     """
@@ -121,14 +230,20 @@ def run_all_unit_tests():
     try:
         loader = unittest.TestLoader()
         # Ищем все тесты во всех папках
-        suite = loader.discover(start_dir=ROOT_DIR, pattern="test_*.py") 
+        suite = loader.discover(start_dir=ROOT_DIR, pattern="test_*.py")
         runner = unittest.TextTestRunner(verbosity=1) # verbosity=2 для деталей
         result = runner.run(suite)
-        
+
         if not result.wasSuccessful():
             print("❌ Обнаружены ошибки в Unit-тестах.")
             return False
-        
+
+        # Проверяем, были ли тесты вообще запущены
+        if result.testsRun == 0:
+             print("⚠️  НИ ОДНОГО ТЕСТА НЕ НАЙДЕНО. Проверьте test_*.py файлы на наличие sys.path!")
+             # Не считаем это ошибкой, но выводим предупреждение
+             return True 
+
         print("✅ Все Unit-тесты пройдены.")
         return True
     except Exception:
@@ -137,7 +252,7 @@ def run_all_unit_tests():
         return False
 
 # ==========================================================
-# 🎧 4. (БЫЛ 3) Проверка конкретного пайплайна (Интеграционный)
+# 🎧 5. (БЫЛ 4) Проверка конкретного пайплайна (Интеграционный)
 # ==========================================================
 def test_prediction_pipeline():
     print("\n🎧 Проверка (интеграционная) ядра StudioCore...")
@@ -164,7 +279,7 @@ def test_prediction_pipeline():
 
 
 # ==========================================================
-# 🌐 5. (БЫЛ 4) Проверка API /api/predict
+# 🌐 6. (БЫЛ 5) Проверка API /api/predict
 # ==========================================================
 def test_api_response():
     print("\n🌐 Проверка /api/predict ...")
@@ -173,6 +288,8 @@ def test_api_response():
             "text": "Я тону, когда солнце уходит вдаль...",
             "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
         }
+        # ПРИМЕЧАНИЕ: Ошибка 404 означает, что URL не найден на сервере.
+        # Проверьте ваш app.py, возможно, URL отличается (например, нет /api/)
         r = requests.post("http://127.0.0.1:7860/api/predict", json=payload, timeout=10)
         assert r.status_code == 200, f"HTTP {r.status_code}"
         data = r.json()
@@ -184,19 +301,20 @@ def test_api_response():
 
 
 # ==========================================================
-# 🧩 6. (БЫЛ 5) Запуск всех тестов и финальный отчёт
+# 🧩 7. (БЫЛ 6) Запуск всех тестов и финальный отчёт
 # ==========================================================
 if __name__ == "__main__":
     print("\n===== 🧩 StudioCore v5.2.1 — FULL SYSTEM CHECK =====")
 
     # ИЗМЕНЕНИЕ 3: Обновлен список тестов
-    total = 6
+    total = 7
     results = {
         "structure": check_directories(),
-        "syntax": check_python_syntax(),
-        "json_yaml": check_json_yaml(),
+        "syntax": check_python_syntax_project(), # <-- Вызов исправленной функции
+        "json_yaml": check_json_yaml_project(), # <-- Вызов исправленной функции
         "imports": test_imports(),
-        "unit_tests (logic)": run_all_unit_tests(), # <-- НОВЫЙ ТЕСТ
+        "dependencies (AST)": check_internal_dependencies(), # <-- НОВЫЙ ТЕСТ СВЯЗЕЙ
+        "unit_tests (logic)": run_all_unit_tests(),
         "integration_api": test_prediction_pipeline() and test_api_response()
     }
 
