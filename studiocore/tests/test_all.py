@@ -287,8 +287,8 @@ def test_prediction_pipeline():
 def test_api_response():
     print("\n🌐 Проверка /api/predict ...")
     
-    # !!! РЕШЕНИЕ 1: Проверьте этот URL. Он должен совпадать с URL в app.py !!!
-    api_url = "http://127.0.0.1:7860/api/predict" 
+    # !!! ИСПРАВЛЕНИЕ 404: Убран /api/ префикс. Проверьте ваш app.py!
+    api_url = "http://127.0.0.1:7860/predict" 
     
     try:
         payload = {
