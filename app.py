@@ -59,6 +59,7 @@ def auto_core_check():
 
 threading.Thread(target=auto_core_check, daemon=True).start()
 
+
 # === АНАЛИЗ ТЕКСТА (адаптивная аннотация) ===
 def analyze_text(text: str, gender: str = "auto"):
     """Полный анализ текста с генерацией inline-аннотации и адаптацией под пол вокала."""
@@ -136,28 +137,31 @@ def analyze_text(text: str, gender: str = "auto"):
         print("❌ Ошибка при анализе:\n", traceback.format_exc())
         return f"❌ Исключение: {str(e)}", "", "", ""
 
-# === PUBLIC UI ===
+
+# === PUBLIC UI (Gradio) ===
 with gr.Blocks(title="🎧 StudioCore v5.2 — Public Interface") as iface_public:
-    gr.Markdown("### StudioCore (Public)\nПубличная версия без логов.")
-    gender_input = gr.Radio(
-        ["auto", "male", "female"],
-        value="auto",
-        label="Пол вокала (Gender)"
+    gr.Markdown("## 🎧 StudioCore v5.2\nПубличная версия без логов.\n")
+
+    with gr.Row():
+        text_input = gr.Textbox(label="Введите текст песни", lines=10, placeholder="Введите текст...")
+        gender_input = gr.Radio(["auto", "male", "female"], value="auto", label="Пол вокала (Gender)")
+
+    analyze_button = gr.Button("🔍 Анализировать")
+
+    with gr.Row():
+        result_box = gr.Textbox(label="📊 Результат", lines=6)
+        style_box = gr.Textbox(label="🎼 Стиль и инструменты", lines=8)
+
+    with gr.Row():
+        suno_box = gr.Textbox(label="🎧 Suno-промт", lines=8)
+        annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=20)
+
+    analyze_button.click(
+        fn=analyze_text,
+        inputs=[text_input, gender_input],
+        outputs=[result_box, style_box, suno_box, annotated_box],
     )
-    gr.Interface(
-        fn=lambda text, gender: analyze_text(text, gender),
-        inputs=[
-            gr.Textbox(label="Введите текст песни", lines=10),
-            gender_input
-        ],
-        outputs=[
-            gr.Textbox(label="📊 Результат", lines=6),
-            gr.Textbox(label="🎼 Стиль и инструменты", lines=8),
-            gr.Textbox(label="🎧 Suno-промт", lines=8),
-            gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=20),
-        ],
-        flagging_mode="never",
-    )
+
 
 # === API ===
 @app.post("/api/predict")
@@ -180,9 +184,11 @@ async def predict_api(request: Request):
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+
 # === MOUNT ===
 iface_public.queue()
 app = gr.mount_gradio_app(app, iface_public, path="/")
+
 
 # === RUN ===
 if __name__ == "__main__":
