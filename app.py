@@ -213,6 +213,7 @@ async def get_test_logic():
     except Exception as e:
         return PlainTextResponse(f"⚠️ Error reading test_logic.txt: {e}")
 
+
 @app.get("/logs/test_log")
 async def get_test_log():
     """Возвращает содержимое test_log.txt (системные тесты)."""
@@ -237,34 +238,54 @@ if __name__ == "__main__":
     print(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API...")
 
     # ==========================================================
-    # 🧩 Auto Integrity + Functional Logic Tests
+    # 🧩 Auto Integrity + Functional Logic Tests + Log Init
     # ==========================================================
     def run_integrity_and_functional_tests():
-        # автоочистка логов при старте
-        for f in ("test_log.txt", "test_logic.txt"):
+        # автоинициализация логов при старте
+        for file_name in ("test_log.txt", "test_logic.txt"):
             try:
-                open(f, "w").close()
-            except Exception:
-                pass
+                if not os.path.exists(file_name):
+                    with open(file_name, "w", encoding="utf-8") as f:
+                        f.write(f"🧩 {file_name} initialized at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                else:
+                    with open(file_name, "a", encoding="utf-8") as f:
+                        f.write(f"\n🔁 Restarted at {time.strftime('%H:%M:%S')}.\n")
+            except Exception as e:
+                print(f"⚠️ Cannot init {file_name}: {e}")
 
         time.sleep(2)
         print("\n🧩 Auto-Running StudioCore Full System Test...")
-        res1 = os.system("python3 studiocore/tests/test_all.py > test_log.txt 2>&1")
-        if res1 == 0:
-            print("✅ test_all.py — системные тесты успешно завершены.")
-        else:
-            print("⚠️ Ошибка в test_all.py — см. test_log.txt")
 
-        print("\n🧠 Running Functional Text Logic Test...")
-        res2 = os.system("python3 studiocore/tests/test_functional_texts.py > test_logic.txt 2>&1")
-        if res2 == 0:
-            print("✅ test_functional_texts.py — функциональная логика пройдена.")
-        else:
-            print("⚠️ Ошибка в функциональном тесте — см. test_logic.txt.")
+        # системные тесты
+        with open("test_log.txt", "a", encoding="utf-8") as log:
+            log.write(f"\n🚀 Running test_all.py at {time.strftime('%H:%M:%S')}\n")
+        res1 = os.system("python3 studiocore/tests/test_all.py >> test_log.txt 2>&1")
+        with open("test_log.txt", "a", encoding="utf-8") as log:
+            if res1 == 0:
+                msg = "✅ test_all.py — системные тесты успешно завершены.\n"
+            else:
+                msg = "⚠️ Ошибка в test_all.py — см. выше.\n"
+            print(msg.strip())
+            log.write(msg)
 
+        # функциональная логика
+        with open("test_logic.txt", "a", encoding="utf-8") as logic:
+            logic.write(f"\n🧠 Running test_functional_texts.py at {time.strftime('%H:%M:%S')}\n")
+        res2 = os.system("python3 studiocore/tests/test_functional_texts.py >> test_logic.txt 2>&1")
+        with open("test_logic.txt", "a", encoding="utf-8") as logic:
+            if res2 == 0:
+                msg = "✅ test_functional_texts.py — функциональная логика пройдена.\n"
+            else:
+                msg = "⚠️ Ошибка в функциональном тесте — см. выше.\n"
+            print(msg.strip())
+            logic.write(msg)
+
+        # завершение
         print("\n📁 Логи сохранены в файлы:")
         print("   • test_log.txt   — системные тесты")
         print("   • test_logic.txt — проверка смысловой логики анализа\n")
+        with open("test_log.txt", "a", encoding="utf-8") as log:
+            log.write("📁 Tests finished.\n")
 
     threading.Thread(target=run_integrity_and_functional_tests, daemon=True).start()
 
