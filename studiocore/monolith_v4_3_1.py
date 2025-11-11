@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v4.3.3 — Monolith (Patched for v5.2 Adaptive)
-Автоматическая аннотация, динамический жанр и адаптивный вокал.
+StudioCore v4.3.4 — Monolith (Patched for v5.2 Adaptive)
+Динамическая куплетная аннотация, адаптивный жанр, безопасные частоты.
 """
 
 from __future__ import annotations
@@ -128,8 +128,31 @@ class PatchedStyleMatrix:
         else:
             return "neutral modal"
 
+    def _derive_key(self, tlp: Dict[str, float], bpm: int) -> str:
+        t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
+        if p > 0.45:
+            mode = "minor"
+        elif l > 0.55:
+            mode = "major"
+        else:
+            mode = "modal"
+        if t > 0.6 and l > 0.5:
+            key = "E"
+        elif l > 0.7:
+            key = "G"
+        elif p > 0.6:
+            key = "A"
+        elif t < 0.3 and l > 0.4:
+            key = "D"
+        elif p > 0.5 and l < 0.3:
+            key = "F"
+        elif bpm > 140 and l > 0.5:
+            key = "C"
+        else:
+            key = "C#"
+        return f"{key} {mode}"
+
     def build(self, emo: Dict[str, float], tlp: Dict[str, float], text: str, bpm: int) -> Dict[str, Any]:
-        # адаптивное определение жанра
         words = re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text)
         word_count = len(words)
         sents = [s for s in re.split(r"[.!?]+", text) if s.strip()]
@@ -159,30 +182,6 @@ class PatchedStyleMatrix:
             "structure": "intro-verse-chorus-outro",
             "style_descr_full": f"{genre} ({dominant})",
         }
-
-    def _derive_key(self, tlp: Dict[str, float], bpm: int) -> str:
-        t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
-        if p > 0.45:
-            mode = "minor"
-        elif l > 0.55:
-            mode = "major"
-        else:
-            mode = "modal"
-        if t > 0.6 and l > 0.5:
-            key = "E"
-        elif l > 0.7:
-            key = "G"
-        elif p > 0.6:
-            key = "A"
-        elif t < 0.3 and l > 0.4:
-            key = "D"
-        elif p > 0.5 and l < 0.3:
-            key = "F"
-        elif bpm > 140 and l > 0.5:
-            key = "C"
-        else:
-            key = "C#"
-        return f"{key} {mode}"
 
 
 # ================================
@@ -220,26 +219,33 @@ class StudioCore:
         }
         return {"bpm": bpm_adj, "overlay": overlay}
 
+    # === новая версия аннотации ===
     def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any], vocals: List[str], bpm: int, emotions=None, tlp=None) -> str:
-        lines = [l for l in text.strip().split("\n") if l.strip()]
+        """
+        🔹 Динамическая аннотация текста по куплетам.
+        Разбивает текст на блоки (куплеты) и добавляет эмоциональные шапки.
+        """
+        blocks = [b.strip() for b in re.split(r"\n\s*\n", text.strip()) if b.strip()]
         sections = overlay.get("sections", [])
-        if not sections:
-            return text
-        block_size = max(1, len(lines) // len(sections))
-        annotated = []
-        idx = 0
-        for sec in sections:
-            tag = f"[{sec['section']} – {sec['mood']}, focus={sec['focus']}] (intensity={sec['intensity']})"
-            annotated.append(tag)
-            block_lines = lines[idx: idx + block_size]
-            annotated.extend(block_lines)
-            idx += block_size
-        if idx < len(lines):
-            annotated.extend(lines[idx:])
-        annotated.append(f"[End – BPM≈{bpm}, Vocal={style.get('vocal_form','auto')}, Tone={style.get('key','auto')}]")
+        annotated_blocks = []
+
+        for i, block in enumerate(blocks):
+            sec = sections[i % len(sections)] if sections else {}
+            section_name = sec.get("section", f"Block{i+1}")
+            mood = sec.get("mood", "neutral")
+            focus = sec.get("focus", "flow")
+            intensity = sec.get("intensity", bpm)
+            header = f"[{section_name} – {mood}, focus={focus}, intensity≈{intensity}]"
+            annotated_blocks.append(header)
+            annotated_blocks.append(block)
+            annotated_blocks.append("")
+
+        vocal_form = style.get("vocal_form", "auto")
+        tone_key = style.get("key", "auto")
         tech = ", ".join([v for v in vocals if v not in ["male", "female"]]) or "neutral tone"
-        annotated.append(f"[Vocal Techniques: {tech}]")
-        return "\n".join(annotated)
+        annotated_blocks.append(f"[End – BPM≈{bpm}, Vocal={vocal_form}, Tone={tone_key}]")
+        annotated_blocks.append(f"[Vocal Techniques: {tech}]")
+        return "\n".join(annotated_blocks).strip()
 
     def analyze(self, text: str, author_style=None, preferred_gender=None, version=None) -> Dict[str, Any]:
         version = version or self.cfg.get("suno_version", "v5")
@@ -282,7 +288,7 @@ class StudioCore:
 # ==========================================================
 # ✅ Auto-Register Patch
 # ==========================================================
-STUDIOCORE_VERSION = "v4.3.3"
+STUDIOCORE_VERSION = "v4.3.4"
 try:
     from inspect import isclass
     if "StudioCore" not in globals():
