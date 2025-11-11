@@ -5,11 +5,11 @@ StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION
 1. Структура папок
 2. Синтаксис Python / JSON / YAML
 3. Импорты и взаимодействие модулей
-4. Генерация BPM, Style, Genre <--- ЭТОТ ПУНКТ ТЕПЕРЬ ЗАГЛУШКА
+4. Генерация BPM, Style, Genre
 5. Работа API /api/predict
 """
 
-# === 🔧 Исправление пути импорта (чтобы test видели пакет) ===
+# === 🔧 Исправление пути импорта (чтобы tests видели пакет) ===
 import os, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if ROOT not in sys.path:
@@ -17,7 +17,6 @@ if ROOT not in sys.path:
 
 # === Импорты после настройки пути ===
 import json, ast, yaml, importlib, requests, traceback
-from statistics import mean
 
 ROOT_DIR = "studiocore"
 MODULES = [
@@ -27,7 +26,7 @@ MODULES = [
     "studiocore.vocals",
     "studiocore.style",
     "studiocore.tone",
-    "studiocore.adapter"
+    "studiocore.adapter",
 ]
 
 # ==========================================================
@@ -45,7 +44,7 @@ def check_directories():
 
 
 def check_python_syntax():
-    print("\n🐍 Проверка синтантаксиса Python...")
+    print("\n🐍 Проверка синтаксиса Python...")
     all_ok = True
     for root, _, files in os.walk(ROOT_DIR):
         for f in files:
@@ -104,9 +103,28 @@ def test_imports():
 # 🎧 3. Проверка внутренней логики ядра
 # ==========================================================
 def test_prediction_pipeline():
-    # ЭТО ЗАГЛУШКА
-    print("\n🎧 Проверка ядра StudioCore... (ЗАГЛУШКА)")
-    return True
+    print("\n🎧 Проверка ядра StudioCore...")
+    try:
+        from studiocore.style import PatchedStyleMatrix
+        # важно: LyricMeter должен существовать в rhythm (или подставь актуальный класс)
+        from studiocore.rhythm import LyricMeter
+
+        text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
+        tlp = {"truth": 0.1, "love": 0.2, "pain": 0.04, "conscious_frequency": 0.85}
+        emo = {"joy": 0.3, "peace": 0.4, "sadness": 0.1}
+
+        bpm = LyricMeter().bpm_from_density(text, emo)
+        style = PatchedStyleMatrix().build(emo, tlp, text, bpm)
+
+        assert 60 <= bpm <= 180, f"BPM вне диапазона: {bpm}"
+        assert "genre" in style and "style" in style, "Отсутствуют ключевые поля"
+        assert isinstance(style.get("techniques", []), list), "Поле techniques не list"
+
+        print(f"✅ BPM={bpm} | Genre={style['genre']} | Style={style['style']}")
+        return True
+    except Exception:
+        traceback.print_exc()
+        return False
 
 
 # ==========================================================
@@ -117,12 +135,15 @@ def test_api_response():
     try:
         payload = {
             "text": "Я тону, когда солнце уходит вдаль...",
-            "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
+            "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92},
         }
         r = requests.post("http://127.0.0.1:7860/api/predict", json=payload, timeout=10)
         assert r.status_code == 200, f"HTTP {r.status_code}"
         data = r.json()
-        print(f"✅ API OK | BPM={data.get('bpm')} | Style={data.get('style')}")
+        # В твоём API ответ — это словарь с полями summary/style_prompt/annotated_text,
+        # поэтому просто проверяем наличие summary:
+        assert "summary" in data, "summary отсутствует в ответе API"
+        print("✅ API OK")
         return True
     except Exception as e:
         print(f"❌ Ошибка API: {e}")
@@ -141,7 +162,7 @@ if __name__ == "__main__":
         "syntax": check_python_syntax(),
         "json_yaml": check_json_yaml(),
         "imports": test_imports(),
-        "logic_api": test_prediction_pipeline() and test_api_response()
+        "logic_api": test_prediction_pipeline() and test_api_response(),
     }
 
     passed = sum(1 for k in results.values() if k)
