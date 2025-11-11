@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v4.3.5 — Monolith (Adaptive Vocal Allocation Patch)
+StudioCore v4.3.6 — Monolith (Adaptive Vocal Allocation Patch, Safe Style Integration)
 Динамическая куплетная аннотация, адаптивный жанр, безопасные частоты,
 автоматическое распределение вокалистов.
 """
@@ -19,6 +19,7 @@ from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 from .tone import ToneSyncEngine
 from .adapter import build_suno_prompt
 from .vocals import VocalProfileRegistry
+from .style import StyleMatrix  # ✅ безопасный импорт основного стиля
 
 
 # ================================
@@ -26,19 +27,12 @@ from .vocals import VocalProfileRegistry
 # ================================
 
 class AdaptiveVocalAllocator:
-    """
-    Анализирует текст, эмоции и BPM, чтобы определить оптимальную форму вокала:
-    solo / duet / trio / choir, а также гендер и количество певцов.
-    """
+    """Анализирует текст, эмоции и BPM, чтобы определить оптимальную форму вокала."""
     def analyze(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int, text: str) -> Dict[str, Any]:
-        love = tlp.get("love", 0.0)
-        pain = tlp.get("pain", 0.0)
-        cf = tlp.get("conscious_frequency", 0.0)
-        truth = tlp.get("truth", 0.0)
+        love, pain, cf, truth = tlp.get("love", 0.0), tlp.get("pain", 0.0), tlp.get("conscious_frequency", 0.0), tlp.get("truth", 0.0)
         word_count = len(re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text))
         avg_line_len = word_count / max(1, len(text.split("\n")))
 
-        # --- логика распределения ---
         if cf > 0.7 and love > pain and word_count > 80:
             form, gender, count = "choir", "mixed", 4
         elif pain >= 0.6 and cf < 0.6:
@@ -52,11 +46,7 @@ class AdaptiveVocalAllocator:
         else:
             form, gender, count = "solo", "auto", 1
 
-        return {
-            "vocal_form": form,
-            "gender": gender,
-            "vocal_count": count
-        }
+        return {"vocal_form": form, "gender": gender, "vocal_count": count}
 
 
 # ================================
@@ -153,10 +143,22 @@ class StudioCore:
         self.safety = PatchedRNSSafety(self.cfg)
         self.integrity = PatchedIntegrityScanEngine()
         self.vocals = VocalProfileRegistry()
-        self.style = PatchedStyleMatrix()
-        self.tone = ToneSyncEngine()
-        self.vocal_allocator = AdaptiveVocalAllocator()  # новый модуль
 
+        # ✅ безопасная инициализация StyleMatrix
+        try:
+            from .style import PatchedStyleMatrix
+            self.style = PatchedStyleMatrix()
+            print("🎨 [StyleMatrix] Используется патчированная версия (PatchedStyleMatrix).")
+        except ImportError:
+            self.style = StyleMatrix()
+            print("🎨 [StyleMatrix] Используется стандартная версия (StyleMatrix).")
+
+        self.tone = ToneSyncEngine()
+        self.vocal_allocator = AdaptiveVocalAllocator()
+
+    # -------------------------------------------------------
+    # Semantic annotation
+    # -------------------------------------------------------
     def _build_semantic_sections(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int) -> Dict[str, Any]:
         love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
         cf = tlp.get("conscious_frequency", 0.0)
@@ -171,6 +173,9 @@ class StudioCore:
                    "sections": [intro, verse, bridge, chorus, outro]}
         return {"bpm": bpm_adj, "overlay": overlay}
 
+    # -------------------------------------------------------
+    # Annotation
+    # -------------------------------------------------------
     def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any],
                       vocals: List[str], bpm: int, emotions=None, tlp=None) -> str:
         blocks = [b.strip() for b in re.split(r"\n\s*\n", text.strip()) if b.strip()]
@@ -189,6 +194,9 @@ class StudioCore:
         annotated_blocks.append(f"[Vocal Techniques: {tech}]")
         return "\n".join(annotated_blocks).strip()
 
+    # -------------------------------------------------------
+    # Analysis core
+    # -------------------------------------------------------
     def analyze(self, text: str, author_style=None, preferred_gender=None, version=None) -> Dict[str, Any]:
         version = version or self.cfg.get("suno_version", "v5")
         raw = normalize_text_preserve_symbols(text)
@@ -200,7 +208,6 @@ class StudioCore:
         overlay_pack = self._build_semantic_sections(emo, tlp, bpm)
         bpm_adj = overlay_pack["bpm"]
 
-        # 🔹 Новый шаг — анализ вокала
         vocal_meta = self.vocal_allocator.analyze(emo, tlp, bpm_adj, raw)
         preferred_gender = vocal_meta["gender"]
 
@@ -229,7 +236,7 @@ class StudioCore:
 # ==========================================================
 # ✅ Auto-Register Patch
 # ==========================================================
-STUDIOCORE_VERSION = "v4.3.5"
+STUDIOCORE_VERSION = "v4.3.6"
 try:
     from inspect import isclass
     if "StudioCore" not in globals():
