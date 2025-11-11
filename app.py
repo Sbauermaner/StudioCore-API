@@ -72,7 +72,22 @@ def analyze_text(text: str, gender: str = "auto"):
                 "Анализ временно недоступен.", "", "", ""
             )
 
-        result = core.analyze(text, preferred_gender=gender)
+        # --- Проверка пользовательских описаний вокала ---
+        # Если пользователь добавил описание вроде "под хриплый мужской вокал" или "soft female growl"
+        overlay = {}
+        voice_hint_keywords = [
+            "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
+            "пескляв", "soft", "airy", "shout", "grit", "фальцет", "whisper"
+        ]
+        if any(k in text.lower() for k in voice_hint_keywords):
+            overlay["voice_profile_hint"] = text.split("\n")[-1].strip()
+            print(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
+        else:
+            overlay = None
+
+        # --- Вызов ядра ---
+        result = core.analyze(text, preferred_gender=gender, overlay=overlay)
+
         if isinstance(result, dict) and "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
 
@@ -129,7 +144,11 @@ with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface
     gr.Markdown(f"## 🎧 StudioCore {STUDIOCORE_VERSION}\nПубличная версия без логов.\n")
 
     with gr.Row():
-        text_input = gr.Textbox(label="Введите текст песни", lines=12, placeholder="Вставьте лирику здесь…")
+        text_input = gr.Textbox(
+            label="Введите текст песни (внизу можно добавить описание вокала)",
+            lines=12,
+            placeholder="Вставьте лирику здесь…\n\nПример: (под хриплый мужской вокал, с криками)"
+        )
         gender_input = gr.Radio(["auto", "male", "female"], value="auto", label="Пол вокала (Gender)")
 
     analyze_button = gr.Button("🔍 Анализировать")
