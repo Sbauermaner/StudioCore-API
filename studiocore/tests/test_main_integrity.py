@@ -76,15 +76,17 @@ class TestMainIntegrity(unittest.TestCase):
 
     def test_api_response(self):
         """
-        Тест: [Integrity] Проверяет эндпоинт /api/predict (требует запущенного сервера).
+        Тест: [Integrity] Проверяет эндпоинт (требует запущенного сервера).
         """
-        print("\n[TestIntegrity] 🌐 Checking /api/predict endpoint...")
+        print("\n[TestIntegrity] 🌐 Checking API endpoint...")
+        
+        # !!! ИСПРАВЛЕНИЕ 404: Убран /api/ префикс. !!!
+        api_url = "http://127.0.0.1:7860/predict"
+        
         payload = {
             "text": "Я тону, когда солнце уходит вдаль...",
             "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
         }
-        
-        api_url = "http://127.0.0.1:7860/api/predict"
         
         try:
             r = requests.post(api_url, json=payload, timeout=10)
