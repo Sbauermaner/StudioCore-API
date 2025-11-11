@@ -134,3 +134,16 @@ class PatchedStyleMatrix:
 # ==========================================================
 STYLE_VERSION = "v5.2.1 adaptive hybrid"
 print(f"🎨 [PatchedStyleMatrix {STYLE_VERSION}] loaded successfully.")
+
+
+# ==========================================================
+# 🔄 Compatibility alias for older Monolith imports
+# ==========================================================
+try:
+    StyleMatrix
+except NameError:
+    try:
+        StyleMatrix = PatchedStyleMatrix
+        print("🎨 [StyleMatrix alias] PatchedStyleMatrix → StyleMatrix (compat mode active)")
+    except Exception as e:
+        print(f"⚠️ [StyleMatrix alias] failed: {e}")
