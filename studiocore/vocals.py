@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — VocalProfileRegistry
+StudioCore v5.1 — VocalProfileRegistry
 Адаптивный подбор вокальных и инструментальных профилей по жанру, эмоциям и структуре.
+Теперь включает map_emotion_to_english() для inline-аннотации (Suno adaptive mode)
 """
 
 from typing import List, Dict, Any, Tuple
@@ -147,3 +148,42 @@ class VocalProfileRegistry:
         inst = [i for i in inst if i in VALID_INSTRUMENTS][:6]
 
         return vox, inst, vocal_form
+
+
+# --------------------------------------------------------
+# 🗣️ Адаптивная аннотация по эмоциям (для inline prompt)
+# --------------------------------------------------------
+def map_emotion_to_english(mood: str, tone: str = "mid") -> str:
+    """
+    Converts emotion/tone info into English phrasing hints for Suno inline annotation.
+    Lyrics stay in original language; only annotations are English.
+    """
+    mood = (mood or "neutral").lower()
+    tone = (tone or "mid").lower()
+
+    emotion_map = {
+        "calm": "soft whisper, warm tone",
+        "peaceful": "gentle flow, smooth phrasing",
+        "hopeful": "light rise, airy resonance",
+        "joyful": "open tone, bright timbre, smiling delivery",
+        "sad": "slow breath, trembling vibrato",
+        "melancholy": "emotional depth, low register warmth",
+        "dramatic": "belted rasp, strong dynamic contrast",
+        "angry": "harsh tone, powerful projection",
+        "prayerful": "vibrato with tender breath",
+        "romantic": "soft dynamics, emotional phrasing",
+        "intense": "raspy tone, controlled tension",
+        "neutral": "balanced tone, natural phrasing"
+    }
+
+    tone_map = {
+        "low": "deep resonance",
+        "mid": "mid-range timbre",
+        "high": "bright tone",
+        "whisper": "breathy delivery",
+        "belt": "strong projection",
+    }
+
+    phrase = emotion_map.get(mood, "neutral phrasing, natural tone")
+    tone_descr = tone_map.get(tone, "")
+    return f"{phrase}, {tone_descr}".strip(", ")
