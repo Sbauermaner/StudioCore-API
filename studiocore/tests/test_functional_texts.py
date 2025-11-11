@@ -3,10 +3,19 @@
 StudioCore v5.2.1 — Extended Functional Logic Test
 Тестирует реакцию ядра на тексты с разными эмоциональными профилями:
 Love / Pain / Fear / Joy / Light / Dark
+
+ИСПРАВЛЕНО: Код преобразован в unittest-совместимый класс.
 """
 
+# === 🔧 Исправление пути импорта (ОБЯЗАТЕЛЬНО) ===
+import os, sys
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+# === Конец исправления ===
+
+import unittest
 from studiocore import get_core
-core = get_core()
 
 # --- Тестовые тексты по архетипам ---
 texts = {
@@ -55,35 +64,67 @@ expected = {
     },
 }
 
-# --- Проверка ---
-print("\n🧠 StudioCore v5.2.1 — Functional Emotional Logic Test")
-print("===============================================")
+class TestFunctionalEmotionalLogic(unittest.TestCase):
+    
+    core = None
 
-for name, text in texts.items():
-    print(f"\n=== 🔹 TEST CASE: {name.upper()} ===")
-    result = core.analyze(text)
+    @classmethod
+    def setUpClass(cls):
+        """Загружаем ядро один раз для всех тестов в этом классе."""
+        print("\n[TestFunctionalTexts] Загрузка StudioCore...")
+        try:
+            cls.core = get_core()
+            print("[TestFunctionalTexts] Ядро успешно загружено.")
+        except Exception as e:
+            print(f"[TestFunctionalTexts] КРИТИЧЕСКАЯ ОШИБКА загрузки ядра: {e}")
+            cls.core = None
 
-    style = result.get("style", {})
-    genre = style.get("genre", "—")
-    mood = style.get("style", "—")
-    atmosphere = style.get("atmosphere", "—")
-    narrative = style.get("narrative", "—")
-    bpm = result.get("bpm", "—")
+    def test_emotional_logic_responses(self):
+        """
+        Главный тест: Прогоняет все тексты и сравнивает с эталонами.
+        """
+        self.assertIsNotNone(self.core, "Ядро StudioCore не было загружено (см. setUpClass). Тест прерван.")
 
-    print(f"🎭 Genre: {genre}")
-    print(f"🎵 Style: {mood}")
-    print(f"🌤 Atmosphere: {atmosphere}")
-    print(f"📖 Narrative: {narrative}")
-    print(f"⏱ BPM: {bpm}")
+        for name, text in texts.items():
+            # self.subTest позволяет тесту продолжаться, даже если один из
+            # кейсов упадет, и сообщает, какой именно упал.
+            with self.subTest(name=name.upper()):
+                result = self.core.analyze(text)
 
-    ok = (
-        genre == expected[name]["genre"]
-        and mood == expected[name]["style"]
-        and atmosphere == expected[name]["atmosphere"]
-        and 60 <= (bpm or 0) <= 172
-    )
+                style = result.get("style", {})
+                actual_genre = style.get("genre", "—")
+                actual_mood = style.get("style", "—")
+                actual_atmosphere = style.get("atmosphere", "—")
+                actual_bpm = result.get("bpm", 0)
 
-    print("✅ OK — ядро реагирует корректно." if ok else "⚠️ MISMATCH — логика нарушена!")
+                expected_data = expected[name]
+                
+                # --- Проверки (Assertions) ---
+                
+                self.assertEqual(
+                    actual_genre, 
+                    expected_data["genre"],
+                    f"[{name.upper()}] Ошибка ЖАНРА: ожидался '{expected_data['genre']}', получен '{actual_genre}'"
+                )
+                
+                self.assertEqual(
+                    actual_mood, 
+                    expected_data["style"],
+                    f"[{name.upper()}] Ошибка СТИЛЯ: ожидался '{expected_data['style']}', получен '{actual_mood}'"
+                )
+                
+                self.assertEqual(
+                    actual_atmosphere, 
+                    expected_data["atmosphere"],
+                    f"[{name.upper()}] Ошибка АТМОСФЕРЫ: ожидалась '{expected_data['atmosphere']}', получена '{actual_atmosphere}'"
+                )
+                
+                self.assertTrue(
+                    60 <= actual_bpm <= 172,
+                    f"[{name.upper()}] Ошибка BPM: {actual_bpm} вне диапазона [60, 172]"
+                )
 
-print("\n📊 Тест завершён.")
-print("Если есть ⚠️ — сравни вывод с эталоном выше.")
+# Этот блок позволяет запускать файл напрямую (python studiocore/tests/test_functional_texts.py)
+# ИЛИ через discover (python studiocore/tests/test_all.py)
+if __name__ == "__main__":
+    unittest.main()
