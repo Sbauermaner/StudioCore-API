@@ -2,7 +2,7 @@
 """
 🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (Safe Integration)
 Truth × Love × Pain = Conscious Frequency
-Unified core loader with fallback + Gradio + FastAPI
+Unified core loader with fallback + Gradio + FastAPI + AutoTest
 """
 
 import os, sys, subprocess, importlib, traceback, threading, time
@@ -66,7 +66,6 @@ def analyze_text(text: str, gender: str = "auto"):
         return "⚠️ Введите текст для анализа.", "", "", ""
 
     try:
-        # Если активен fallback — предупредить
         if getattr(core, "is_fallback", False):
             return (
                 "⚠️ StudioCore находится в безопасном режиме (fallback). "
@@ -194,3 +193,19 @@ if __name__ == "__main__":
     import uvicorn
     print(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API...")
     uvicorn.run(app, host="0.0.0.0", port=7860)
+
+    # ==========================================================
+    # 🧩 Auto Integrity Check on Startup (StudioCore v5.2.1)
+    # ==========================================================
+    import threading, os, time
+
+    def run_integrity_tests():
+        time.sleep(2)
+        print("\n🧩 Auto-Running StudioCore Full System Test...")
+        result = os.system("python3 studiocore/tests/test_all.py")
+        if result == 0:
+            print("✅ Автотесты StudioCore успешно завершены.")
+        else:
+            print("⚠️ Ошибка при выполнении автотестов. Проверь логи выше.")
+
+    threading.Thread(target=run_integrity_tests, daemon=True).start()
