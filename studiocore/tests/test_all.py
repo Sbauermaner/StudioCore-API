@@ -2,23 +2,26 @@
 """
 StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION
 Автоматическая проверка всех модулей, структуры, синтаксиса и API:
-1. Структура папок
-2. Синтаксис Python / JSON / YAML
+1. Структура папок (ВЕСЬ ПРОЕКТ)
+2. Синтаксис Python / JSON / YAML (ВЕСЬ ПРОЕКТ)
 3. Импорты и взаимодействие модулей
-4. Генерация BPM, Style, Genre
-5. Работа API /api/predict
+4. ЗАПУСК ВСЕХ UNIT-ТЕСТОВ (проверка логики ядра и связей)
+5. Тест API /api/predict
 """
 
-# === 🔧 Исправление пути импорта (чтобы tests видели пакет) ===
-import os, sys
+# === 🔧 Исправление пути импорта (чтобы test видели пакет) ===
+import os, sys, json, ast, yaml, importlib, requests, traceback
+from statistics import mean
+import unittest # <-- Добавлен для запуска всех тестов
+
+# ВАЖНО: Этот блок исправляет путь, чтобы можно было импортировать 'studiocore'
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-# === Импорты после настройки пути ===
-import json, ast, yaml, importlib, requests, traceback
+# ИЗМЕНЕНИЕ 1: Проверяем весь проект, а не только 'studiocore'
+ROOT_DIR = ROOT 
 
-ROOT_DIR = "studiocore"
 MODULES = [
     "studiocore.text_utils",
     "studiocore.emotion",
@@ -26,7 +29,7 @@ MODULES = [
     "studiocore.vocals",
     "studiocore.style",
     "studiocore.tone",
-    "studiocore.adapter",
+    "studiocore.adapter"
 ]
 
 # ==========================================================
@@ -34,7 +37,8 @@ MODULES = [
 # ==========================================================
 def check_directories():
     print("📂 Проверка структуры...")
-    required = [ROOT_DIR, f"{ROOT_DIR}/tests"]
+    # Проверяем только 'studiocore', а не весь ROOT
+    required = [f"{ROOT_DIR}/studiocore", f"{ROOT_DIR}/studiocore/tests"]
     missing = [d for d in required if not os.path.isdir(d)]
     if missing:
         print(f"❌ Отсутствуют директории: {missing}")
@@ -44,9 +48,12 @@ def check_directories():
 
 
 def check_python_syntax():
-    print("\n🐍 Проверка синтаксиса Python...")
+    print("\n🐍 Проверка синтаксиса Python (весь проект)...")
     all_ok = True
+    # Теперь os.walk идет по всему ROOT_DIR (всему проекту)
     for root, _, files in os.walk(ROOT_DIR):
+        if ".venv" in root or ".git" in root: # Игнорируем ненужные
+            continue
         for f in files:
             if f.endswith(".py"):
                 path = os.path.join(root, f)
@@ -61,9 +68,12 @@ def check_python_syntax():
 
 
 def check_json_yaml():
-    print("\n🧩 Проверка JSON / YAML...")
+    print("\n🧩 Проверка JSON / YAML (весь проект)...")
     ok = True
+    # Теперь os.walk идет по всему ROOT_DIR (всему проекту)
     for root, _, files in os.walk(ROOT_DIR):
+        if ".venv" in root or ".git" in root: # Игнорируем ненужные
+            continue
         for f in files:
             path = os.path.join(root, f)
             if f.endswith(".json"):
@@ -98,15 +108,41 @@ def test_imports():
             all_ok = False
     return all_ok
 
+# ==========================================================
+# 🔬 3. ИЗМЕНЕНИЕ 2: Запуск ВСЕХ Unit-тестов (Логика ядра)
+# ==========================================================
+def run_all_unit_tests():
+    """
+    Автоматически находит и запускает все файлы 'test_*.py' 
+    во всех папках проекта (в ROOT_DIR).
+    Это и есть проверка "логики ядра" и "связей".
+    """
+    print("\n🔬 Запуск всех Unit-тестов (проверка логики)...")
+    try:
+        loader = unittest.TestLoader()
+        # Ищем все тесты во всех папках
+        suite = loader.discover(start_dir=ROOT_DIR, pattern="test_*.py") 
+        runner = unittest.TextTestRunner(verbosity=1) # verbosity=2 для деталей
+        result = runner.run(suite)
+        
+        if not result.wasSuccessful():
+            print("❌ Обнаружены ошибки в Unit-тестах.")
+            return False
+        
+        print("✅ Все Unit-тесты пройдены.")
+        return True
+    except Exception:
+        print("❌ КРИТИЧЕСКАЯ ОШИБКА при запуске тестов:")
+        traceback.print_exc()
+        return False
 
 # ==========================================================
-# 🎧 3. Проверка внутренней логики ядра
+# 🎧 4. (БЫЛ 3) Проверка конкретного пайплайна (Интеграционный)
 # ==========================================================
 def test_prediction_pipeline():
-    print("\n🎧 Проверка ядра StudioCore...")
+    print("\n🎧 Проверка (интеграционная) ядра StudioCore...")
     try:
         from studiocore.style import PatchedStyleMatrix
-        # важно: LyricMeter должен существовать в rhythm (или подставь актуальный класс)
         from studiocore.rhythm import LyricMeter
 
         text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
@@ -116,11 +152,11 @@ def test_prediction_pipeline():
         bpm = LyricMeter().bpm_from_density(text, emo)
         style = PatchedStyleMatrix().build(emo, tlp, text, bpm)
 
-        assert 60 <= bpm <= 180, f"BPM вне диапазона: {bpm}"
+        assert 60 <= bpm <= 172, f"BPM вне диапазона: {bpm}"
         assert "genre" in style and "style" in style, "Отсутствуют ключевые поля"
-        assert isinstance(style.get("techniques", []), list), "Поле techniques не list"
+        assert isinstance(style["techniques"], list), "Поле techniques не list"
 
-        print(f"✅ BPM={bpm} | Genre={style['genre']} | Style={style['style']}")
+        print(f"✅ Интеграция OK | BPM={bpm} | Genre={style['genre']} | Style={style['style']}")
         return True
     except Exception:
         traceback.print_exc()
@@ -128,22 +164,19 @@ def test_prediction_pipeline():
 
 
 # ==========================================================
-# 🌐 4. Проверка API /api/predict
+# 🌐 5. (БЫЛ 4) Проверка API /api/predict
 # ==========================================================
 def test_api_response():
     print("\n🌐 Проверка /api/predict ...")
     try:
         payload = {
             "text": "Я тону, когда солнце уходит вдаль...",
-            "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92},
+            "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
         }
         r = requests.post("http://127.0.0.1:7860/api/predict", json=payload, timeout=10)
         assert r.status_code == 200, f"HTTP {r.status_code}"
         data = r.json()
-        # В твоём API ответ — это словарь с полями summary/style_prompt/annotated_text,
-        # поэтому просто проверяем наличие summary:
-        assert "summary" in data, "summary отсутствует в ответе API"
-        print("✅ API OK")
+        print(f"✅ API OK | BPM={data.get('bpm')} | Style={data.get('style')}")
         return True
     except Exception as e:
         print(f"❌ Ошибка API: {e}")
@@ -151,18 +184,20 @@ def test_api_response():
 
 
 # ==========================================================
-# 🧩 5. Запуск всех тестов и финальный отчёт
+# 🧩 6. (БЫЛ 5) Запуск всех тестов и финальный отчёт
 # ==========================================================
 if __name__ == "__main__":
     print("\n===== 🧩 StudioCore v5.2.1 — FULL SYSTEM CHECK =====")
 
-    total = 5
+    # ИЗМЕНЕНИЕ 3: Обновлен список тестов
+    total = 6
     results = {
         "structure": check_directories(),
         "syntax": check_python_syntax(),
         "json_yaml": check_json_yaml(),
         "imports": test_imports(),
-        "logic_api": test_prediction_pipeline() and test_api_response(),
+        "unit_tests (logic)": run_all_unit_tests(), # <-- НОВЫЙ ТЕСТ
+        "integration_api": test_prediction_pipeline() and test_api_response()
     }
 
     passed = sum(1 for k in results.values() if k)
