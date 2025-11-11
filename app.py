@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (Safe Integration)
+🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (Safe Integration + Inline Logs)
 Truth × Love × Pain = Conscious Frequency
-Unified core loader with fallback + Gradio + FastAPI + AutoTests + Log Viewer
+Unified core loader with fallback + Gradio + FastAPI + Inline Log Viewer
 """
 
-import os, sys, subprocess, importlib, traceback, threading, time
+import os, sys, subprocess, importlib, traceback, threading, time, io
 import gradio as gr
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-# === Импорт ядра (с безопасной обёрткой) ===
+# === Импорт ядра ===
 from studiocore import get_core, STUDIOCORE_VERSION
 
 # === Установка requests (для self-check) ===
@@ -24,13 +24,6 @@ try:
     import requests  # type: ignore
 except Exception:
     requests = None
-
-# === Автосинхронизация OpenAPI (если есть скрипт) ===
-try:
-    if os.path.exists("auto_sync_openapi.py"):
-        subprocess.call([sys.executable, "auto_sync_openapi.py"])
-except Exception as e:
-    print("⚠️ Ошибка OpenAPI sync:", e)
 
 # === Инициализация ядра и FastAPI ===
 core = get_core()
@@ -57,7 +50,6 @@ def auto_core_check():
         print("❌ Self-Check error:", e)
 
 threading.Thread(target=auto_core_check, daemon=True).start()
-
 
 # === АНАЛИЗ ТЕКСТА ===
 def analyze_text(text: str, gender: str = "auto"):
@@ -137,156 +129,72 @@ def analyze_text(text: str, gender: str = "auto"):
         print("❌ Ошибка при анализе:\n", traceback.format_exc())
         return "❌ Внутреннее исключение при анализе.", "", "", ""
 
+# === INLINE TEST RUNNER ===
+def run_inline_tests():
+    """Выполняет тесты и возвращает stdout прямо в интерфейс."""
+    buffer = io.StringIO()
+    buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
+    buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+    try:
+        buffer.write("🚀 Running: test_all.py\n")
+        res1 = os.system("python3 studiocore/tests/test_all.py > tmp_test_all.txt 2>&1")
+        with open("tmp_test_all.txt", "r", encoding="utf-8", errors="ignore") as f:
+            buffer.write(f.read() + "\n")
+
+        buffer.write("🧠 Running: test_functional_texts.py\n")
+        res2 = os.system("python3 studiocore/tests/test_functional_texts.py > tmp_test_logic.txt 2>&1")
+        with open("tmp_test_logic.txt", "r", encoding="utf-8", errors="ignore") as f:
+            buffer.write(f.read() + "\n")
+
+        buffer.write("✅ Inline test session complete.\n")
+
+    except Exception as e:
+        buffer.write(f"❌ Ошибка при запуске тестов: {e}\n")
+
+    return buffer.getvalue()
 
 # === PUBLIC UI (Gradio) ===
 with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface") as iface_public:
-    gr.Markdown(f"## 🎧 StudioCore {STUDIOCORE_VERSION}\nПубличная версия без логов.\n")
+    gr.Markdown(f"## 🎧 StudioCore {STUDIOCORE_VERSION}\nАдаптивный движок с тестами и логами.\n")
 
-    with gr.Row():
-        text_input = gr.Textbox(
-            label="Введите текст песни (внизу можно добавить описание вокала)",
-            lines=12,
-            placeholder="Вставьте лирику здесь…\n\nПример: (под хриплый мужской вокал, с криками)"
+    with gr.Tab("🎙️ Анализ текста"):
+        with gr.Row():
+            text_input = gr.Textbox(
+                label="Введите текст песни (внизу можно добавить описание вокала)",
+                lines=12,
+                placeholder="Вставьте лирику здесь…\n\nПример: (под хриплый мужской вокал, с криками)"
+            )
+            gender_input = gr.Radio(["auto", "male", "female"], value="auto", label="Пол вокала (Gender)")
+
+        analyze_button = gr.Button("🔍 Анализировать")
+
+        with gr.Row():
+            result_box = gr.Textbox(label="📊 Результат", lines=6)
+            style_box = gr.Textbox(label="🎼 Стиль и инструменты", lines=8)
+
+        with gr.Row():
+            suno_box = gr.Textbox(label="🎧 Suno-промт (Style)", lines=8)
+            annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=24)
+
+        analyze_button.click(
+            fn=analyze_text,
+            inputs=[text_input, gender_input],
+            outputs=[result_box, style_box, suno_box, annotated_box],
         )
-        gender_input = gr.Radio(["auto", "male", "female"], value="auto", label="Пол вокала (Gender)")
 
-    analyze_button = gr.Button("🔍 Анализировать")
-
-    with gr.Row():
-        result_box = gr.Textbox(label="📊 Результат", lines=6)
-        style_box = gr.Textbox(label="🎼 Стиль и инструменты", lines=8)
-
-    with gr.Row():
-        suno_box = gr.Textbox(label="🎧 Suno-промт (Style)", lines=8)
-        annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=24)
-
-    analyze_button.click(
-        fn=analyze_text,
-        inputs=[text_input, gender_input],
-        outputs=[result_box, style_box, suno_box, annotated_box],
-    )
-
-
-# === API ===
-@app.get("/status")
-async def status():
-    return JSONResponse(
-        content={
-            "status": "ok",
-            "engine": "StudioCore",
-            "ready": not getattr(core, "is_fallback", False),
-            "version": STUDIOCORE_VERSION,
-        }
-    )
-
-
-@app.post("/api/predict")
-async def predict_api(request: Request):
-    try:
-        payload = await request.json()
-        text = payload.get("text", "")
-        gender = payload.get("gender", "auto")
-        summary, style_prompt, suno, annotated = analyze_text(text, gender)
-        return JSONResponse(
-            content={
-                "summary": summary,
-                "style_prompt": style_prompt,
-                "prompt_suno": suno,
-                "annotated_text": annotated,
-                "engine_version": STUDIOCORE_VERSION,
-                "gender": gender,
-            }
-        )
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-# === LOG VIEW ENDPOINTS ===
-@app.get("/logs/test_logic")
-async def get_test_logic():
-    """Возвращает содержимое test_logic.txt."""
-    try:
-        with open("test_logic.txt", "r", encoding="utf-8") as f:
-            return PlainTextResponse(f.read())
-    except FileNotFoundError:
-        return PlainTextResponse("❌ test_logic.txt not found or not yet generated.")
-    except Exception as e:
-        return PlainTextResponse(f"⚠️ Error reading test_logic.txt: {e}")
-
-
-@app.get("/logs/test_log")
-async def get_test_log():
-    """Возвращает содержимое test_log.txt (системные тесты)."""
-    try:
-        with open("test_log.txt", "r", encoding="utf-8") as f:
-            return PlainTextResponse(f.read())
-    except FileNotFoundError:
-        return PlainTextResponse("❌ test_log.txt not found or not yet generated.")
-    except Exception as e:
-        return PlainTextResponse(f"⚠️ Error reading test_log.txt: {e}")
-
+    with gr.Tab("🧩 Логи и тесты"):
+        gr.Markdown("### Автоматическая проверка ядра StudioCore")
+        run_btn = gr.Button("🚀 Запустить тесты")
+        output_box = gr.Textbox(label="Результаты тестов", lines=30, show_copy_button=True)
+        run_btn.click(fn=run_inline_tests, inputs=None, outputs=output_box)
 
 # === MOUNT ===
 iface_public.queue()
 app = gr.mount_gradio_app(app, iface_public, path="/")
 
-
 # === RUN ===
 if __name__ == "__main__":
     import uvicorn
-
-    print(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API...")
-
-    # ==========================================================
-    # 🧩 Auto Integrity + Functional Logic Tests + Log Init
-    # ==========================================================
-    def run_integrity_and_functional_tests():
-        # автоинициализация логов при старте
-        for file_name in ("test_log.txt", "test_logic.txt"):
-            try:
-                if not os.path.exists(file_name):
-                    with open(file_name, "w", encoding="utf-8") as f:
-                        f.write(f"🧩 {file_name} initialized at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-                else:
-                    with open(file_name, "a", encoding="utf-8") as f:
-                        f.write(f"\n🔁 Restarted at {time.strftime('%H:%M:%S')}.\n")
-            except Exception as e:
-                print(f"⚠️ Cannot init {file_name}: {e}")
-
-        time.sleep(2)
-        print("\n🧩 Auto-Running StudioCore Full System Test...")
-
-        # системные тесты
-        with open("test_log.txt", "a", encoding="utf-8") as log:
-            log.write(f"\n🚀 Running test_all.py at {time.strftime('%H:%M:%S')}\n")
-        res1 = os.system("python3 studiocore/tests/test_all.py >> test_log.txt 2>&1")
-        with open("test_log.txt", "a", encoding="utf-8") as log:
-            if res1 == 0:
-                msg = "✅ test_all.py — системные тесты успешно завершены.\n"
-            else:
-                msg = "⚠️ Ошибка в test_all.py — см. выше.\n"
-            print(msg.strip())
-            log.write(msg)
-
-        # функциональная логика
-        with open("test_logic.txt", "a", encoding="utf-8") as logic:
-            logic.write(f"\n🧠 Running test_functional_texts.py at {time.strftime('%H:%M:%S')}\n")
-        res2 = os.system("python3 studiocore/tests/test_functional_texts.py >> test_logic.txt 2>&1")
-        with open("test_logic.txt", "a", encoding="utf-8") as logic:
-            if res2 == 0:
-                msg = "✅ test_functional_texts.py — функциональная логика пройдена.\n"
-            else:
-                msg = "⚠️ Ошибка в функциональном тесте — см. выше.\n"
-            print(msg.strip())
-            logic.write(msg)
-
-        # завершение
-        print("\n📁 Логи сохранены в файлы:")
-        print("   • test_log.txt   — системные тесты")
-        print("   • test_logic.txt — проверка смысловой логики анализа\n")
-        with open("test_log.txt", "a", encoding="utf-8") as log:
-            log.write("📁 Tests finished.\n")
-
-    threading.Thread(target=run_integrity_and_functional_tests, daemon=True).start()
-
+    print(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API (Inline Logs Mode)...")
     uvicorn.run(app, host="0.0.0.0", port=7860)
