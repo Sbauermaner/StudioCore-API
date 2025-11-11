@@ -2,13 +2,13 @@
 """
 🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (Safe Integration)
 Truth × Love × Pain = Conscious Frequency
-Unified core loader with fallback + Gradio + FastAPI + AutoTests
+Unified core loader with fallback + Gradio + FastAPI + AutoTests + Log Viewer
 """
 
 import os, sys, subprocess, importlib, traceback, threading, time
 import gradio as gr
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # === Импорт ядра (с безопасной обёрткой) ===
@@ -73,7 +73,6 @@ def analyze_text(text: str, gender: str = "auto"):
             )
 
         # --- Проверка пользовательских описаний вокала ---
-        # Если пользователь добавил описание вроде "под хриплый мужской вокал" или "soft female growl"
         overlay = {}
         voice_hint_keywords = [
             "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
@@ -202,6 +201,30 @@ async def predict_api(request: Request):
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
+# === LOG VIEW ENDPOINTS ===
+@app.get("/logs/test_logic")
+async def get_test_logic():
+    """Возвращает содержимое test_logic.txt."""
+    try:
+        with open("test_logic.txt", "r", encoding="utf-8") as f:
+            return PlainTextResponse(f.read())
+    except FileNotFoundError:
+        return PlainTextResponse("❌ test_logic.txt not found or not yet generated.")
+    except Exception as e:
+        return PlainTextResponse(f"⚠️ Error reading test_logic.txt: {e}")
+
+@app.get("/logs/test_log")
+async def get_test_log():
+    """Возвращает содержимое test_log.txt (системные тесты)."""
+    try:
+        with open("test_log.txt", "r", encoding="utf-8") as f:
+            return PlainTextResponse(f.read())
+    except FileNotFoundError:
+        return PlainTextResponse("❌ test_log.txt not found or not yet generated.")
+    except Exception as e:
+        return PlainTextResponse(f"⚠️ Error reading test_log.txt: {e}")
+
+
 # === MOUNT ===
 iface_public.queue()
 app = gr.mount_gradio_app(app, iface_public, path="/")
@@ -217,6 +240,13 @@ if __name__ == "__main__":
     # 🧩 Auto Integrity + Functional Logic Tests
     # ==========================================================
     def run_integrity_and_functional_tests():
+        # автоочистка логов при старте
+        for f in ("test_log.txt", "test_logic.txt"):
+            try:
+                open(f, "w").close()
+            except Exception:
+                pass
+
         time.sleep(2)
         print("\n🧩 Auto-Running StudioCore Full System Test...")
         res1 = os.system("python3 studiocore/tests/test_all.py > test_log.txt 2>&1")
