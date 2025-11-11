@@ -35,6 +35,7 @@ MODULES = [
 
 # ИСПРАВЛЕНИЕ: Сканируем только эти папки и файлы, чтобы не трогать /usr/lib
 PROJECT_FOLDERS_TO_SCAN = ["studiocore"]
+# Добавьте сюда другие корневые файлы .py или .json, если они есть
 PROJECT_FILES_TO_SCAN = ["app.py", "studio_config.json"]
 
 
@@ -229,8 +230,11 @@ def run_all_unit_tests():
     print("\n🔬 Запуск всех Unit-тестов (проверка логики)...")
     try:
         loader = unittest.TestLoader()
-        # Ищем все тесты во всех папках
-        suite = loader.discover(start_dir=ROOT_DIR, pattern="test_*.py")
+        
+        # ИСПРАВЛЕНИЕ: Ищем тесты только в папке tests, а не во всем проекте.
+        test_dir = os.path.join(ROOT_DIR, "studiocore", "tests")
+        suite = loader.discover(start_dir=test_dir, pattern="test_*.py")
+        
         runner = unittest.TextTestRunner(verbosity=1) # verbosity=2 для деталей
         result = runner.run(suite)
 
@@ -240,11 +244,10 @@ def run_all_unit_tests():
 
         # Проверяем, были ли тесты вообще запущены
         if result.testsRun == 0:
-             print("⚠️  НИ ОДНОГО ТЕСТА НЕ НАЙДЕНО. Проверьте test_*.py файлы на наличие sys.path!")
-             # Не считаем это ошибкой, но выводим предупреждение
+             print("⚠️  НИ ОДНОГО ТЕСТА НЕ НАЙДЕНО. (Это может быть нормально, если их пока нет)")
              return True 
 
-        print("✅ Все Unit-тесты пройдены.")
+        print(f"✅ Все {result.testsRun} Unit-теста пройдены.")
         return True
     except Exception:
         print("❌ КРИТИЧЕСКАЯ ОШИБКА при запуске тестов:")
@@ -283,20 +286,22 @@ def test_prediction_pipeline():
 # ==========================================================
 def test_api_response():
     print("\n🌐 Проверка /api/predict ...")
+    
+    # !!! РЕШЕНИЕ 1: Проверьте этот URL. Он должен совпадать с URL в app.py !!!
+    api_url = "http://127.0.0.1:7860/api/predict" 
+    
     try:
         payload = {
             "text": "Я тону, когда солнце уходит вдаль...",
             "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
         }
-        # ПРИМЕЧАНИЕ: Ошибка 404 означает, что URL не найден на сервере.
-        # Проверьте ваш app.py, возможно, URL отличается (например, нет /api/)
-        r = requests.post("http://127.0.0.1:7860/api/predict", json=payload, timeout=10)
+        r = requests.post(api_url, json=payload, timeout=10)
         assert r.status_code == 200, f"HTTP {r.status_code}"
         data = r.json()
         print(f"✅ API OK | BPM={data.get('bpm')} | Style={data.get('style')}")
         return True
     except Exception as e:
-        print(f"❌ Ошибка API: {e}")
+        print(f"❌ Ошибка API: {e} (Проверьте URL: {api_url})")
         return False
 
 
@@ -306,7 +311,6 @@ def test_api_response():
 if __name__ == "__main__":
     print("\n===== 🧩 StudioCore v5.2.1 — FULL SYSTEM CHECK =====")
 
-    # ИЗМЕНЕНИЕ 3: Обновлен список тестов
     total = 7
     results = {
         "structure": check_directories(),
@@ -314,7 +318,7 @@ if __name__ == "__main__":
         "json_yaml": check_json_yaml_project(), # <-- Вызов исправленной функции
         "imports": test_imports(),
         "dependencies (AST)": check_internal_dependencies(), # <-- НОВЫЙ ТЕСТ СВЯЗЕЙ
-        "unit_tests (logic)": run_all_unit_tests(),
+        "unit_tests (logic)": run_all_unit_tests(), # <-- Вызов исправленной функции
         "integration_api": test_prediction_pipeline() and test_api_response()
     }
 
