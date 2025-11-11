@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v4.3.2 — Monolith (Patched for v5.2)
-Совместимость с app.py (gender adaptive)
+StudioCore v4.3.3 — Monolith (Patched for v5.2 Adaptive)
+Автоматическая аннотация, динамический жанр и адаптивный вокал.
 """
 
 from __future__ import annotations
@@ -112,7 +112,7 @@ class PatchedIntegrityScanEngine:
 
 
 # ================================
-# Patched StyleMatrix
+# Patched StyleMatrix (Adaptive)
 # ================================
 
 class PatchedStyleMatrix:
@@ -128,39 +128,37 @@ class PatchedStyleMatrix:
         else:
             return "neutral modal"
 
-    def _derive_genre(self, text: str, emo: Dict[str, float], tlp: Dict[str, float]) -> str:
-        word_count = len(re.findall(r"\b\w+\b", text))
-        sentences = [s for s in re.split(r"[.!?]", text) if s.strip()]
-        avg_sent_len = sum(len(s.split()) for s in sentences) / max(1, len(sentences))
-        density = min(word_count / 100.0, 10)
-        emotional_range = (tlp.get("love", 0) + tlp.get("pain", 0) + tlp.get("truth", 0)) / 3
+    def build(self, emo: Dict[str, float], tlp: Dict[str, float], text: str, bpm: int) -> Dict[str, Any]:
+        # адаптивное определение жанра
+        words = re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text)
+        word_count = len(words)
+        sents = [s for s in re.split(r"[.!?]+", text) if s.strip()]
+        avg_sent_len = (sum(len(s.split()) for s in sents) / max(1, len(sents))) if sents else 10
+        density = word_count / max(1, len(sents) or 1)
+        dominant = max(emo, key=emo.get) if emo else "neutral"
 
-        if emotional_range > 0.7 and density < 2:
-            base = "orchestral poetic"
-        elif density > 6 and tlp.get("pain", 0) > 0.4:
-            base = "dark rhythmic"
-        elif density > 5 and tlp.get("love", 0) > 0.4:
-            base = "dynamic emotional"
-        elif avg_sent_len > 12:
-            base = "cinematic narrative"
+        if dominant in ("anger", "epic") and bpm >= 132 and density >= 12:
+            genre = "rock"
+        elif dominant in ("joy", "peace") and bpm >= 118 and avg_sent_len <= 10:
+            genre = "pop"
+        elif dominant in ("sadness",) and bpm <= 92 and avg_sent_len >= 12:
+            genre = "folk"
+        elif dominant in ("fear", "awe") and avg_sent_len >= 14 and bpm <= 100:
+            genre = "cinematic"
+        elif dominant in ("peace",) and bpm <= 90 and avg_sent_len <= 10:
+            genre = "ambient"
+        elif density >= 14 and bpm >= 110 and dominant in ("anger","joy"):
+            genre = "hip hop"
         else:
-            base = "lyrical adaptive"
+            genre = "electronic" if bpm >= 120 else "folk"
 
-        dominant = max(emo, key=emo.get)
-        if dominant == "anger":
-            mood = "dramatic"
-        elif dominant == "fear":
-            mood = "mystic"
-        elif dominant == "joy":
-            mood = "uplifting"
-        elif dominant == "sadness":
-            mood = "melancholic"
-        elif dominant == "epic":
-            mood = "heroic"
-        else:
-            mood = "reflective"
-
-        return f"{base} {mood}".strip()
+        return {
+            "genre": genre,
+            "style": self._tone_profile(emo, tlp),
+            "key": self._derive_key(tlp, bpm),
+            "structure": "intro-verse-chorus-outro",
+            "style_descr_full": f"{genre} ({dominant})",
+        }
 
     def _derive_key(self, tlp: Dict[str, float], bpm: int) -> str:
         t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
@@ -186,18 +184,6 @@ class PatchedStyleMatrix:
             key = "C#"
         return f"{key} {mode}"
 
-    def build(self, emo: Dict[str, float], tlp: Dict[str, float], text: str, bpm: int) -> Dict[str, Any]:
-        descr = self._derive_genre(text, emo, tlp)
-        valid_genres = {"rock", "pop", "folk", "electronic", "ambient", "cinematic", "orchestral", "hip hop", "rap"}
-        genre = next((g for g in valid_genres if g in descr), "rock")
-        return {
-            "genre": genre,
-            "style": self._tone_profile(emo, tlp),
-            "key": self._derive_key(tlp, bpm),
-            "structure": "intro-verse-chorus-outro",
-            "style_descr_full": descr,
-        }
-
 
 # ================================
 # StudioCore
@@ -216,7 +202,6 @@ class StudioCore:
         self.style = PatchedStyleMatrix()
         self.tone = ToneSyncEngine()
 
-    # === добавлено: восстановленная функция ===
     def _build_semantic_sections(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int) -> Dict[str, Any]:
         love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
         cf = tlp.get("conscious_frequency", 0.0)
@@ -235,6 +220,27 @@ class StudioCore:
         }
         return {"bpm": bpm_adj, "overlay": overlay}
 
+    def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any], vocals: List[str], bpm: int, emotions=None, tlp=None) -> str:
+        lines = [l for l in text.strip().split("\n") if l.strip()]
+        sections = overlay.get("sections", [])
+        if not sections:
+            return text
+        block_size = max(1, len(lines) // len(sections))
+        annotated = []
+        idx = 0
+        for sec in sections:
+            tag = f"[{sec['section']} – {sec['mood']}, focus={sec['focus']}] (intensity={sec['intensity']})"
+            annotated.append(tag)
+            block_lines = lines[idx: idx + block_size]
+            annotated.extend(block_lines)
+            idx += block_size
+        if idx < len(lines):
+            annotated.extend(lines[idx:])
+        annotated.append(f"[End – BPM≈{bpm}, Vocal={style.get('vocal_form','auto')}, Tone={style.get('key','auto')}]")
+        tech = ", ".join([v for v in vocals if v not in ["male", "female"]]) or "neutral tone"
+        annotated.append(f"[Vocal Techniques: {tech}]")
+        return "\n".join(annotated)
+
     def analyze(self, text: str, author_style=None, preferred_gender=None, version=None) -> Dict[str, Any]:
         version = version or self.cfg.get("suno_version", "v5")
         raw = normalize_text_preserve_symbols(text)
@@ -246,23 +252,17 @@ class StudioCore:
         overlay_pack = self._build_semantic_sections(emo, tlp, bpm)
         bpm_adj = overlay_pack["bpm"]
         style = self.style.build(emo, tlp, raw, bpm_adj)
-
         vox, inst, vocal_form = self.vocals.get(style["genre"], preferred_gender or "auto", raw, sections)
         style["vocal_form"] = vocal_form
-
         print(f"🎧 [StudioCore] Analyze: Gender={preferred_gender or 'auto'} | Genre={style['genre']} | BPM={bpm_adj}")
-
         integ = self.integrity.analyze(raw)
         tone = self.tone.colors_for_primary(emo, tlp, style.get("key", "auto"))
-
         philosophy = (
             f"Truth={tlp.get('truth', 0):.2f}, Love={tlp.get('love', 0):.2f}, Pain={tlp.get('pain', 0):.2f}, CF={tlp.get('conscious_frequency', 0):.2f}"
         )
-
         prompt_full = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="full")
         prompt_suno = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="suno")
-        annotated_text = " ".join(raw.splitlines())
-
+        annotated_text = self.annotate_text(raw, overlay_pack["overlay"], style, vox, bpm_adj, emo, tlp)
         return {
             "emotions": emo,
             "tlp": tlp,
@@ -282,7 +282,7 @@ class StudioCore:
 # ==========================================================
 # ✅ Auto-Register Patch
 # ==========================================================
-STUDIOCORE_VERSION = "v4.3.2"
+STUDIOCORE_VERSION = "v4.3.3"
 try:
     from inspect import isclass
     if "StudioCore" not in globals():
