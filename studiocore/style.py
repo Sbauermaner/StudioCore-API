@@ -110,7 +110,11 @@ def resolve_style_and_form(
     elif style == "soft whisper tone":
         atmosphere = "fragile and ethereal"
     else:
-        atmosphere = "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
+        # ИСПРАВЛЕНИЕ: Добавляем 'neutral modal' в атмосферу
+        if style == "neutral modal":
+            atmosphere = "balanced and reflective"
+        else:
+            atmosphere = "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
 
     # Нарратив
     if narrative:
