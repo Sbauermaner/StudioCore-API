@@ -2,12 +2,11 @@
 """
 StudioCore v4.3.9 — Monolith (USER-MODE Vocal Overlay + Auto Voice Detection)
 Правило: «Если пользователь указал — исполняй буквально. Если не указал — подбери сам».
-Добавлена интеграция detect_voice_profile() из style.py (v5.2.3).
+Поддержка описаний вокала из текста (RU/EN) и автоматического определения через detect_voice_profile().
 """
 
 from __future__ import annotations
 import re, json
-from pathlib import Path
 from statistics import mean
 from typing import Dict, Any, List, Tuple
 
@@ -18,9 +17,11 @@ from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 from .tone import ToneSyncEngine
 from .adapter import build_suno_prompt
 from .vocals import VocalProfileRegistry
-from .style import StyleMatrix
+from .style import StyleMatrix  # безопасный импорт (патч или стандарт)
 
-# 🔹 Пытаемся импортировать автоопределение вокала из PatchedStyleMatrix
+# ==========================================================
+# 🧩 Проверка наличия автораспознавания вокала
+# ==========================================================
 try:
     from .style import detect_voice_profile
     _AUTO_VOCAL_DETECT = True
@@ -28,10 +29,10 @@ try:
 except Exception:
     detect_voice_profile = None
     _AUTO_VOCAL_DETECT = False
-    print("⚠️ [Monolith] Auto voice detection недоступен (нет detect_voice_profile).")
+    print("⚠️ [Monolith] Auto voice detection недоступен (detect_voice_profile отсутствует).")
 
 # ==========================================================
-# Adaptive Vocal Allocation
+# 🔹 Adaptive Vocal Allocation (автоподбор по эмоциям/TLP/BPM)
 # ==========================================================
 class AdaptiveVocalAllocator:
     def analyze(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int, text: str) -> Dict[str, Any]:
@@ -55,6 +56,79 @@ class AdaptiveVocalAllocator:
 
 
 # ==========================================================
+# 🔸 Локальные подсистемы (замена monolith_subsystems)
+# ==========================================================
+class PatchedLyricMeter:
+    vowels = set("aeiouyауоыиэяюёеAEIOUYАУОЫИЭЯЮЁЕ")
+    def _syllables(self, line: str) -> int:
+        return max(1, sum(1 for ch in line if ch in self.vowels))
+    def bpm_from_density(self, text: str) -> int:
+        lines = [l for l in text.split("\n") if l.strip()]
+        if not lines: return 100
+        avg_syll = sum(self._syllables(l) for l in lines) / max(1, len(lines))
+        bpm = 140 - min(60, (avg_syll - 8) * 6)
+        punct_boost = sum(ch in ",.!?…" for ch in text) * 0.5
+        bpm = bpm + min(20, punct_boost)
+        return int(max(60, min(180, bpm)))
+
+class PatchedUniversalFrequencyEngine:
+    base = 24.5
+    def resonance_profile(self, tlp: Dict[str, float]) -> Dict[str, Any]:
+        cf = tlp.get("conscious_frequency", 0.0)
+        base_f = self.base * (1.0 + tlp.get("truth", 0.0))
+        spread = tlp.get("love", 0.0) * 2000.0
+        mod = 1.0 + tlp.get("pain", 0.0) * 0.5
+        if cf > 0.7: rec = [4, 5, 6, 7]
+        elif cf > 0.3: rec = [2, 3, 4, 5]
+        else: rec = [1, 2, 3, 4]
+        return {
+            "base_frequency": round(base_f, 3),
+            "harmonic_range": round(spread, 3),
+            "modulation_depth": round(mod, 3),
+            "recommended_octaves": rec
+        }
+
+class PatchedRNSSafety:
+    def __init__(self, cfg: Dict[str, Any]):
+        self.cfg = cfg.get("safety", {
+            "safe_octaves": [2, 3, 4, 5],
+            "avoid_freq_bands_hz": [18.0, 30.0],
+            "max_peak_db": -1.0,
+            "max_rms_db": -14.0,
+            "fade_in_ms": 1000,
+            "fade_out_ms": 1500,
+        })
+    def clamp_octaves(self, octaves: List[int]) -> List[int]:
+        safe = set(self.cfg.get("safe_octaves", [2, 3, 4, 5]))
+        arr = [o for o in octaves if o in safe]
+        return arr or [2, 3, 4]
+    def safety_meta(self) -> Dict[str, Any]:
+        return {
+            "max_peak_db": self.cfg.get("max_peak_db", -1.0),
+            "max_rms_db": self.cfg.get("max_rms_db", -14.0),
+            "avoid_freq_bands_hz": self.cfg.get("avoid_freq_bands_hz", []),
+            "fade_in_ms": self.cfg.get("fade_in_ms", 1000),
+            "fade_out_ms": self.cfg.get("fade_out_ms", 1500),
+        }
+
+class PatchedIntegrityScanEngine:
+    def analyze(self, text: str) -> Dict[str, Any]:
+        words = re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text.lower())
+        sents = [s for s in re.split(r"[.!?]+", text) if s.strip()]
+        lexical_div = len(set(words)) / max(1, len(words))
+        avg_sent_len = len(words) / max(1, len(sents))
+        reflection = len([w for w in words if w in ("я","i","me","my","меня","сам")]) / max(1, len(words))
+        vib_coh = round((1 - abs(avg_sent_len - 14) / 14 + 1 - abs(lexical_div - 0.5) / 0.5) / 2, 3)
+        return {
+            "form": {"word_count": len(words), "avg_sentence_len": round(avg_sent_len, 2),
+                     "lexical_diversity": round(lexical_div, 2)},
+            "reflection": {"self_awareness_density": round(reflection, 2)},
+            "vibrational_coherence": vib_coh,
+            "flags": []
+        }
+
+
+# ==========================================================
 # StudioCore
 # ==========================================================
 class StudioCore:
@@ -62,10 +136,8 @@ class StudioCore:
         self.cfg = load_config(config_path or "studio_config.json")
         self.emotion = AutoEmotionalAnalyzer()
         self.tlp = TruthLovePainEngine()
-        from .monolith_subsystems import (
-            PatchedLyricMeter, PatchedUniversalFrequencyEngine,
-            PatchedRNSSafety, PatchedIntegrityScanEngine,
-        )
+
+        # Подсистемы локально
         self.rhythm = PatchedLyricMeter()
         self.freq = PatchedUniversalFrequencyEngine()
         self.safety = PatchedRNSSafety(self.cfg)
@@ -119,25 +191,21 @@ class StudioCore:
 
         vocal_meta = self.vocal_allocator.analyze(emo, tlp, bpm_adj, raw)
 
-        # --- Поиск пользовательского описания ---
-        user_voice = None
+        user_voice, auto_detected_hint = None, None
         if overlay and "voice_profile" in overlay:
             user_voice = overlay["voice_profile"]
-        if not user_voice:
-            # Пробуем встроенный метод _extract_user_vocal_from_text (старый)
+        else:
             try:
                 from .monolith import _extract_user_vocal_from_text
                 user_voice = _extract_user_vocal_from_text(raw)
             except Exception:
                 pass
 
-        auto_detected_hint = None
         if not user_voice and _AUTO_VOCAL_DETECT and detect_voice_profile:
             auto_detected_hint = detect_voice_profile(raw)
             if auto_detected_hint:
                 overlay_pack["overlay"]["voice_profile_hint"] = auto_detected_hint
 
-        # --- Определяем режим ---
         mode = "AUTO-MODE"
         if user_voice:
             mode = "USER-MODE"
@@ -145,15 +213,11 @@ class StudioCore:
             mode = "AUTO-DETECT"
 
         preferred_gender_eff = preferred_gender or vocal_meta.get("gender") or "auto"
-
-        # --- Определяем стиль ---
         style = self.style.build(emo, tlp, raw, bpm_adj, overlay_pack["overlay"])
 
-        # --- Получаем вокалы и инструменты ---
         vox, inst, vocal_form = self.vocals.get(
             style["genre"], preferred_gender_eff, raw, sections
         )
-
         style["vocal_form"] = vocal_form
         style["vocal_count"] = vocal_meta["vocal_count"]
 
