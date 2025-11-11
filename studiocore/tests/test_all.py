@@ -9,7 +9,16 @@ StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION
 5. Работа API /api/predict
 """
 
-import os, json, ast, yaml, importlib, requests, traceback
+# ==========================================================
+# 🧩 Bootstrap для корректных импортов (важно для Hugging Face)
+# ==========================================================
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+# ==========================================================
+# 🧠 Импорты модулей
+# ==========================================================
+import json, ast, yaml, importlib, requests, traceback
 from statistics import mean
 
 ROOT_DIR = "studiocore"
