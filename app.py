@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5 — Compressed Adaptive Engine
+🎧 StudioCore v5.1 — Adaptive Annotation Engine
 Truth × Love × Pain = Conscious Frequency
-Optimized for Hugging Face (low RAM, compressed annotated output)
+Inline annotation mode (for Suno adaptive phrasing)
+Optimized for Hugging Face (low RAM)
 """
 
 import os, sys, subprocess, importlib, traceback, threading, json, time
@@ -59,9 +60,9 @@ def auto_core_check():
 
 threading.Thread(target=auto_core_check, daemon=True).start()
 
-# === АНАЛИЗ ТЕКСТА (с компрессией) ===
+# === АНАЛИЗ ТЕКСТА (адаптивная аннотация) ===
 def analyze_text(text: str):
-    """Полный анализ с интеллектуальным сжатием (до 100k символов, ~0.3 KB вывода)."""
+    """Полный анализ текста с генерацией inline-аннотации над строками."""
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
     try:
@@ -71,7 +72,7 @@ def analyze_text(text: str):
 
         # --- краткий summary ---
         summary = (
-            f"✅ StudioCore v5\n"
+            f"✅ StudioCore v5.1\n"
             f"🎭 {result['style'].get('genre', '—')} | "
             f"🎵 {result['style'].get('style', '—')} | "
             f"🎙 {result['style'].get('vocal_form', '—')} | "
@@ -90,36 +91,30 @@ def analyze_text(text: str):
             result.get("tlp", {}),
         )
 
-        # --- очистка ---
-        annotated_text = " ".join(annotated_text.split())
-        if len(annotated_text) > 100000:
-            annotated_text = annotated_text[:100000]
+        # === Новый блок: inline-аннотация ===
+        try:
+            sections = result.get("sections", [])
+            inline_lines = []
+            for section in sections:
+                mood = section.get("emotion", "neutral")
+                tone = section.get("tone", "mid")
+                phrasing = core.vocals.map_emotion_to_english(mood, tone)
+                inline_lines.append(f"[{section.get('name','Verse')} – {phrasing}]")
+                inline_lines.append(section.get("text", "").strip())
+                inline_lines.append("")
+            annotated_inline = "\n".join(inline_lines) if inline_lines else annotated_text
+        except Exception:
+            annotated_inline = annotated_text
 
-        # --- уплотнение структуры ---
-        annotated_text = (
-            annotated_text.replace("(tone:", "[")
-            .replace("Truth=", "T=")
-            .replace("Love=", "L=")
-            .replace("Pain=", "P=")
-            .replace("CF=", "CF=")
-            .replace(")", "]")
-        )
-
-        # --- лёгкое адаптивное сжатие ---
-        lines = annotated_text.split()
-        preview = " ".join(lines[:80])  # первые 80 токенов
-        tail = " ".join(lines[-30:]) if len(lines) > 120 else ""
-        annotated_compressed = (
-            f"🎙️ **Annotation (compressed 0.3 KB view)**\n\n"
-            + preview
-            + ("\n\n... " + tail if tail else "")
-        )
+        # --- лёгкая защита от переполнения ---
+        if len(annotated_inline) > 100000:
+            annotated_inline = annotated_inline[:100000] + "\n\n⚠️ [Truncated]"
 
         return (
             summary,
             result.get("prompt_full", "⚠️ Нет данных"),
             result.get("prompt_suno", "⚠️ Нет данных"),
-            annotated_compressed,
+            annotated_inline,
         )
 
     except Exception as e:
@@ -127,7 +122,7 @@ def analyze_text(text: str):
         return f"❌ Исключение: {str(e)}", "", "", ""
 
 # === PUBLIC UI ===
-with gr.Blocks(title="🎧 StudioCore v5 — Public Interface") as iface_public:
+with gr.Blocks(title="🎧 StudioCore v5.1 — Public Interface") as iface_public:
     gr.Markdown("### StudioCore (Public)\nПубличная версия без логов.")
     gr.Interface(
         fn=analyze_text,
@@ -136,7 +131,7 @@ with gr.Blocks(title="🎧 StudioCore v5 — Public Interface") as iface_public:
             gr.Textbox(label="📊 Результат", lines=6),
             gr.Textbox(label="🎼 Полный промт", lines=8),
             gr.Textbox(label="🎧 Suno-промт", lines=8),
-            gr.Textbox(label="🎙️ Аннотация (сжата)", lines=20),
+            gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=20),
         ],
         flagging_mode="never",
     )
@@ -161,7 +156,7 @@ with gr.Blocks(title="🎧 StudioCore Admin") as iface_admin:
                 gr.Textbox(label="📊 Результат", lines=6),
                 gr.Textbox(label="🎼 Полный промт", lines=8),
                 gr.Textbox(label="🎧 Suno-промт", lines=8),
-                gr.Textbox(label="🎙️ Вокальная аннотация (сжата)", lines=20),
+                gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=20),
             ],
             flagging_mode="manual",
         )
