@@ -1,32 +1,103 @@
-# auto_sync_openapi.py
-import os, json, re
+# -*- coding: utf-8 -*-
+"""
+auto_sync_openapi.py — безопасная генерация OpenAPI файлов для StudioCore
+Теперь без зависимости от шаблонов .template.*
+"""
+
+import os, json
 from pathlib import Path
 
-# 1) пытаемся взять версию из Python-модуля
-VERSION = None
+# === Версия ядра ===
 try:
     from studiocore import STUDIOCORE_VERSION
     VERSION = STUDIOCORE_VERSION
 except Exception:
-    pass
-if not VERSION:
-    VERSION = os.environ.get("STUDIOCORE_VERSION", "v5.0")
+    VERSION = os.environ.get("STUDIOCORE_VERSION", "v5.2")
 
-# 2) определяем URL Space
+# === URL Space ===
 SPACE_URL = os.environ.get("SPACE_URL", "http://0.0.0.0:7860")
 
-def render(src: Path, dst: Path, mapping: dict):
-    txt = src.read_text(encoding="utf-8")
-    for k, v in mapping.items():
-        txt = txt.replace("{{" + k + "}}", v)
-    dst.write_text(txt, encoding="utf-8")
-    print(f"✔️  Rendered {dst.name} (version={mapping['VERSION']}, url={mapping['SPACE_URL']})")
-
+# === Папка проекта ===
 root = Path(".")
-mapping = {"VERSION": VERSION, "SPACE_URL": SPACE_URL}
 
-# JSON для Space
-render(root / "openapi_main.template.json", root / "openapi_main.json", mapping)
+# === Путь к OpenAPI файлам ===
+openapi_main = root / "openapi_main.json"
+openapi_gpt = root / "openapi_gpt.yaml"
 
-# YAML для GPT
-render(root / "openapi_gpt.template.yaml", root / "openapi_gpt.yaml", mapping)
+# === Автоматическая генерация JSON ===
+openapi_data = {
+    "openapi": "3.0.0",
+    "info": {
+        "title": "StudioCore Adaptive API",
+        "version": VERSION,
+        "description": "Adaptive annotation & analysis engine for StudioCore"
+    },
+    "servers": [{"url": SPACE_URL}],
+    "paths": {
+        "/status": {
+            "get": {
+                "summary": "Check server status",
+                "responses": {"200": {"description": "OK"}}
+            }
+        },
+        "/api/predict": {
+            "post": {
+                "summary": "Analyze text",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object", "properties": {"text": {"type": "string"}}}
+                        }
+                    }
+                },
+                "responses": {"200": {"description": "Analysis result"}}
+            }
+        }
+    }
+}
+
+try:
+    openapi_main.write_text(json.dumps(openapi_data, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"✅ OpenAPI JSON generated → {openapi_main}")
+except Exception as e:
+    print(f"⚠️ Error writing {openapi_main}: {e}")
+
+# === Автоматическая генерация YAML (для GPT совместимости) ===
+try:
+    yaml_lines = [
+        "openapi: 3.0.0",
+        "info:",
+        f"  title: StudioCore Adaptive API",
+        f"  version: {VERSION}",
+        "servers:",
+        f"  - url: {SPACE_URL}",
+        "paths:",
+        "  /status:",
+        "    get:",
+        "      summary: Check server status",
+        "      responses:",
+        "        '200':",
+        "          description: OK",
+        "  /api/predict:",
+        "    post:",
+        "      summary: Analyze text",
+        "      requestBody:",
+        "        required: true",
+        "        content:",
+        "          application/json:",
+        "            schema:",
+        "              type: object",
+        "              properties:",
+        "                text:",
+        "                  type: string",
+        "      responses:",
+        "        '200':",
+        "          description: Analysis result",
+    ]
+    openapi_gpt.write_text("\n".join(yaml_lines), encoding="utf-8")
+    print(f"✅ OpenAPI YAML generated → {openapi_gpt}")
+except Exception as e:
+    print(f"⚠️ Error writing {openapi_gpt}: {e}")
+
+print(f"🎧 StudioCore API descriptors ready (version={VERSION})")
