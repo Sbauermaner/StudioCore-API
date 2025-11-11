@@ -1,243 +1,262 @@
+studiocore/monolith_v4_3_1.py
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (Safe Integration + Inline Logs)
-Truth × Love × Pain = Conscious Frequency
-Unified core loader with fallback + Gradio + FastAPI + Inline Log Viewer
+StudioCore v4.3.9 — Monolith (USER-MODE Vocal Overlay + Auto Voice Detection)
+Правило: «Если пользователь указал — исполняй буквально. Если не указал — подбери сам».
+Поддержка описаний вокала из текста (RU/EN) и автоматического определения через detect_voice_profile().
 """
 
-import os, sys, subprocess, importlib, traceback, threading, time, io
-import gradio as gr
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+from __future__ import annotations
+import re, json
+from statistics import mean
+from typing import Dict, Any, List, Tuple
 
-# === Импорты для API ===
-from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
+# --- Core imports ---
+from .config import load_config
+from .text_utils import normalize_text_preserve_symbols, extract_sections
+from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
+from .tone import ToneSyncEngine
+from .adapter import build_suno_prompt
+from .vocals import VocalProfileRegistry
+from .style import StyleMatrix  # безопасный импорт (патч или стандарт)
 
-# === Импорт ядра ===
-from studiocore import get_core, STUDIOCORE_VERSION
-
-# === Установка requests (для self-check) ===
-if importlib.util.find_spec("requests") is None:
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
-    except Exception:
-        pass
+# ==========================================================
+# 🧩 Проверка наличия автораспознавания вокала
+# ==========================================================
 try:
-    import requests  # type: ignore
+    from .style import detect_voice_profile
+    _AUTO_VOCAL_DETECT = True
+    print("🎙️ [Monolith] Auto voice detection активен (detect_voice_profile подключен).")
 except Exception:
-    requests = None
+    detect_voice_profile = None
+    _AUTO_VOCAL_DETECT = False
+    print("⚠️ [Monolith] Auto voice detection недоступен (detect_voice_profile отсутствует).")
 
-# === Инициализация ядра и FastAPI ===
-core = get_core()
-app = FastAPI(title="StudioCore API")
+# ==========================================================
+# 🔹 Adaptive Vocal Allocation (автоподбор по эмоциям/TLP/BPM)
+# ==========================================================
+class AdaptiveVocalAllocator:
+    def analyze(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int, text: str) -> Dict[str, Any]:
+        love, pain, cf, truth = tlp.get("love", 0.0), tlp.get("pain", 0.0), tlp.get("conscious_frequency", 0.0), tlp.get("truth", 0.0)
+        word_count = len(re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text))
+        avg_line_len = word_count / max(1, len(text.split("\n")))
 
-# === CORS ===
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# === 🎧 ИСПРАВЛЕНИЕ: ДОБАВЛЕН API ENDPOINT ===
-
-class PredictRequest(BaseModel):
-    """ Модель запроса для API """
-    text: str
-    gender: str = "auto"
-    tlp: Optional[Dict[str, float]] = None
-    overlay: Optional[Dict[str, Any]] = None
-
-@app.post("/api/predict")
-async def api_predict(request_data: PredictRequest):
-    """
-    Эндпоинт, который ищут 'test_all.py' и 'auto_core_check'.
-    Он принимает JSON и возвращает JSON.
-    """
-    try:
-        # Мы сопоставляем данные из запроса с тем, что ожидает core.analyze
-        # TLP не используется в monolith v4.3.9, но overlay используется
-        result = core.analyze(
-            request_data.text,
-            preferred_gender=request_data.gender,
-            overlay=request_data.overlay
-        )
-        
-        if isinstance(result, dict) and "error" in result:
-             # Если ядро вернуло ошибку, передаем ее
-             return JSONResponse(content=result, status_code=400)
-        
-        # Возвращаем полный результат (тесты ожидают 'bpm' и 'style')
-        return JSONResponse(content=result, status_code=200)
-
-    except Exception as e:
-        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА в /api/predict: {traceback.format_exc()}")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
-
-# === Конец API ENDPOINT ===
+        if cf > 0.7 and love > pain and word_count > 80:
+            form, gender, count = "choir", "mixed", 4
+        elif pain >= 0.6 and cf < 0.6:
+            form, gender, count = "duet", "female", 2
+        elif truth > 0.5 and bpm > 130:
+            form, gender, count = "trio", "male", 3
+        elif avg_line_len < 6 and love < 0.3 and bpm < 100:
+            form, gender, count = "solo", "male", 1
+        elif bpm > 150 and love > 0.4:
+            form, gender, count = "duet", "mixed", 2
+        else:
+            form, gender, count = "solo", "auto", 1
+        return {"vocal_form": form, "gender": gender, "vocal_count": count}
 
 
-# === SELF-CHECK ===
-def auto_core_check():
-    if os.environ.get("DISABLE_SELF_CHECK") == "1" or requests is None:
-        return
-    time.sleep(3)
-    try:
-        # Теперь этот запрос должен работать
-        r = requests.post("http://0.0.0.0:7860/api/predict", json={"text": "test"}, timeout=10)
-        print(f"[Self-Check] → {r.status_code}")
-    except Exception as e:
-        print("❌ Self-Check error:", e)
+# ==========================================================
+# 🔸 Локальные подсистемы (замена monolith_subsystems)
+# ==========================================================
+class PatchedLyricMeter:
+    vowels = set("aeiouyауоыиэяюёеAEIOUYАУОЫИЭЯЮЁЕ")
+    def _syllables(self, line: str) -> int:
+        return max(1, sum(1 for ch in line if ch in self.vowels))
+    def bpm_from_density(self, text: str) -> int:
+        lines = [l for l in text.split("\n") if l.strip()]
+        if not lines: return 100
+        avg_syll = sum(self._syllables(l) for l in lines) / max(1, len(lines))
+        bpm = 140 - min(60, (avg_syll - 8) * 6)
+        punct_boost = sum(ch in ",.!?…" for ch in text) * 0.5
+        bpm = bpm + min(20, punct_boost)
+        return int(max(60, min(180, bpm)))
 
-threading.Thread(target=auto_core_check, daemon=True).start()
+class PatchedUniversalFrequencyEngine:
+    base = 24.5
+    def resonance_profile(self, tlp: Dict[str, float]) -> Dict[str, Any]:
+        cf = tlp.get("conscious_frequency", 0.0)
+        base_f = self.base * (1.0 + tlp.get("truth", 0.0))
+        spread = tlp.get("love", 0.0) * 2000.0
+        mod = 1.0 + tlp.get("pain", 0.0) * 0.5
+        if cf > 0.7: rec = [4, 5, 6, 7]
+        elif cf > 0.3: rec = [2, 3, 4, 5]
+        else: rec = [1, 2, 3, 4]
+        return {
+            "base_frequency": round(base_f, 3),
+            "harmonic_range": round(spread, 3),
+            "modulation_depth": round(mod, 3),
+            "recommended_octaves": rec
+        }
 
-# === АНАЛИЗ ТЕКСТА (Gradio) ===
-def analyze_text(text: str, gender: str = "auto"):
-    """Основная функция анализа текста через StudioCore."""
-    if not text.strip():
-        return "⚠️ Введите текст для анализа.", "", "", ""
+class PatchedRNSSafety:
+    def __init__(self, cfg: Dict[str, Any]):
+        self.cfg = cfg.get("safety", {
+            "safe_octaves": [2, 3, 4, 5],
+            "avoid_freq_bands_hz": [18.0, 30.0],
+            "max_peak_db": -1.0,
+            "max_rms_db": -14.0,
+            "fade_in_ms": 1000,
+            "fade_out_ms": 1500,
+        })
+    def clamp_octaves(self, octaves: List[int]) -> List[int]:
+        safe = set(self.cfg.get("safe_octaves", [2, 3, 4, 5]))
+        arr = [o for o in octaves if o in safe]
+        return arr or [2, 3, 4]
+    def safety_meta(self) -> Dict[str, Any]:
+        return {
+            "max_peak_db": self.cfg.get("max_peak_db", -1.0),
+            "max_rms_db": self.cfg.get("max_rms_db", -14.0),
+            "avoid_freq_bands_hz": self.cfg.get("avoid_freq_bands_hz", []),
+            "fade_in_ms": self.cfg.get("fade_in_ms", 1000),
+            "fade_out_ms": self.cfg.get("fade_out_ms", 1500),
+        }
 
-    try:
-        if getattr(core, "is_fallback", False):
-            return (
-                "⚠️ StudioCore находится в безопасном режиме (fallback). "
-                "Анализ временно недоступен.", "", "", ""
-            )
+class PatchedIntegrityScanEngine:
+    def analyze(self, text: str) -> Dict[str, Any]:
+        words = re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text.lower())
+        sents = [s for s in re.split(r"[.!?]+", text) if s.strip()]
+        lexical_div = len(set(words)) / max(1, len(words))
+        avg_sent_len = len(words) / max(1, len(sents))
+        reflection = len([w for w in words if w in ("я","i","me","my","меня","сам")]) / max(1, len(words))
+        vib_coh = round((1 - abs(avg_sent_len - 14) / 14 + 1 - abs(lexical_div - 0.5) / 0.5) / 2, 3)
+        return {
+            "form": {"word_count": len(words), "avg_sentence_len": round(avg_sent_len, 2),
+                     "lexical_diversity": round(lexical_div, 2)},
+            "reflection": {"self_awareness_density": round(reflection, 2)},
+            "vibrational_coherence": vib_coh,
+            "flags": []
+        }
 
-        # --- Проверка пользовательских описаний вокала ---
-        overlay = {}
-        voice_hint_keywords = [
-            "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
-            "пескляв", "soft", "airy", "shout", "grit", "фальцет", "whisper"
-        ]
-        if any(k in text.lower() for k in voice_hint_keywords):
-            overlay["voice_profile_hint"] = text.split("\n")[-1].strip()
-            print(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
-        else:
-            overlay = None
+# ==========================================================
+# StudioCore
+# ==========================================================
+class StudioCore:
+    def __init__(self, config_path: str | None = None):
+        self.cfg = load_config(config_path or "studio_config.json")
+        self.emotion = AutoEmotionalAnalyzer()
+        self.tlp = TruthLovePainEngine()
 
-        # --- Вызов ядра ---
-        result = core.analyze(text, preferred_gender=gender, overlay=overlay)
+        # Подсистемы локально
+        self.rhythm = PatchedLyricMeter()
+        self.freq = PatchedUniversalFrequencyEngine()
+        self.safety = PatchedRNSSafety(self.cfg)
+        self.integrity = PatchedIntegrityScanEngine()
+        self.vocals = VocalProfileRegistry()
 
-        if isinstance(result, dict) and "error" in result:
-            return f"❌ Ошибка: {result['error']}", "", "", ""
+        try:
+            from .style import PatchedStyleMatrix
+            self.style = PatchedStyleMatrix()
+            print("🎨 [StyleMatrix] Используется патчированная версия (PatchedStyleMatrix).")
+        except ImportError:
+            self.style = StyleMatrix()
+            print("🎨 [StyleMatrix] Используется стандартная версия (StyleMatrix).")
 
-        style = result.get("style", {})
-        vocals = result.get("vocals", [])
-        instruments = ", ".join(result.get("instruments", [])) or "no instruments"
-        vocal_form = style.get("vocal_form", "auto")
+        self.tone = ToneSyncEngine()
+        self.vocal_allocator = AdaptiveVocalAllocator()
 
-        summary = (
-            f"✅ StudioCore {STUDIOCORE_VERSION}\n"
-            f"🎭 {style.get('genre', '—')} | "
-            f"🎵 {style.get('style', '—')} | "
-            f"🎙 {vocal_form} ({gender}) | "
-            f"🎸 {instruments} | "
-            f"⏱ {result.get('bpm', '—')} BPM"
-        )
+    # -------------------------------------------------------
+    def _build_semantic_sections(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int) -> Dict[str, Any]:
+        love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
+        cf = tlp.get("conscious_frequency", 0.0)
+        avg_emo = mean(abs(v) for v in emo.values()) if emo else 0.0
+        intro = {"section": "Intro", "mood": "mystic" if cf >= 0.5 else "calm", "intensity": round(bpm * 0.8, 2), "focus": "tone_establish"}
+        verse = {"section": "Verse", "mood": "reflective" if truth > love else "narrative", "intensity": round(bpm, 2), "focus": "story_flow"}
+        bridge = {"section": "Bridge", "mood": "dramatic" if pain > 0.3 else "dreamlike", "intensity": round(bpm * (1.05 + avg_emo / 4), 2), "focus": "contrast"}
+        chorus = {"section": "Chorus", "mood": "uplifting" if love >= pain else "tense", "intensity": round(bpm * 1.15, 2), "focus": "release"}
+        outro = {"section": "Outro", "mood": "peaceful" if cf > 0.6 else "fading", "intensity": round(bpm * 0.7, 2), "focus": "closure"}
+        bpm_adj = int(bpm + (avg_emo * 8) + (cf * 4))
+        overlay = {"depth": round((truth + pain) / 2, 2), "warmth": round(love, 2), "clarity": round(cf, 2),
+                   "sections": [intro, verse, bridge, chorus, outro]}
+        return {"bpm": bpm_adj, "overlay": overlay}
 
-        annotated_text = result.get("annotated_text")
-        if not annotated_text and hasattr(core, "annotate_text"):
-            annotated_text = core.annotate_text(
-                text,
-                result.get("overlay", {}),
-                style,
-                vocals,
-                result.get("bpm") or getattr(core, "rhythm", None).bpm_from_density(text) or 120,
-                result.get("emotions", {}),
-                result.get("tlp", {}),
-            )
+    # -------------------------------------------------------
+    def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any],
+                      vocals: List[str], bpm: int, emotions=None, tlp=None) -> str:
+        """
+        Добавляет аннотации к тексту (структура песни, BPM, вокальные техники)
+        """
+        blocks = [b.strip() for b in re.split(r"\n\s*\n", text.strip()) if b.strip()]
+        sections = overlay.get("sections", [])
+        annotated_blocks = []
+        for i, block in enumerate(blocks):
+            sec = sections[i % len(sections)] if sections else {}
+            header = f"[{sec.get('section','Block')} – {sec.get('mood','neutral')}, focus={sec.get('focus','flow')}, intensity≈{sec.get('intensity',bpm)}]"
+            annotated_blocks.append(header)
+            annotated_blocks.append(block)
+            annotated_blocks.append("")
+        vocal_form = style.get("vocal_form", "auto")
+        tone_key = style.get("key", "auto")
+        tech = ", ".join([v for v in vocals if v not in ["male","female"]]) or "neutral tone"
+        annotated_blocks.append(f"[End – BPM≈{bpm}, Vocal={vocal_form}, Tone={tone_key}]")
+        annotated_blocks.append(f"[Vocal Techniques: {tech}]")
+        return "\n".join(annotated_blocks).strip()
 
-        style_prompt = (
-            f"[StudioCore {STUDIOCORE_VERSION} | BPM: {result.get('bpm', 'auto')}]\n"
-            f"Genre: {style.get('genre', 'unknown')}\n"
-            f"Vocal: {vocal_form} ({gender})\n"
-            f"Instruments: {instruments}\n"
-            f"Tone: {style.get('key', 'auto')}\n"
-            f"Atmosphere: {style.get('atmosphere', 'balanced')}\n"
-            f"Narrative: {style.get('narrative', 'flow')}\n"
-        )
+    # -------------------------------------------------------
+    def analyze(self, text: str, author_style=None, preferred_gender=None, version=None,
+                overlay: Dict[str, Any] | None = None) -> Dict[str, Any]:
+        version = version or self.cfg.get("suno_version", "v5")
+        raw = normalize_text_preserve_symbols(text)
+        sections = extract_sections(raw)
+        emo = self.emotion.analyze(raw)
+        tlp = self.tlp.analyze(raw)
+        bpm = self.rhythm.bpm_from_density(raw)
+        freq = self.freq.resonance_profile(tlp)
+        overlay_pack = self._build_semantic_sections(emo, tlp, bpm)
+        bpm_adj = overlay_pack["bpm"]
 
-        return (
-            summary,
-            style_prompt,
-            result.get("prompt_suno", "⚠️ Нет данных"),
-            annotated_text,
-        )
+        vocal_meta = self.vocal_allocator.analyze(emo, tlp, bpm_adj, raw)
 
-    except Exception:
-        print("❌ Ошибка при анализе:\n", traceback.format_exc())
-        return "❌ Внутреннее исключение при анализе.", "", "", ""
+        user_voice, auto_detected_hint = None, None
+        if overlay and "voice_profile" in overlay:
+            user_voice = overlay["voice_profile"]
+        else:
+            try:
+                from .monolith import _extract_user_vocal_from_text
+                user_voice = _extract_user_vocal_from_text(raw)
+            except Exception:
+                pass
 
-# === INLINE TEST RUNNER ===
-def run_inline_tests():
-    """Выполняет тесты и возвращает stdout прямо в интерфейс."""
-    buffer = io.StringIO()
-    buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
-    buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        if not user_voice and _AUTO_VOCAL_DETECT and detect_voice_profile:
+            auto_detected_hint = detect_voice_profile(raw)
+            if auto_detected_hint:
+                overlay_pack["overlay"]["voice_profile_hint"] = auto_detected_hint
 
-    try:
-        buffer.write("🚀 Running: test_all.py\n")
-        res1 = os.system("python3 studiocore/tests/test_all.py > tmp_test_all.txt 2>&1")
-        with open("tmp_test_all.txt", "r", encoding="utf-8", errors="ignore") as f:
-            buffer.write(f.read() + "\n")
+        mode = "AUTO-MODE"
+        if user_voice:
+            mode = "USER-MODE"
+        elif auto_detected_hint:
+            mode = "AUTO-DETECT"
 
-        buffer.write("🧠 Running: test_functional_texts.py\n")
-        res2 = os.system("python3 studiocore/tests/test_functional_texts.py > tmp_test_logic.txt 2>&1")
-        with open("tmp_test_logic.txt", "r", encoding="utf-8", errors="ignore") as f:
-            buffer.write(f.read() + "\n")
+        preferred_gender_eff = preferred_gender or vocal_meta.get("gender") or "auto"
+        style = self.style.build(emo, tlp, raw, bpm_adj, overlay_pack["overlay"])
 
-        buffer.write("✅ Inline test session complete.\n")
+        vox, inst, vocal_form = self.vocals.get(
+            style["genre"], preferred_gender_eff, raw, sections
+        )
+        style["vocal_form"] = vocal_form
+        style["vocal_count"] = vocal_meta["vocal_count"]
 
-    except Exception as e:
-        buffer.write(f"❌ Ошибка при запуске тестов: {e}\n")
+        print(f"🎧 [StudioCore] Analyze [{mode}]: Gender={preferred_gender_eff} | Form={vocal_form} | Genre={style['genre']} | BPM={bpm_adj}")
 
-    return buffer.getvalue()
+        integ = self.integrity.analyze(raw)
+        tone = self.tone.colors_for_primary(emo, tlp, style.get("key", "auto"))
+        philosophy = (f"Truth={tlp.get('truth', 0):.2f}, Love={tlp.get('love', 0):.2f}, "
+                      f"Pain={tlp.get('pain', 0):.2f}, CF={tlp.get('conscious_frequency', 0):.2f}")
 
-# === PUBLIC UI (Gradio) ===
-with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface") as iface_public:
-    gr.Markdown(f"## 🎧 StudioCore {STUDIOCORE_VERSION}\nАдаптивный движок с тестами и логами.\n")
+        prompt_full = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="full")
+        prompt_suno = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="suno")
+        annotated_text = self.annotate_text(raw, overlay_pack["overlay"], style, vox, bpm_adj, emo, tlp)
 
-    with gr.Tab("🎙️ Анализ текста"):
-        with gr.Row():
-            text_input = gr.Textbox(
-                label="Введите текст песни (внизу можно добавить описание вокала)",
-                lines=12,
-                placeholder="Вставьте лирику здесь…\n\nПример: (под хриплый мужской вокал, с криками)"
-            )
-            gender_input = gr.Radio(["auto", "male", "female"], value="auto", label="Пол вокала (Gender)")
+        return {
+            "emotions": emo, "tlp": tlp, "bpm": bpm_adj, "frequency": freq,
+            "style": style, "vocals": vox, "instruments": inst,
+            "prompt_full": prompt_full, "prompt_suno": prompt_suno,
+            "annotated_text": annotated_text, "preferred_gender": preferred_gender_eff,
+            "version": version, "mode": mode
+        }
 
-        analyze_button = gr.Button("🔍 Анализировать")
 
-        with gr.Row():
-            result_box = gr.Textbox(label="📊 Результат", lines=6)
-            style_box = gr.Textbox(label="🎼 Стиль и инструменты", lines=8)
-
-        with gr.Row():
-            suno_box = gr.Textbox(label="🎧 Suno-промт (Style)", lines=8)
-            annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=24)
-
-        analyze_button.click(
-            fn=analyze_text,
-            inputs=[text_input, gender_input],
-            outputs=[result_box, style_box, suno_box, annotated_box],
-        )
-
-    with gr.Tab("🧩 Логи и тесты"):
-        gr.Markdown("### Автоматическая проверка ядра StudioCore")
-        run_btn = gr.Button("🚀 Запустить тесты")
-        output_box = gr.Textbox(label="Результаты тестов", lines=30, show_copy_button=True)
-        run_btn.click(fn=run_inline_tests, inputs=None, outputs=output_box)
-
-# === MOUNT ===
-iface_public.queue()
-app = gr.mount_gradio_app(app, iface_public, path="/")
-
-# === RUN ===
-if __name__ == "__main__":
-    import uvicorn
-    print(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API (Inline Logs Mode)...")
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+# ==========================================================
+STUDIOCORE_VERSION = "v4.3.9"
+print(f"🔹 [StudioCore {STUDIOCORE_VERSION}] Monolith loaded (USER-MODE + Auto Voice Detection).")
