@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2 — VocalProfileRegistry (Extended Adaptive Integration)
-Интеграция с AdaptiveVocalAllocator для динамического подбора количества певцов и формы.
+StudioCore v5.2.1 — VocalProfileRegistry (Adaptive + Overlay Integration)
+Интеграция с AdaptiveVocalAllocator и внешним overlay-вводом (из app.py).
+Поддержка автораспознавания вокального описания из текста:
+tone (тембр), texture (характер), emotion (эмоциональный стиль).
 """
 
 from typing import List, Dict, Any, Tuple
@@ -52,24 +54,14 @@ class VocalProfileRegistry:
 
     # --------------------------------------------------------
     def auto_vocal_form(self, emo: Dict[str,float], tlp: Dict[str,float], text: str) -> str:
-        """
-        Определяет вокальную форму на основе:
-        - CF (Conscious Frequency)
-        - Truth/Love/Pain
-        - эмоционального профиля текста
-        - длины (слов)
-        """
         wc = len(text.split())
         cf = tlp.get("conscious_frequency", 0.0)
         love, pain, truth = tlp.get("love", 0.0), tlp.get("pain", 0.0), tlp.get("truth", 0.0)
 
-        # ✴️ Энергия вектора эмоций (по философии StudioCore)
         base_energy = (truth * 0.4 + pain * 0.6 + cf * 0.8) - (love * 0.3)
         emo_energy = max(emo.values()) if emo else 0.25
-
         ensemble_intensity = round(min(1.0, max(0.0, (base_energy + emo_energy) / 1.5)), 3)
 
-        # базовая логика ансамбля
         if wc < 40 and ensemble_intensity < 0.3:
             form = "solo"
         elif 40 <= wc < 80 or 0.3 <= ensemble_intensity < 0.45:
@@ -83,7 +75,6 @@ class VocalProfileRegistry:
         else:
             form = "solo"
 
-        # 💡 Дополнительная коррекция формы по CF и TLP
         if cf > 0.9 and form != "choir":
             form = "choir"
         elif cf > 0.85 and pain > 0.05 and form in ["solo", "duet"]:
@@ -96,16 +87,10 @@ class VocalProfileRegistry:
     # --------------------------------------------------------
     def get(self, genre: str, preferred_gender: str, text: str, sections: List[Dict[str,Any]],
             override: Dict[str, Any] | None = None) -> Tuple[List[str], List[str], str]:
-        """
-        Возвращает (voices, instruments, vocal_form)
-        override — словарь от AdaptiveVocalAllocator с ключами:
-        { "vocal_form": str, "gender": str, "vocal_count": int }
-        """
         g = genre if genre in self.map else "rock"
         hints = self._detect_ensemble_hints(text, sections)
         emo = AutoEmotionalAnalyzer().analyze(text)
 
-        # ⚙️ Временный TLP-stub (до прямой интеграции из ядра)
         tlp_stub = {
             "conscious_frequency": emo.get("intensity", 0.5),
             "love": emo.get("joy", 0.3),
@@ -115,22 +100,40 @@ class VocalProfileRegistry:
 
         form = self.auto_vocal_form(emo, tlp_stub, text)
 
-        # 🔸 override (если задан)
+        # 🔸 override integration
+        vox = []
         if override:
             form = override.get("vocal_form", form)
             preferred_gender = override.get("gender", preferred_gender)
 
-        # 🔸 Выбор по полу
-        if preferred_gender == "female":
-            vox = self.map[g]["female"]
-        elif preferred_gender == "male":
-            vox = self.map[g]["male"]
-        elif preferred_gender == "auto":
-            vox = self.map[g]["female"] if emo.get("joy",0) > emo.get("anger",0) else self.map[g]["male"]
+            voice_override = override.get("voice_profile") or override.get("vocals")
+            if isinstance(voice_override, dict):
+                tone = voice_override.get("tone", "")
+                texture = voice_override.get("texture", "")
+                emotion = voice_override.get("emotion", "")
+                vox.extend([tone, texture, emotion])
+            elif isinstance(voice_override, list) and len(voice_override) > 0:
+                v = voice_override[0]
+                vox.extend([
+                    v.get("tone", ""), v.get("texture", ""), v.get("emotion", "")
+                ])
         else:
-            vox = self.map[g]["female"]
+            voice_hint = detect_voice_profile_from_text(text)
+            vox.extend([voice_hint["tone"], voice_hint["texture"], voice_hint["emotion"]])
 
-        # 🔸 Хинты из текста
+        # 🔸 Gender selection
+        if preferred_gender == "female":
+            vox += self.map[g]["female"]
+        elif preferred_gender == "male":
+            vox += self.map[g]["male"]
+        elif preferred_gender == "auto":
+            vox += self.map[g]["female"] if emo.get("joy",0) > emo.get("anger",0) else self.map[g]["male"]
+        else:
+            vox += self.map[g]["female"]
+
+        inst = self.map[g]["inst"]
+
+        # 🔸 Ensemble hints
         if hints["wants_choir"]:
             form = "choir"
         elif hints["wants_quintet"]:
@@ -142,10 +145,10 @@ class VocalProfileRegistry:
         elif hints["wants_duet"] or hints["dialogue"] or hints["call_response"]:
             form = "duet"
 
-        vox = [form] + vox
-        inst = self.map[g]["inst"]
+        vox = [form] + [v for v in vox if v in VALID_VOICES][:6]
+        inst = [i for i in inst if i in VALID_INSTRUMENTS][:6]
 
-        # 🎙 Определяем итоговую форму
+        # 🎙 Define vocal form
         if "choir" in vox:
             if "male" in vox and "female" in vox:
                 vocal_form = "choir_mixed"
@@ -175,10 +178,40 @@ class VocalProfileRegistry:
         else:
             vocal_form = "solo_auto"
 
-        vox = [v for v in vox if v in VALID_VOICES][:6]
-        inst = [i for i in inst if i in VALID_INSTRUMENTS][:6]
-
         return vox, inst, vocal_form
+
+
+# --------------------------------------------------------
+def detect_voice_profile_from_text(text: str) -> Dict[str, str]:
+    """Распознаёт вокальный характер из текста (tone, texture, emotion)."""
+    t = text.lower()
+    voice = {"tone": "neutral", "texture": "clean", "emotion": "balanced"}
+
+    # --- Tone (тембр)
+    if any(k in t for k in ["баритон", "низкий", "глубокий", "bass", "baritone"]):
+        voice["tone"] = "baritone"
+    elif any(k in t for k in ["высокий", "тонкий", "soprano", "alto", "женский"]):
+        voice["tone"] = "soprano"
+    elif any(k in t for k in ["тенор", "мужской", "male", "deep voice"]):
+        voice["tone"] = "tenor"
+
+    # --- Texture (характер)
+    if any(k in t for k in ["хрип", "хриплый", "rasp", "rough", "gritty"]):
+        voice["texture"] = "raspy"
+    elif any(k in t for k in ["мягкий", "soft", "теплый", "warm"]):
+        voice["texture"] = "soft"
+    elif any(k in t for k in ["чистый", "clear", "bright"]):
+        voice["texture"] = "clean"
+
+    # --- Emotion (эмоциональность)
+    if any(k in t for k in ["эмоцион", "душев", "сердеч", "heart", "soul", "tear"]):
+        voice["emotion"] = "emotional"
+    elif any(k in t for k in ["спокой", "тихий", "calm", "gentle"]):
+        voice["emotion"] = "calm"
+    elif any(k in t for k in ["груб", "агрессив", "anger", "strong"]):
+        voice["emotion"] = "aggressive"
+
+    return voice
 
 
 # --------------------------------------------------------
