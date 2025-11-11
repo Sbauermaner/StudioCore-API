@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5.2 — Adaptive Annotation Engine
+🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (Safe Integration)
 Truth × Love × Pain = Conscious Frequency
-Enhanced adaptive output with vocal gender, style, and instruments
+Unified core loader with fallback + Gradio + FastAPI
 """
 
 import os, sys, subprocess, importlib, traceback, threading, time
@@ -10,7 +10,9 @@ import gradio as gr
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from studiocore import StudioCore, STUDIOCORE_VERSION
+
+# === Импорт ядра (с безопасной обёрткой) ===
+from studiocore import get_core, STUDIOCORE_VERSION
 
 # === Установка requests (для self-check) ===
 if importlib.util.find_spec("requests") is None:
@@ -31,7 +33,7 @@ except Exception as e:
     print("⚠️ Ошибка OpenAPI sync:", e)
 
 # === Инициализация ядра и FastAPI ===
-core = StudioCore()
+core = get_core()
 app = FastAPI(title="StudioCore API")
 
 # === CORS ===
@@ -57,16 +59,20 @@ def auto_core_check():
 threading.Thread(target=auto_core_check, daemon=True).start()
 
 
-# === АНАЛИЗ ТЕКСТА (адаптивная аннотация) ===
+# === АНАЛИЗ ТЕКСТА ===
 def analyze_text(text: str, gender: str = "auto"):
-    """
-    Возвращает:
-        summary, style_prompt, prompt_suno, annotated_inline
-    """
+    """Основная функция анализа текста через StudioCore."""
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
 
     try:
+        # Если активен fallback — предупредить
+        if getattr(core, "is_fallback", False):
+            return (
+                "⚠️ StudioCore находится в безопасном режиме (fallback). "
+                "Анализ временно недоступен.", "", "", ""
+            )
+
         result = core.analyze(text, preferred_gender=gender)
         if isinstance(result, dict) and "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
@@ -76,9 +82,8 @@ def analyze_text(text: str, gender: str = "auto"):
         instruments = ", ".join(result.get("instruments", [])) or "no instruments"
         vocal_form = style.get("vocal_form", "auto")
 
-        # --- краткий summary ---
         summary = (
-            f"✅ StudioCore v5.2\n"
+            f"✅ StudioCore {STUDIOCORE_VERSION}\n"
             f"🎭 {style.get('genre', '—')} | "
             f"🎵 {style.get('style', '—')} | "
             f"🎙 {vocal_form} ({gender}) | "
@@ -86,23 +91,20 @@ def analyze_text(text: str, gender: str = "auto"):
             f"⏱ {result.get('bpm', '—')} BPM"
         )
 
-        # --- аннотированный текст (от ядра) ---
         annotated_text = result.get("annotated_text")
-        if not annotated_text:
-            # fallback — на случай, если ядро не вернуло строку
+        if not annotated_text and hasattr(core, "annotate_text"):
             annotated_text = core.annotate_text(
                 text,
                 result.get("overlay", {}),
                 style,
                 vocals,
-                result.get("bpm") or core.rhythm.bpm_from_density(text) or 120,
+                result.get("bpm") or getattr(core, "rhythm", None).bpm_from_density(text) or 120,
                 result.get("emotions", {}),
                 result.get("tlp", {}),
             )
 
-        # --- компактный style-prompt (не лирика!) ---
         style_prompt = (
-            f"[StudioCore v5.2 | BPM: {result.get('bpm', 'auto')}]\n"
+            f"[StudioCore {STUDIOCORE_VERSION} | BPM: {result.get('bpm', 'auto')}]\n"
             f"Genre: {style.get('genre', 'unknown')}\n"
             f"Vocal: {vocal_form} ({gender})\n"
             f"Instruments: {instruments}\n"
@@ -124,8 +126,8 @@ def analyze_text(text: str, gender: str = "auto"):
 
 
 # === PUBLIC UI (Gradio) ===
-with gr.Blocks(title="🎧 StudioCore v5.2 — Public Interface") as iface_public:
-    gr.Markdown("## 🎧 StudioCore v5.2\nПубличная версия без логов.\n")
+with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface") as iface_public:
+    gr.Markdown(f"## 🎧 StudioCore {STUDIOCORE_VERSION}\nПубличная версия без логов.\n")
 
     with gr.Row():
         text_input = gr.Textbox(label="Введите текст песни", lines=12, placeholder="Вставьте лирику здесь…")
@@ -141,7 +143,6 @@ with gr.Blocks(title="🎧 StudioCore v5.2 — Public Interface") as iface_publi
         suno_box = gr.Textbox(label="🎧 Suno-промт (Style)", lines=8)
         annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=24)
 
-    # Важно: передаем 2 входа → 4 выхода (исправляет ошибку “needed: 2, got: 1”)
     analyze_button.click(
         fn=analyze_text,
         inputs=[text_input, gender_input],
@@ -153,8 +154,14 @@ with gr.Blocks(title="🎧 StudioCore v5.2 — Public Interface") as iface_publi
 @app.get("/status")
 async def status():
     return JSONResponse(
-        content={"status": "ok", "engine": "StudioCore", "ready": True, "version": STUDIOCORE_VERSION}
+        content={
+            "status": "ok",
+            "engine": "StudioCore",
+            "ready": not getattr(core, "is_fallback", False),
+            "version": STUDIOCORE_VERSION,
+        }
     )
+
 
 @app.post("/api/predict")
 async def predict_api(request: Request):
@@ -166,9 +173,9 @@ async def predict_api(request: Request):
         return JSONResponse(
             content={
                 "summary": summary,
-                "style_prompt": style_prompt,   # компактный style prompt (≤1000)
-                "prompt_suno": suno,            # адаптивный suno prompt из adapter.py
-                "annotated_text": annotated,    # полный аннотированный текст
+                "style_prompt": style_prompt,
+                "prompt_suno": suno,
+                "annotated_text": annotated,
                 "engine_version": STUDIOCORE_VERSION,
                 "gender": gender,
             }
@@ -185,4 +192,5 @@ app = gr.mount_gradio_app(app, iface_public, path="/")
 # === RUN ===
 if __name__ == "__main__":
     import uvicorn
+    print(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API...")
     uvicorn.run(app, host="0.0.0.0", port=7860)
