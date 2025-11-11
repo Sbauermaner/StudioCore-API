@@ -5,15 +5,14 @@ Truth × Love × Pain = Conscious Frequency
 Enhanced adaptive output with vocal gender, style, and instruments
 """
 
-import os, sys, subprocess, importlib, traceback, threading, json, time
-from datetime import datetime
+import os, sys, subprocess, importlib, traceback, threading, time
 import gradio as gr
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from studiocore import StudioCore, STUDIOCORE_VERSION
 
-# === Установка requests ===
+# === Установка requests (для self-check) ===
 if importlib.util.find_spec("requests") is None:
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
@@ -24,14 +23,14 @@ try:
 except Exception:
     requests = None
 
-# === Автосинхронизация OpenAPI ===
+# === Автосинхронизация OpenAPI (если есть скрипт) ===
 try:
     if os.path.exists("auto_sync_openapi.py"):
         subprocess.call([sys.executable, "auto_sync_openapi.py"])
 except Exception as e:
     print("⚠️ Ошибка OpenAPI sync:", e)
 
-# === Инициализация ядра ===
+# === Инициализация ядра и FastAPI ===
 core = StudioCore()
 app = FastAPI(title="StudioCore API")
 
@@ -46,9 +45,7 @@ app.add_middleware(
 
 # === SELF-CHECK ===
 def auto_core_check():
-    if os.environ.get("DISABLE_SELF_CHECK") == "1":
-        return
-    if requests is None:
+    if os.environ.get("DISABLE_SELF_CHECK") == "1" or requests is None:
         return
     time.sleep(3)
     try:
@@ -62,20 +59,24 @@ threading.Thread(target=auto_core_check, daemon=True).start()
 
 # === АНАЛИЗ ТЕКСТА (адаптивная аннотация) ===
 def analyze_text(text: str, gender: str = "auto"):
-    """Полный анализ текста с генерацией inline-аннотации и адаптацией под пол вокала."""
+    """
+    Возвращает:
+        summary, style_prompt, prompt_suno, annotated_inline
+    """
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", "", ""
+
     try:
         result = core.analyze(text, preferred_gender=gender)
-        if "error" in result:
+        if isinstance(result, dict) and "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
 
-        # --- краткий summary ---
         style = result.get("style", {})
         vocals = result.get("vocals", [])
         instruments = ", ".join(result.get("instruments", [])) or "no instruments"
         vocal_form = style.get("vocal_form", "auto")
 
+        # --- краткий summary ---
         summary = (
             f"✅ StudioCore v5.2\n"
             f"🎭 {style.get('genre', '—')} | "
@@ -85,37 +86,21 @@ def analyze_text(text: str, gender: str = "auto"):
             f"⏱ {result.get('bpm', '—')} BPM"
         )
 
-        # --- аннотация ---
-        annotated_text = result.get("annotated_text") or core.annotate_text(
-            text,
-            result.get("overlay", {}),
-            style,
-            vocals,
-            result.get("bpm") or core.rhythm.bpm_from_density(text) or 120,
-            result.get("emotions", {}),
-            result.get("tlp", {}),
-        )
+        # --- аннотированный текст (от ядра) ---
+        annotated_text = result.get("annotated_text")
+        if not annotated_text:
+            # fallback — на случай, если ядро не вернуло строку
+            annotated_text = core.annotate_text(
+                text,
+                result.get("overlay", {}),
+                style,
+                vocals,
+                result.get("bpm") or core.rhythm.bpm_from_density(text) or 120,
+                result.get("emotions", {}),
+                result.get("tlp", {}),
+            )
 
-        # === Inline-аннотация ===
-        try:
-            sections = result.get("sections", [])
-            inline_lines = []
-            for section in sections:
-                mood = section.get("emotion", "neutral")
-                tone = section.get("tone", "mid")
-                phrasing = core.vocals.map_emotion_to_english(mood, tone)
-                inline_lines.append(f"[{section.get('name','Verse')} – {phrasing}]")
-                inline_lines.append(section.get("text", "").strip())
-                inline_lines.append("")
-            annotated_inline = "\n".join(inline_lines) if inline_lines else annotated_text
-        except Exception:
-            annotated_inline = annotated_text
-
-        # --- ограничение размера ---
-        if len(annotated_inline) > 100000:
-            annotated_inline = annotated_inline[:100000] + "\n\n⚠️ [Truncated]"
-
-        # --- style-prompt для Suno ---
+        # --- компактный style-prompt (не лирика!) ---
         style_prompt = (
             f"[StudioCore v5.2 | BPM: {result.get('bpm', 'auto')}]\n"
             f"Genre: {style.get('genre', 'unknown')}\n"
@@ -130,12 +115,12 @@ def analyze_text(text: str, gender: str = "auto"):
             summary,
             style_prompt,
             result.get("prompt_suno", "⚠️ Нет данных"),
-            annotated_inline,
+            annotated_text,
         )
 
-    except Exception as e:
+    except Exception:
         print("❌ Ошибка при анализе:\n", traceback.format_exc())
-        return f"❌ Исключение: {str(e)}", "", "", ""
+        return "❌ Внутреннее исключение при анализе.", "", "", ""
 
 
 # === PUBLIC UI (Gradio) ===
@@ -143,7 +128,7 @@ with gr.Blocks(title="🎧 StudioCore v5.2 — Public Interface") as iface_publi
     gr.Markdown("## 🎧 StudioCore v5.2\nПубличная версия без логов.\n")
 
     with gr.Row():
-        text_input = gr.Textbox(label="Введите текст песни", lines=10, placeholder="Введите текст...")
+        text_input = gr.Textbox(label="Введите текст песни", lines=12, placeholder="Вставьте лирику здесь…")
         gender_input = gr.Radio(["auto", "male", "female"], value="auto", label="Пол вокала (Gender)")
 
     analyze_button = gr.Button("🔍 Анализировать")
@@ -153,9 +138,10 @@ with gr.Blocks(title="🎧 StudioCore v5.2 — Public Interface") as iface_publi
         style_box = gr.Textbox(label="🎼 Стиль и инструменты", lines=8)
 
     with gr.Row():
-        suno_box = gr.Textbox(label="🎧 Suno-промт", lines=8)
-        annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=20)
+        suno_box = gr.Textbox(label="🎧 Suno-промт (Style)", lines=8)
+        annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=24)
 
+    # Важно: передаем 2 входа → 4 выхода (исправляет ошибку “needed: 2, got: 1”)
     analyze_button.click(
         fn=analyze_text,
         inputs=[text_input, gender_input],
@@ -164,19 +150,25 @@ with gr.Blocks(title="🎧 StudioCore v5.2 — Public Interface") as iface_publi
 
 
 # === API ===
+@app.get("/status")
+async def status():
+    return JSONResponse(
+        content={"status": "ok", "engine": "StudioCore", "ready": True, "version": STUDIOCORE_VERSION}
+    )
+
 @app.post("/api/predict")
 async def predict_api(request: Request):
     try:
         payload = await request.json()
         text = payload.get("text", "")
         gender = payload.get("gender", "auto")
-        summary, full, suno, annotated = analyze_text(text, gender)
+        summary, style_prompt, suno, annotated = analyze_text(text, gender)
         return JSONResponse(
             content={
                 "summary": summary,
-                "prompt_full": full,
-                "prompt_suno": suno,
-                "annotated_text": annotated,
+                "style_prompt": style_prompt,   # компактный style prompt (≤1000)
+                "prompt_suno": suno,            # адаптивный suno prompt из adapter.py
+                "annotated_text": annotated,    # полный аннотированный текст
                 "engine_version": STUDIOCORE_VERSION,
                 "gender": gender,
             }
