@@ -216,6 +216,25 @@ class StudioCore:
         self.style = PatchedStyleMatrix()
         self.tone = ToneSyncEngine()
 
+    # === добавлено: восстановленная функция ===
+    def _build_semantic_sections(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int) -> Dict[str, Any]:
+        love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
+        cf = tlp.get("conscious_frequency", 0.0)
+        avg_emo = mean(abs(v) for v in emo.values()) if emo else 0.0
+        intro = {"section": "Intro", "mood": "mystic" if cf >= 0.5 else "calm", "intensity": round(bpm * 0.8, 2), "focus": "tone_establish"}
+        verse = {"section": "Verse", "mood": "reflective" if truth > love else "narrative", "intensity": round(bpm, 2), "focus": "story_flow"}
+        bridge = {"section": "Bridge", "mood": "dramatic" if pain > 0.3 else "dreamlike", "intensity": round(bpm * (1.05 + avg_emo / 4), 2), "focus": "contrast"}
+        chorus = {"section": "Chorus", "mood": "uplifting" if love >= pain else "tense", "intensity": round(bpm * 1.15, 2), "focus": "release"}
+        outro = {"section": "Outro", "mood": "peaceful" if cf > 0.6 else "fading", "intensity": round(bpm * 0.7, 2), "focus": "closure"}
+        bpm_adj = int(bpm + (avg_emo * 8) + (cf * 4))
+        overlay = {
+            "depth": round((truth + pain) / 2, 2),
+            "warmth": round(love, 2),
+            "clarity": round(cf, 2),
+            "sections": [intro, verse, bridge, chorus, outro],
+        }
+        return {"bpm": bpm_adj, "overlay": overlay}
+
     def analyze(self, text: str, author_style=None, preferred_gender=None, version=None) -> Dict[str, Any]:
         version = version or self.cfg.get("suno_version", "v5")
         raw = normalize_text_preserve_symbols(text)
@@ -231,7 +250,6 @@ class StudioCore:
         vox, inst, vocal_form = self.vocals.get(style["genre"], preferred_gender or "auto", raw, sections)
         style["vocal_form"] = vocal_form
 
-        # --- лог для Hugging Face / Gradio ---
         print(f"🎧 [StudioCore] Analyze: Gender={preferred_gender or 'auto'} | Genre={style['genre']} | BPM={bpm_adj}")
 
         integ = self.integrity.analyze(raw)
@@ -243,7 +261,7 @@ class StudioCore:
 
         prompt_full = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="full")
         prompt_suno = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="suno")
-        annotated_text = self.annotate_text(raw, overlay_pack["overlay"], style, vox, bpm_adj, emo, tlp)
+        annotated_text = " ".join(raw.splitlines())
 
         return {
             "emotions": emo,
@@ -259,6 +277,7 @@ class StudioCore:
             "preferred_gender": preferred_gender or "auto",
             "version": version
         }
+
 
 # ==========================================================
 # ✅ Auto-Register Patch
