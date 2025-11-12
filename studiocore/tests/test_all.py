@@ -239,6 +239,7 @@ def run_all_unit_tests():
 def test_prediction_pipeline():
     print("\n🎧 Проверка (интеграционная) ядра StudioCore...")
     try:
+        # ИСПРАВЛЕНИЕ: Импортируем из monolith, так как rhythm.py не содержит PatchedLyricMeter
         from studiocore.monolith_v4_3_1 import PatchedLyricMeter
         from studiocore.style import PatchedStyleMatrix
         from studiocore.emotion import TruthLovePainEngine, AutoEmotionalAnalyzer
