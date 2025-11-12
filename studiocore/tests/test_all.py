@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION (v4)
+StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION (v5)
 Автоматическая проверка всех модулей, структуры, синтаксиса и API:
 1. Структура папок (Только проект)
 2. Синтаксис Python / JSON / YAML (Только проект)
@@ -10,10 +10,8 @@ StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION (v4)
 6. Интеграционный тест (API)
 7. Интеграционный тест (Ядро)
 
-ИСПРАВЛЕНИЯ (v4):
+ИСПРАВЛЕНИЯ (v5):
 - Добавлен 'import re' (исправление NameError)
-- Исправлен ImportError для PatchedLyricMeter (теперь импортируется из monolith)
-- Увеличен таймаут API до 120с
 """
 
 # === 🔧 Исправление пути импорта (чтобы test видели пакет) ===
@@ -344,13 +342,16 @@ if __name__ == "__main__":
     # Если они провалятся, нет смысла проверять интеграцию API
     results["unit_tests (logic)"] = run_all_unit_tests()
     
+    # В v5 мы переименовали test_prediction_pipeline в integration_core
+    results["integration_core"] = False
+    
     if results["unit_tests (logic)"]:
         # Запускаем интеграционные тесты, только если unit-тесты прошли
         results["integration_core"] = test_prediction_pipeline()
         results["integration_api"] = test_api_response()
     else:
         print("\n🔬 Пропуск 'integration_api' и 'integration_core', так как 'unit_tests (logic)' провалились.")
-        results["integration_core"] = False
+        # integration_core уже False
         results["integration_api"] = False
 
     passed = sum(1 for k in results.values() if k)
@@ -361,8 +362,6 @@ if __name__ == "__main__":
     print("\n===== 🧾 ИТОГОВЫЙ ОТЧЁТ =====")
     for name, ok in results.items():
         print(f"{'✅' if ok else '❌'} {name}")
-
-    print(f"\n🎯 ПРОЙДЕНО: {passed}/{total} тестов ({round(passed / total * 100, 2)}%)")
 
     # Получаем процент для условного вывода
     percent = round(passed / total * 100, 2)
