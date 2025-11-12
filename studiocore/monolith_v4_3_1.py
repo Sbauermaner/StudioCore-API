@@ -4,7 +4,7 @@ StudioCore v4.3.9 — Monolith (USER-MODE Vocal Overlay + Auto Voice Detection)
 Правило: «Если пользователь указал — исполняй буквально. Если не указал — подбери сам».
 Поддержка описаний вокала из текста (RU/EN) и автоматического определения через detect_voice_profile().
 
-ИСПРАВЛЕНИЕ: Убран невидимый символ (U+00A0) в строке 21.
+ИСПРАВЛЕНИЕ v2 (Грамматика): Добавлена функция detect_gender_from_grammar ('я шел' / 'я шла')
 """
 
 from __future__ import annotations
@@ -25,7 +25,6 @@ from .style import StyleMatrix  # безопасный импорт (патч и
 # 🧩 Проверка наличия автораспознавания вокала
 # ==========================================================
 try:
-    # ИСПРАВЛЕНИЕ: (Строка 21) Убраны невидимые символы (U+00A0) из отступов.
     from .style import detect_voice_profile
     _AUTO_VOCAL_DETECT = True
     print("🎙️ [Monolith] Auto voice detection активен (detect_voice_profile подключен).")
@@ -33,6 +32,39 @@ except Exception:
     detect_voice_profile = None
     _AUTO_VOCAL_DETECT = False
     print("⚠️ [Monolith] Auto voice detection недоступен (detect_voice_profile отсутствует).")
+
+# ==========================================================
+# 🗣️ НОВАЯ ФУНКЦИЯ: Грамматическое определение пола
+# ==========================================================
+def detect_gender_from_grammar(text: str) -> str | None:
+    """
+    Анализирует текст на грамматические признаки (я шел / я шла)
+    для определения пола.
+    """
+    # Ищем слова, идущие сразу после "я "
+    matches = re.findall(r"\b(я)\s+([а-яё]+)\b", text.lower())
+    if not matches:
+        return None
+
+    male_verbs = 0
+    female_verbs = 0
+
+    for _, verb in matches:
+        # "я шел", "я был", "я сказал"
+        if verb.endswith("л") and not verb.endswith("ла"):
+            male_verbs += 1
+        # "я шла", "я была", "я сказала"
+        elif verb.endswith("ла"):
+            female_verbs += 1
+
+    if male_verbs > female_verbs:
+        print("🎙️ [AutoDetect] Обнаружен мужской пол по грамматике ('я ...л')")
+        return "male"
+    if female_verbs > male_verbs:
+        print("🎙️ [AutoDetect] Обнаружен женский пол по грамматике ('я ...ла')")
+        return "female"
+            
+    return None
 
 # ==========================================================
 # 🔹 Adaptive Vocal Allocation (автоподбор по эмоциям/TLP/BPM)
@@ -230,16 +262,29 @@ class StudioCore:
         elif auto_detected_hint:
             mode = "AUTO-DETECT"
 
-        preferred_gender_eff = preferred_gender or vocal_meta.get("gender") or "auto"
+        # --- ИЗМЕНЕНИЕ v2: ГРАММАТИЧЕСКИЙ АНАЛИЗ ПОЛА ---
+        # 1. Сначала берем пол, заданный пользователем (через UI, например)
+        gender_final = preferred_gender
+        
+        # 2. Если пользователь не задал, пытаемся угадать по грамматике
+        if not gender_final or gender_final == "auto":
+            grammatical_gender = detect_gender_from_grammar(raw)
+            if grammatical_gender:
+                gender_final = grammatical_gender
+            else:
+                # 3. Если грамматика не помогла, берем авто-подбор по эмоциям
+                gender_final = vocal_meta.get("gender") or "auto"
+        # ------------------------------------------------
+
         style = self.style.build(emo, tlp, raw, bpm_adj, overlay_pack["overlay"])
 
         vox, inst, vocal_form = self.vocals.get(
-            style["genre"], preferred_gender_eff, raw, sections
+            style["genre"], gender_final, raw, sections
         )
         style["vocal_form"] = vocal_form
         style["vocal_count"] = vocal_meta["vocal_count"]
 
-        print(f"🎧 [StudioCore] Analyze [{mode}]: Gender={preferred_gender_eff} | Form={vocal_form} | Genre={style['genre']} | BPM={bpm_adj}")
+        print(f"🎧 [StudioCore] Analyze [{mode}]: Gender={gender_final} | Form={vocal_form} | Genre={style['genre']} | BPM={bpm_adj}")
 
         integ = self.integrity.analyze(raw)
         tone = self.tone.colors_for_primary(emo, tlp, style.get("key", "auto"))
@@ -254,7 +299,7 @@ class StudioCore:
             "emotions": emo, "tlp": tlp, "bpm": bpm_adj, "frequency": freq,
             "style": style, "vocals": vox, "instruments": inst,
             "prompt_full": prompt_full, "prompt_suno": prompt_suno,
-            "annotated_text": annotated_text, "preferred_gender": preferred_gender_eff,
+            "annotated_text": annotated_text, "preferred_gender": gender_final,
             "version": version, "mode": mode
         }
 
