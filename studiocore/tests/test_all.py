@@ -1,26 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION (v6)
-Автоматическая проверка всех модулей, структуры, синтаксиса и API:
-1. Структура папок (Только проект)
-2. Синтаксис Python / JSON / YAML (Только проект)
-3. Проверка внутренних связей (AST)
-4. Импорты и взаимодействие модулей
-5. ЗАПУСК ВСЕХ UNIT-ТЕСТОВ (проверка логики ядра и связей)
-6. Интеграционный тест (API)
-7. Интеграционный тест (Ядро)
+StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION (v7)
+(Возврат к быстрым тестам v3)
 
-ИСПРАВЛЕНИЯ (v6):
-- Добавлен 'import re' (исправление NameError)
-- Исправлен ImportError для PatchedLyricMeter (теперь импортируется из monolith)
-- Увеличен таймаут API до 120с
+ИСПРАВЛЕНИЯ (v7):
+- Таймаут API возвращен на 20с (т.к. 'emotion.py' v3 быстрый)
 """
 
 # === 🔧 Исправление пути импорта (чтобы test видели пакет) ===
 import os, sys, json, ast, yaml, importlib, requests, traceback
 from statistics import mean
 import unittest
-import re # <-- ИСПРАВЛЕНИЕ: Добавлен 'import re'
+import re 
 
 # ВАЖНО: Этот блок исправляет путь, чтобы можно было импортировать 'studiocore'
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -58,14 +49,12 @@ def check_directories():
 
 def _is_ignored(path):
     """Проверяет, нужно ли игнорировать путь (системные папки)."""
-    # Предотвращаем сканирование site-packages, /usr/lib и т.д.
     return any(p in path for p in ["/usr/", "/lib/", ".git/", ".venv/", "site-packages"])
 
 def check_python_syntax_project():
     print("\n🐍 Проверка синтаксиса Python (проект)...")
     all_ok = True
     
-    # 1. Сканируем указанные папки
     for folder in PROJECT_FOLDERS_TO_SCAN:
         scan_dir = os.path.join(ROOT_DIR, folder)
         if not os.path.isdir(scan_dir):
@@ -86,7 +75,6 @@ def check_python_syntax_project():
                         print(f"❌ Ошибка синтаксиса: {path} → {e}")
                         all_ok = False
 
-    # 2. Проверяем отдельные файлы в корне
     for f in PROJECT_FILES_TO_SCAN:
         path = os.path.join(ROOT_DIR, f)
         if os.path.isfile(path):
@@ -105,7 +93,6 @@ def check_json_yaml_project():
     print("\n🧩 Проверка JSON / YAML (проект)...")
     ok = True
     
-    # 1. Сканируем указанные папки
     for folder in PROJECT_FOLDERS_TO_SCAN:
         scan_dir = os.path.join(ROOT_DIR, folder)
         if not os.path.isdir(scan_dir): continue
@@ -131,13 +118,10 @@ def check_json_yaml_project():
                         print(f"❌ YAML Error: {path} → {e}")
                         ok = False
                         
-    # 2. Проверяем отдельные файлы в корне (например, studio_config.json)
     for root, _, files in os.walk(ROOT_DIR, topdown=True):
-        # Идем только по корневой директории, не глубже
         for f in files:
             if f.endswith(".json") or f.endswith((".yml", ".yaml")):
                  path = os.path.join(root, f)
-                 # Пропускаем, если уже проверили (на всякий случай)
                  if any(folder in path for folder in PROJECT_FOLDERS_TO_SCAN):
                      continue
                  
@@ -148,7 +132,6 @@ def check_json_yaml_project():
                     except Exception as e:
                         print(f"❌ JSON Error: {path} → {e}")
                         ok = False
-        # Прерываем os.walk, чтобы он не шел вглубь
         break 
 
     return ok
@@ -157,10 +140,6 @@ def check_json_yaml_project():
 # 🕸️ 2. Проверка внутренних связей (AST)
 # ==========================================================
 def check_internal_dependencies():
-    """
-    Сканирует все .py файлы в 'studiocore' и ищет внутренние импорты,
-    чтобы показать "взаимосвязи" ядра.
-    """
     print("\n🕸️  Проверка внутренних связей (studiocore.*)...")
     dependencies = {}
     ok = True
@@ -173,15 +152,12 @@ def check_internal_dependencies():
                 continue
             
             path = os.path.join(root, f)
-            # Превращаем путь в имя модуля (studiocore.rhythm)
-            # Убираем os.path.sep, чтобы // не ломали имя
             module_name = path.replace(ROOT_DIR, "") \
                               .replace(os.path.sep, ".") \
                               .replace("..", ".") \
                               .strip(".") \
                               .replace(".py", "")
             
-            # ИСПРАВЛЕНИЕ: Используем 're'
             module_name = re.sub(r"\.+", ".", module_name)
             
             dependencies[module_name] = []
@@ -190,7 +166,6 @@ def check_internal_dependencies():
                 with open(path, "r", encoding="utf-8") as fp:
                     tree = ast.parse(fp.read(), filename=path)
                 
-                # Ищем все 'import X' и 'from X import Y'
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Import):
                         for alias in node.names:
@@ -204,13 +179,11 @@ def check_internal_dependencies():
                 print(f"❌ Не удалось спарсить {path}: {e}")
                 ok = False
 
-    # Печатаем отчет о связях
     print("--- Карта зависимостей ядра ---")
     for module, imports in dependencies.items():
         if imports:
             print(f"📄 {module.replace('studiocore.', '')} импортирует:")
             for imp in sorted(list(set(imports))):
-                 # Очищаем для читаемости
                 imp_clean = imp.replace('studiocore.', '').strip('.')
                 if imp_clean:
                     print(f"    └── {imp_clean}")
@@ -236,15 +209,9 @@ def test_imports():
 # 🔬 4. Запуск ВСЕХ Unit-тестов (Логика ядра)
 # ==========================================================
 def run_all_unit_tests():
-    """
-    Автоматически находит и запускает все файлы 'test_*.py' 
-    в папке 'studiocore/tests/'.
-    """
     print("\n🔬 Запуск всех Unit-тестов (проверка логики)...")
     try:
         loader = unittest.TestLoader()
-        
-        # ИСПРАВЛЕНИЕ: Ищем тесты только в папке tests
         test_dir = os.path.join(ROOT_DIR, "studiocore", "tests")
         suite = loader.discover(start_dir=test_dir, pattern="test_*.py") 
         
@@ -255,7 +222,6 @@ def run_all_unit_tests():
             print("❌ Обнаружены ошибки в Unit-тестах.")
             return False
         
-        # Проверяем, что тесты вообще были найдены
         if result.testsRun == 0:
             print("⚠️  НИ ОДНОГО ТЕСТА НЕ НАЙДЕНО. Проверьте test_*.py файлы на наличие sys.path!")
             return True
@@ -273,18 +239,15 @@ def run_all_unit_tests():
 def test_prediction_pipeline():
     print("\n🎧 Проверка (интеграционная) ядра StudioCore...")
     try:
-        # ИСПРАВЛЕНИЕ: Импорт PatchedLyricMeter из monolith_v4_3_1
         from studiocore.monolith_v4_3_1 import PatchedLyricMeter
         from studiocore.style import PatchedStyleMatrix
         from studiocore.emotion import TruthLovePainEngine, AutoEmotionalAnalyzer
 
-        # Инициализируем движки, которые нужны для теста
         emo_analyzer = AutoEmotionalAnalyzer()
         tlp_engine = TruthLovePainEngine()
         
         text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
         
-        # Эмулируем полный пайплайн
         emo = emo_analyzer.analyze(text)
         tlp = tlp_engine.analyze(text)
         bpm = PatchedLyricMeter().bpm_from_density(text)
@@ -307,15 +270,15 @@ def test_prediction_pipeline():
 # ==========================================================
 def test_api_response():
     print("\n🌐 Проверка /api/predict ...")
-    api_url = "http://127.0.0.1:7860/api/predict" # Используем /api/predict
+    api_url = "http://127.0.0.1:7860/api/predict"
     try:
         payload = {
             "text": "Я тону, когда солнце уходит вдаль...",
             "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
         }
         
-        # ИСПРАВЛЕНИЕ: Таймаут увеличен до 120 секунд для медленного API (ИИ)
-        r = requests.post(api_url, json=payload, timeout=120)
+        # ИСПРАВЛЕНИЕ: Таймаут возвращен на 20 секунд (движок v3 быстрый)
+        r = requests.post(api_url, json=payload, timeout=20)
         
         assert r.status_code == 200, f"HTTP {r.status_code}. Ответ: {r.text}"
         data = r.json()
@@ -332,23 +295,17 @@ def test_api_response():
 if __name__ == "__main__":
     print("\n===== 🧩 StudioCore v5.2.1 — FULL SYSTEM CHECK =====")
 
-    total = 8 # Теперь 8 тестов
+    total = 8
     results = {}
     
-    # Запускаем тесты пошагово
     results["structure"] = check_directories()
     results["syntax"] = check_python_syntax_project()
     results["json_yaml"] = check_json_yaml_project()
     results["imports"] = test_imports()
     results["dependencies (AST)"] = check_internal_dependencies()
-    
-    # Сначала запускаем unit_tests. 
     results["unit_tests (logic)"] = run_all_unit_tests()
-    
-    # Запускаем интеграционные тесты
     results["integration_core"] = test_prediction_pipeline()
     
-    # Пропускаем API-тест, если Unit-тесты провалились (т.к. API все равно упадет)
     if not results["unit_tests (logic)"] or not results["integration_core"]:
         print("\n🔬 Пропуск 'integration_api', так как 'unit_tests (logic)' или 'integration_core' провалились.")
         results["integration_api"] = False
@@ -356,15 +313,12 @@ if __name__ == "__main__":
         results["integration_api"] = test_api_response()
     
     passed = sum(1 for k in results.values() if k)
-    
-    # Обновляем total, если тесты были пропущены (хотя мы их засчитали как False)
     total = len(results)
 
     print("\n===== 🧾 ИТОГОВЫЙ ОТЧЁТ =====")
     for name, ok in results.items():
         print(f"{'✅' if ok else '❌'} {name}")
 
-    # Получаем процент для условного вывода
     percent = round(passed / total * 100, 2)
     
     if percent == 100:
