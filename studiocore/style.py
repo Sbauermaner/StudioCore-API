@@ -5,7 +5,7 @@ StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE + Auto Voice Detect
 Позволяет ядру StudioCore адаптировать жанр, стиль, атмосферу и вокальные техники
 в зависимости от Truth/Love/Pain, Conscious Frequency и пользовательских описаний вокала.
 
-ИСПРАВЛЕНИЕ v2: Пороги (thresholds) для 'love' и 'pain' понижены ЕЩЕ СИЛЬНЕЕ.
+ИСПРАВЛЕНИЕ v3 (ФИНАЛ): Пороги (thresholds) для 'love' и 'pain' понижены до минимума.
 """
 
 import re
@@ -75,24 +75,26 @@ def resolve_style_and_form(
     else:
         # AUTO-MODE (эмоциональный анализ)
         
-        # --- ИСПРАВЛЕНИЕ ЛОГИКИ ЖАНРА v2 ---
+        # --- ИСПРАВЛЕНИЕ ЛОГИКИ ЖАНРА v3 ---
+        # Пороги понижены до минимума
         if cf > 0.9 or pain >= 0.04 or mood in ("intense", "angry", "dramatic"): # Было: 0.05
             genre = "cinematic adaptive"
-        elif love >= 0.10 and pain < 0.04 and mood in ("peaceful", "hopeful", "romantic"): # Было: 0.15
+        elif love >= 0.05 and pain < 0.04 and mood in ("peaceful", "hopeful", "romantic"): # Было: 0.10
             genre = "lyrical adaptive"
-        elif mood in ("melancholy", "sad") or (pain >= 0.03 and love < 0.15): # Было: 0.04
+        elif mood in ("melancholy", "sad") or (pain >= 0.01 and love < 0.15): # Было: 0.03
             genre = "lyrical adaptive"
         else:
             genre = "cinematic narrative"
 
-        # --- ИСПРАВЛЕНИЕ ЛОГИКИ СТИЛЯ v2 ---
+        # --- ИСПРАВЛЕНИЕ ЛОГИКИ СТИЛЯ v3 ---
         if cf >= 0.92 or (pain >= 0.04 and truth >= 0.05): # Было: 0.05
             style, key_mode = "dramatic harmonic minor", "minor"
-        elif pain >= 0.03 and love < 0.15: # Было: 0.04
+        elif pain >= 0.01 and love < 0.15: # Было: 0.03
             style, key_mode = "melancholic minor", "minor"
-        elif love >= 0.10 and pain < 0.04: # Было: 0.15
+        elif love >= 0.05 and pain < 0.04: # Было: 0.10
             style, key_mode = "majestic major", "major"
         else:
+            # Этот блок все еще может срабатывать, если TLP=0, но шансов меньше
             style, key_mode = "neutral modal", "modal"
 
     # Атмосфера
@@ -167,7 +169,7 @@ class PatchedStyleMatrix:
             "dramatic harmonic minor": "light and shadow interplay, emotional contrasts, dynamic framing",
             "aggressive growl": "fire, smoke, chaos, sharp cuts",
             "soft whisper tone": "blurred lights, feathers, close-up breathing",
-            "neutral modal": "shifting colors, abstract transitions" # Добавлено
+            "neutral modal": "shifting colors, abstract transitions"
         }
         visual = visuals.get(resolved["style"], "shifting colors, abstract transitions")
 
