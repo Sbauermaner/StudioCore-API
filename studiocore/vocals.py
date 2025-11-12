@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — Vocal Profile Registry (v2 - Расширенный инструментарий)
-Определяет состав вокала (solo/duet/choir) и базовые инструменты.
+StudioCore v5 — Vocal Profile Registry (v4 - f-string ИСПРАВЛЕН)
 """
 
 import re
 from typing import Dict, Any, List, Tuple
 from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine # Используем "быстрый" движок
+import logging
+
+log = logging.getLogger(__name__)
 
 # =========================
 # 1. Расширенный список инструментов
@@ -16,21 +18,16 @@ VALID_VOICES = [
     "tenor","soprano","alto","baritone","bass",
     "raspy","breathy","powerful","soft","emotional","angelic","deep",
     "whispered","warm","clear", "processed", "melodic rap", "layered harmonies",
-    "ethereal"
+    "ethereal", "solo"
 ]
 
 VALID_INSTRUMENTS = [
-    # Основа
     "guitar","piano","synth","bass","drums","percussion",
-    # Струнные / Оркестр
-    "strings","violin","cello","trumpet","horns", "french horn", "timpani",
-    # Электроника (Новое)
+    "strings","violin","cello","trumpet","horns", "french horn", "timpani", "orchestral strings",
     "synth lead", "808 bass", "riser", "FX", "trance pad", "house piano",
-    "synth melody", "synth pad", "drum machine",
-    # Акустика / Фолк
+    "synth melody", "synth pad", "drum machine", "atmospheric pads", "synth bass",
     "organ","harp","flute","acoustic guitar", "power chords", "tagelharpa",
-    # Вокал как инструмент
-    "choir","vocals","pad", "atmospheric pads"
+    "choir","vocals","pad", 
 ]
 
 # =========================
@@ -55,7 +52,7 @@ DEFAULT_VOCAL_MAP = {
     "cinematic": {
         "female": ["female", "angelic", "soprano"],
         "male": ["male", "deep", "baritone"],
-        "inst": ["strings", "piano", "choir", "drums", "french horn", "timpani"]
+        "inst": ["strings", "piano", "choir", "drums", "french horn", "timpani", "orchestral strings", "atmospheric pads"]
     },
     "electronic": {
         "female": ["female", "breathy", "ethereal"],
@@ -72,11 +69,15 @@ DEFAULT_VOCAL_MAP = {
         "male": ["male", "deep", "bass"],
         "inst": ["strings", "choir", "horns", "percussion", "timpani", "cello"]
     },
-    # НОВАЯ КАРТА
     "edm": {
         "female": ["female", "processed", "ethereal"],
         "male": ["male", "processed", "melodic rap"],
-        "inst": ["synth lead", "808 bass", "drum machine", "riser", "FX", "trance pad"]
+        "inst": ["synth lead", "808 bass", "drum machine", "riser", "FX", "trance pad", "synth bass"]
+    },
+    "default": {
+        "female": ["female", "emotional"],
+        "male": ["male", "emotional"],
+        "inst": ["piano", "guitar", "bass", "drums"]
     }
 }
 
@@ -88,41 +89,58 @@ class VocalProfileRegistry:
     """
     def __init__(self, vocal_map: Dict[str, Any] | None = None):
         self.map = vocal_map or DEFAULT_VOCAL_MAP
-        # Инициализируем анализаторы ОДИН РАЗ, чтобы не делать это при каждом вызове .get()
-        self.emo_analyzer = AutoEmotionalAnalyzer()
-        self.tlp_analyzer = TruthLovePainEngine()
+        try:
+            self.emo_analyzer = AutoEmotionalAnalyzer()
+            self.tlp_analyzer = TruthLovePainEngine()
+            log.debug("VocalProfileRegistry успешно инициализировал Emo/TLP движки.")
+        except Exception as e:
+            log.error(f"VocalProfileRegistry НЕ СМОГ инициализировать Emo/TLP: {e}")
+            self.emo_analyzer = None
+            self.tlp_analyzer = None
+
 
     def _detect_ensemble_hints(self, text: str, sections: List[Dict[str,Any]]) -> Dict[str,bool]:
         """ Ищет прямые указания на ансамбль (хор, дуэт и т.д.) """
+        log.debug("Вызов функции: _detect_ensemble_hints")
         s = (text + " " + " ".join(s.get("tag","") for s in sections)).lower()
-        return {
+        hints = {
             "wants_choir": any(k in s for k in ["choir","хор","group","chorus","anthem"]),
             "wants_duet": any(k in s for k in ["duet","дуэт","duo","вместе", "вдвоем"]),
             "wants_trio": any(k in s for k in ["trio","трио"]),
             "wants_quartet": any(k in s for k in ["quartet","квартет"]),
             "wants_quintet": any(k in s for k in ["quintet","квинтет"]),
         }
+        log.debug(f"Результат _detect_ensemble_hints: {hints}")
+        return hints
 
     def _auto_form(self, emo: Dict[str,float], tlp: Dict[str,float], text: str) -> str:
         """ Автоматически определяет форму (solo/duet/...) на основе плотности и энергии """
+        log.debug("Вызов функции: _auto_form")
+        if not emo or not tlp:
+            log.warning("_auto_form не получил emo/tlp, возврат 'solo'")
+            return "solo"
+            
         wc = len(text.split())
         cf = tlp.get("conscious_frequency", 0.5)
         energy = (tlp.get("love",0) + tlp.get("pain",0) + tlp.get("truth",0)) / 3
 
-        if wc < 40 and energy < 0.3: return "solo"
-        elif 40 <= wc < 80 or cf > 0.5: return "duet"
-        elif 80 <= wc < 150 or (energy > 0.4 and cf > 0.6): return "trio"
-        elif 150 <= wc < 250 or energy > 0.6: return "quartet"
-        elif wc >= 250 or cf > 0.75 or emo.get("epic", 0) > 0.3: return "choir"
-        return "solo"
+        if wc < 40 and energy < 0.3: form = "solo"
+        elif 40 <= wc < 80 or cf > 0.5: form = "duet"
+        elif 80 <= wc < 150 or (energy > 0.4 and cf > 0.6): form = "trio"
+        elif 150 <= wc < 250 or energy > 0.6: form = "quartet"
+        elif wc >= 250 or cf > 0.75 or emo.get("epic", 0) > 0.3: form = "choir"
+        else: form = "solo"
+        
+        log.debug(f"Результат _auto_form: {form} (WC={wc}, CF={cf:.2f}, E={energy:.2f})")
+        return form
 
     def _mixed_code(self, form: str, preferred_gender: str, text: str) -> str:
         """
         Создает код вокальной формы (solo_m, duet_mf, choir_mixed)
         на основе формы, предпочтений и намеков в тексте.
         """
+        log.debug(f"Вызов функции: _mixed_code (Form={form}, PrefGender={preferred_gender})")
         t = text.lower()
-        # Ищем грамматику (добавлено в monolith, здесь ищем только прямые намеки)
         has_f = any(x in t for x in [" she ", "her ", "женщин", "девушк"])
         has_m = any(x in t for x in [" he ", "his ", "мужчин", "парень"])
 
@@ -130,29 +148,32 @@ class VocalProfileRegistry:
         if preferred_gender in ("male", "female"):
             gender_code = "m" if preferred_gender == "male" else "f"
             if form == "solo": return f"solo_{gender_code}"
-            if form == "duet": return f"duet_{gender_code}{gender_code}" # duet_mm или duet_ff
-            # для хора/трио и т.д. оставляем mixed, если не указано иное
-            if "choir" in form: return f"choir_{"male" if gender_code == 'm' else 'female'}"
-            return f"{form}_{gender_code}" # trio_m
+            if form == "duet": return f"duet_{gender_code}{gender_code}" 
+            
+            # === ИСПРАВЛЕНИЕ ОШИБКИ v4 (f-string) ===
+            # Было: if "choir" in form: return f"choir_{"male" if gender_code == 'm' else 'female'}"
+            if "choir" in form: return f"choir_{'male' if gender_code == 'm' else 'female'}"
+            # === Конец исправления ===
+            
+            return f"{form}_{gender_code}"
 
         # 2. Автоматический выбор (preferred_gender == "auto" или "mixed")
         if form == "solo":
             if has_f and not has_m: return "solo_f"
             if has_m and not has_f: return "solo_m"
-            return "solo_auto" # По умолчанию (или если есть и M, и F в тексте)
+            return "solo_auto" 
 
         if form == "duet":
             if has_m and has_f: return "duet_mf"
-            if has_f: return "duet_ff" # Только женские намеки
-            if has_m: return "duet_mm" # Только мужские намеки
-            return "duet_mf" # По умолчанию для дуэта
+            if has_f: return "duet_ff" 
+            if has_m: return "duet_mm" 
+            return "duet_mf" 
 
         if "choir" in form:
             if "женск" in t or "female choir" in t: return "choir_female"
-            if "мужск" in t or "male choir" in t: return "choir_male"
+            if "мужск" в t or "male choir" in t: return "choir_male"
             return "choir_mixed"
 
-        # Для trio, quartet, quintet
         return f"{form}_mixed"
 
     def get(
@@ -161,12 +182,11 @@ class VocalProfileRegistry:
         preferred_gender: str,
         text: str,
         sections: List[Dict[str,Any]],
-        vocal_profile_tags: Dict[str, str] # Новое: теги из monolith
+        vocal_profile_tags: Dict[str, str]
     ) -> Tuple[List[str], List[str], str]:
-        """
-        Главный метод.
-        vocal_profile_tags: {'male': 2, 'female': 1, 'mixed': 1} (пример)
-        """
+        
+        log.debug(f"Вызов функции: VocalProfileRegistry.get (Genre={genre_full}, PrefGender={preferred_gender})")
+        
         # 1. Определяем базовый жанр для карты инструментов
         g = "edm" if "edm" in genre_full else \
             "cinematic" if "cinematic" in genre_full else \
@@ -175,38 +195,39 @@ class VocalProfileRegistry:
             "pop" if "pop" in genre_full else \
             "folk" if "folk" in genre_full else \
             "ambient" if "ambient" in genre_full else \
-            "lyrical" if "lyrical" in genre_full else "pop" # Запасной
+            "lyrical" if "lyrical" in genre_full else "default" 
 
-        # Если карта для жанра не найдена (напр. 'lyrical'), используем 'pop'
         if g not in self.map:
-            g = "pop"
+            log.warning(f"Жанр '{g}' не найден в vocal_map, используется 'default'")
+            g = "default"
+        log.debug(f"Выбранная карта инструментов: {g}")
 
         # 2. Определяем форму (solo/duet/choir)
         hints = self._detect_ensemble_hints(text, sections)
-        form = "solo" # По умолчанию
-
-        # Сначала проверяем теги из monolith (самый высокий приоритет)
+        form = "solo" 
+        
+        log.debug(f"Теги вокала из monolith: {vocal_profile_tags}")
         if vocal_profile_tags.get("mixed", 0) > 0:
             form = "duet"
         elif vocal_profile_tags.get("male", 0) > 0 and vocal_profile_tags.get("female", 0) > 0:
              form = "duet"
         
-        # Затем проверяем прямые хинты (wants_choir и т.д.)
         for name in ["choir","quintet","quartet","trio","duet"]:
             if hints.get(f"wants_{name}"):
                 form = name
-                break # Важно: choir > duet
+                break 
+        log.debug(f"Форма после хинтов: {form}")
 
-        # Если хинтов нет, используем авто-определение по TLP/длине
         if form == "solo" and not (vocal_profile_tags.get("male") or vocal_profile_tags.get("female")):
-            emo = self.emo_analyzer.analyze(text)
-            tlp = self.tlp_analyzer.analyze(text)
-            form = self._auto_form(emo, tlp, text)
+            if self.emo_analyzer and self.tlp_analyzer:
+                emo = self.emo_analyzer.analyze(text)
+                tlp = self.tlp_analyzer.analyze(text)
+                form = self._auto_form(emo, tlp, text)
+            else:
+                log.warning("Emo/TLP анализаторы не загружены, _auto_form пропущен.")
+        log.debug(f"Финальная форма: {form}")
 
         # 3. Определяем состав (male/female/mixed)
-        # Логика _mixed_code теперь учитывает теги из monolith
-        
-        # Определяем "предпочтительный" пол на основе грамматики
         auto_gender = "auto"
         if vocal_profile_tags.get("male", 0) > vocal_profile_tags.get("female", 0):
             auto_gender = "male"
@@ -214,35 +235,35 @@ class VocalProfileRegistry:
             auto_gender = "female"
         elif vocal_profile_tags.get("mixed", 0) > 0:
             auto_gender = "mixed"
+        log.debug(f"Грамматический пол: {auto_gender}")
 
-        # preferred_gender от UI (auto/male/female) имеет приоритет над грамматикой
         final_gender_preference = preferred_gender if preferred_gender != "auto" else auto_gender
-        if final_gender_preference == "mixed": final_gender_preference = "auto" # _mixed_code понимает 'auto'
+        if final_gender_preference == "mixed": final_gender_preference = "auto" 
+        log.debug(f"Финальный пол (с учетом UI): {final_gender_preference}")
         
         vocal_form = self._mixed_code(form, final_gender_preference, text)
+        log.debug(f"Финальный код формы: {vocal_form}")
 
         # 4. Собираем вокал и инструменты
         female_vox = self.map[g]["female"]
         male_vox = self.map[g]["male"]
         
-        # Выбираем тембр
         if final_gender_preference == "female":
             vox = female_vox
         elif final_gender_preference == "male":
             vox = male_vox
-        else: # auto или mixed
-            # Если в форме есть и M, и F, смешиваем
+        else: 
             if "mf" in vocal_form:
                 vox = male_vox + female_vox
-            # Иначе берем по умолчанию (например, по эмоциям)
             else:
-                emo = self.emo_analyzer.analyze(text)
+                emo = self.emo_analyzer.analyze(text) if self.emo_analyzer else {}
                 vox = (female_vox if (emo.get("joy",0)+emo.get("peace",0) >
                                       emo.get("anger",0)+emo.get("epic",0)) else male_vox)
-
+        
         # 5. Очистка и возврат
         vox = [form] + vox
-        vox = sorted(list(set(v for v in vox if v in VALID_VOICES or v.startswith(form))))[:6]
+        vox = sorted(list(set(v for v in vox if v in VALID_VOICES)))[:6]
         inst = sorted(list(set(i for i in self.map[g]["inst"] if i in VALID_INSTRUMENTS)))[:6]
         
+        log.debug(f"Возврат: Vox={vox}, Inst={inst}, Form={vocal_form}")
         return vox, inst, vocal_form
