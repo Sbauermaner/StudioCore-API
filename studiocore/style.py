@@ -1,47 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE + Auto Voice Detection)
-Интеграция автоматического распознавания вокальных описаний в текстах.
-Позволяет ядру StudioCore адаптировать жанр, стиль, атмосферу и вокальные техники
-в зависимости от Truth/Love/Pain, Conscious Frequency и пользовательских описаний вокала.
-
-ИСПРАВЛЕНИЕ v6 (ФИНАЛ): Перестроена логика if/elif.
-Проверка PAIN теперь идет ПЕРЕД LOVE.
+StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE)
+ИСПРАВЛЕНИЕ v9 (Рефакторинг): 'detect_voice_profile' был перемещен
+в monolith_v4_3_1.py для по-блочного анализа.
+Этот файл теперь отвечает ТОЛЬКО за TLP/CF-анализ стиля.
 """
 
-import re
 from typing import Dict, Any, Tuple
 from statistics import mean
 
 
 # ==========================================================
-# 🗣️ Автоматическое распознавание вокального описания
-# ==========================================================
-def detect_voice_profile(text: str) -> str | None:
-    """
-    Автоматически определяет вокальные подсказки из текста.
-    Возвращает строку с описанием (например, "под хриплый мужской вокал")
-    или None, если ничего не найдено.
-    """
-    text_low = text.lower()
-    # Типичные шаблоны описаний вокала
-    patterns = [
-        r"под\s+[а-яa-z\s,]+вокал",          # под хриплый мужской вокал
-        r"\(.*(вокал|voice|growl|scream).*\)",   # (soft female growl)
-        r"(мужск\w+|женск\w+)\s+вокал",
-        r"(soft|airy|raspy|grit|growl|scream|whisper)",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text_low)
-        if match:
-            hint = match.group(0).strip("() ")
-            print(f"🎙️ [AutoDetect] Найдено описание вокала: {hint}")
-            return hint
-    return None
-
-
-# ==========================================================
-# 🧠 Новый адаптивный резолвер стиля (с поддержкой USER-MODE)
+# 🧠 Адаптивный резолвер стиля (v8 Логика)
 # ==========================================================
 def resolve_style_and_form(
     tlp: Dict[str, float],
@@ -49,7 +19,7 @@ def resolve_style_and_form(
     mood: str, # 'mood' - это dominant emotion
     narrative: Tuple[str, str, str] | None = None,
     key_hint: str | None = None,
-    voice_hint: str | None = None,
+    voice_hint: str | None = None, # (Принимает подсказку от монолита)
 ) -> Dict[str, str]:
     love = tlp.get("love", 0.0)
     pain = tlp.get("pain", 0.0)
@@ -76,28 +46,24 @@ def resolve_style_and_form(
     else:
         # AUTO-MODE (эмоциональный анализ)
         
-        # --- ИСПРАВЛЕНИЕ ЛОГИКИ ЖАНРА v6 ---
-        # Порядок: 1. DRAMA, 2. PAIN, 3. LOVE/JOY, 4. DEFAULT
-        if cf > 0.9 or pain >= 0.04 or mood in ("intense", "angry", "dramatic"):
+        # --- Логика ЖАНРА v8 ---
+        # Порядок: 1. DRAMA, 2. PAIN (строго > love), 3. LOVE/JOY (строго > pain), 4. DEFAULT
+        if cf > 0.9 or (pain >= 0.04 and truth >= 0.05) or mood in ("intense", "angry", "dramatic"):
             genre = "cinematic adaptive"
-        # ПРОВЕРКА 2: Сначала PAIN (боль)
-        elif (pain >= 0.01 or mood in ("melancholy", "sad")):
+        elif (pain >= 0.01 and pain > love) or mood in ("melancholy", "sad"):
             genre = "lyrical adaptive"
-        # ПРОВЕРКА 3: Потом LOVE/JOY (любовь/радость)
-        elif (love >= 0.05 or mood == "joy"):
+        elif (love >= 0.05 and love > pain) or mood in ("joy", "peaceful", "hopeful"):
             genre = "lyrical adaptive"
         else:
             genre = "cinematic narrative"
 
-        # --- ИСПРАВЛЕНИЕ ЛОГИКИ СТИЛЯ v6 ---
-        # Порядок: 1. DRAMA, 2. PAIN, 3. LOVE/JOY, 4. DEFAULT
+        # --- Логика СТИЛЯ v8 ---
+        # Порядок: 1. DRAMA, 2. PAIN (строго > love), 3. LOVE/JOY (строго > pain), 4. DEFAULT
         if cf >= 0.92 or (pain >= 0.04 and truth >= 0.05) or mood in ("intense", "angry", "dramatic"):
             style, key_mode = "dramatic harmonic minor", "minor"
-        # ПРОВЕРКА 2: Сначала PAIN (боль)
-        elif (pain >= 0.01 or mood in ("melancholy", "sad")):
+        elif (pain >= 0.01 and pain > love) or mood in ("melancholy", "sad"):
             style, key_mode = "melancholic minor", "minor"
-        # ПРОВЕРКА 3: Потом LOVE/JOY (любовь/радость)
-        elif (love >= 0.05 or mood == "joy"):
+        elif (love >= 0.05 and love > pain) or mood in ("joy", "peaceful", "hopeful"):
             style, key_mode = "majestic major", "major"
         else:
             style, key_mode = "neutral modal", "modal"
@@ -116,7 +82,6 @@ def resolve_style_and_form(
     elif style == "neutral modal":
         atmosphere = "balanced and reflective"
     else:
-        # Fallback
         atmosphere = "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
 
     # Нарратив
@@ -136,31 +101,28 @@ def resolve_style_and_form(
 
 
 # ==========================================================
-# 🎨 PatchedStyleMatrix (v5.2.3) с автоопределением вокала
+# 🎨 PatchedStyleMatrix (v5.2.3)
 # ==========================================================
 class PatchedStyleMatrix:
-    """Adaptive emotional-to-style mapping engine (hybrid v5.2.3, USER-MODE + AutoDetect)."""
+    """Adaptive emotional-to-style mapping engine (hybrid v5.2.3)."""
 
     def build(
         self,
         emo: Dict[str, float],
         tlp: Dict[str, float],
-        text: str,
+        text: str, # (text больше не используется для 'detect_voice_profile' здесь)
         bpm: int,
         overlay: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         cf = tlp.get("conscious_frequency", 0.0)
         dominant = max(emo, key=emo.get) if emo else "neutral"
 
-        # 🔹 Определяем вокальный намёк (из overlay или автоматически)
+        # 🔹 Вокальный намёк теперь передается из Monolith
         voice_hint = None
         if overlay and "voice_profile_hint" in overlay:
             voice_hint = overlay["voice_profile_hint"]
-        else:
-            voice_hint = detect_voice_profile(text)
 
         narrative = ("search", "struggle", "transformation")
-        # Передаем 'dominant' (эмоцию) в резолвер
         resolved = resolve_style_and_form(tlp, cf, dominant, narrative, voice_hint=voice_hint)
 
         # 🎼 Ключ
@@ -203,7 +165,6 @@ class PatchedStyleMatrix:
             if emo.get("joy", 0) > 0.3 or l > 0.3:
                 techniques += ["falsetto", "bright tone"]
             
-            # Fallback
             if not techniques:
                 techniques += ["resonant layering", "harmonic blend"]
 
