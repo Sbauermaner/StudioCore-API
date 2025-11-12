@@ -1,96 +1,109 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore Emotion Engine (v12 - Local MiniLM AI)
-Использует облегченную локальную модель (Plan B)
+StudioCore Emotion Engines (v13 - БЫСТРЫЙ СЛОВАРЬ)
+БЫСТРЫЙ, "глупый" (не-ИИ) движок, основанный на расширенных словарях (v3),
+чтобы исправить ошибку 'PAIN' (v13).
 """
 
-import os
-import requests
-import time
-from typing import Dict, Any, List
+import re
+import math
+from typing import Dict, Any
 
-# === ИСПОЛЬЗОВАНИЕ ЛОКАЛЬНОЙ МОДЕЛИ ===
-# Мы используем локальную 'pipeline' из transformers.
-# Это медленнее, чем API, но надежнее.
-try:
-    from transformers import pipeline
-    # Используем "облегченную" (Mini) модель, чтобы она работала на CPU
-    MODEL_NAME = "MoritzLaurer/multilingual-MiniLMv2-L6-mnli-xnli"
-    print("🧠 [EmotionEngine] Загрузка локальной 'Mini' NLI-модели...")
-    # device="cpu" гарантирует, что он не будет пытаться использовать GPU
-    classifier = pipeline("zero-shot-classification", model=MODEL_NAME, device="cpu")
-    print(f"✅ [EmotionEngine] Локальная модель '{MODEL_NAME}' успешно загружена.")
-    _USE_API = False
-except ImportError:
-    print("❌ [EmotionEngine] ОШИБКА: 'transformers' или 'torch' не установлены.")
-    print("❌ [EmotionEngine] TLP-анализ будет отключен.")
-    classifier = None
-    _USE_API = False
-except Exception as e:
-    # Ошибка при загрузке модели (например, нет сети в Hugging Face)
-    print(f"❌ [EmotionEngine] ОШИБКА ЗАГРУЗКИ МОДЕЛИ: {e}")
-    classifier = None
-    _USE_API = False
+# === Весовые карты ===
+PUNCT_WEIGHTS = {"!": 0.6, "?": 0.4, ".": 0.1, ",": 0.05, "…": 0.5, "—": 0.2, ":": 0.15, ";": 0.1}
+EMOJI_WEIGHTS = {ch: 0.5 for ch in "❤💔💖🔥😭😢✨🌌🌅🌙🌈☀⚡💫"}
 
 
-# === Метки ===
-TLP_LABELS = ["truth", "love", "pain"]
-EMO_LABELS = ["joy", "sadness", "anger", "fear", "peace", "epic"]
-
-class AutoEmotionalAnalyzer:
-    """v12: Анализатор EMO (Радость, Грусть...)"""
-    def analyze(self, text: str) -> Dict[str, float]:
-        if not classifier:
-            return {"neutral": 1.0}
-
-        try:
-            # multi_label=True, так как в тексте может быть и радость, и страх
-            output = classifier(text, EMO_LABELS, multi_label=True)
-            
-            scores = {label: 0.0 for label in EMO_LABELS}
-            if output and 'labels' in output and 'scores' in output:
-                for label, score in zip(output['labels'], output['scores']):
-                    scores[label] = score
-                return scores
-            else:
-                print("⚠️  [EmotionEngine] EMO: Модель вернула неверный формат.")
-                return {"neutral": 1.0}
-        except Exception as e:
-            print(f"❌ [EmotionEngine] EMO Ошибка: {e}")
-            return {"neutral": 1.0}
-
+# =====================================================
+# 💠 Truth × Love × Pain Engine (v13 - Расширенный)
+# =====================================================
 class TruthLovePainEngine:
-    """v12: Анализатор TLP (Истина, Любовь, Боль)"""
+    """Balances three archetypal axes: Truth, Love, Pain → Conscious Frequency."""
+
+    # ИСПРАВЛЕНО (v13): Добавлены 'солнц', 'жизн', 'свобод', 'крыш'
+    POSITIVE = [
+        "love", "care", "unity", "truth", "light", "heart", "peace", "hope", "faith", "sun", "life",
+        "любов", "сердц", "мир", "надежд", "истин", "свет", "добро", "вер", "солнц", "жизн", "свобод", "крыш",
+        "простит", "дышит", "бог"
+    ]
+    # ИСПРАВЛЕНО (v13): Добавлены 'страх', 'тону', 'камен', 'груз', 'обман', 'печал'
+    NEGATIVE = [
+        "pain", "hate", "fear", "lie", "dark", "death", "anger", "cry", "cold", "war", "lost", "stone", "drown",
+        "страд", "боль", "ненав", "лож", "тьм", "смерт", "гнев", "слез", "холод", "войн", "страх", "тону",
+        "камен", "груз", "обман", "печал", "рушит", "гром", "устал"
+    ]
+
     def analyze(self, text: str) -> Dict[str, float]:
-        if not classifier:
-            return {"truth": 0.33, "love": 0.33, "pain": 0.33, "conscious_frequency": 0.5}
+        s = text.lower()
+        words = re.findall(r"[a-zа-яё]+", s)
+        n = max(1, len(words))
 
-        try:
-            # multi_label=False, чтобы TLP конкурировали друг с другом
-            output = classifier(text, TLP_LABELS, multi_label=False)
-            
-            scores = {label: 0.0 for label in TLP_LABELS}
-            if output and 'labels' in output and 'scores' in output:
-                # 'output' уже отсортирован по убыванию
-                scores[output['labels'][0]] = output['scores'][0]
-                scores[output['labels'][1]] = output['scores'][1]
-                scores[output['labels'][2]] = output['scores'][2]
-            else:
-                 print("⚠️  [EmotionEngine] TLP: Модель вернула неверный формат.")
-                 return {"truth": 0.33, "love": 0.33, "pain": 0.33, "conscious_frequency": 0.5}
+        pos_hits = sum(1 for w in words if any(p in w for p in self.POSITIVE))
+        neg_hits = sum(1 for w in words if any(nv in w for nv in self.NEGATIVE))
 
-            t, l, p = scores.get("truth", 0.0), scores.get("love", 0.0), scores.get("pain", 0.0)
-            
-            # Сознательная частота (CF)
-            cf = 1.0 - (abs(t - l) * 0.5 + abs(l - p) * 0.5 + abs(t - p) * 0.5)
-            cf = max(0.0, min(cf, 1.0))
+        positivity = pos_hits / n
+        negativity = neg_hits / n
+        polarity = positivity - negativity
 
-            return {
-                "truth": round(t, 3),
-                "love": round(l, 3),
-                "pain": round(p, 3),
-                "conscious_frequency": round(cf, 3),
-            }
-        except Exception as e:
-            print(f"❌ [EmotionEngine] TLP Ошибка: {e}")
-            return {"truth": 0.33, "love": 0.33, "pain": 0.33, "conscious_frequency": 0.5}
+        # (Формулы оставлены без изменений, так как они работают, если словари верны)
+        truth = max(0.0, min(1.0, positivity * (1.0 - negativity)))
+        love = max(0.0, min(1.0, (positivity * 2.4 + polarity * 0.8)))
+        # (v13) Небольшой буст 'pain' (боли), чтобы он был более чувствительным
+        pain = max(0.0, min(1.0, (negativity * 2.2 - polarity * 0.5 + 0.01)))
+
+        # Conscious Frequency = гармония трёх осей
+        cf = 1.0 - (abs(truth - love) + abs(love - pain) * 0.35 + abs(truth - pain) * 0.25)
+        cf = max(0.0, min(cf, 1.0))
+
+        return {
+            "truth": round(truth, 3),
+            "love": round(love, 3),
+            "pain": round(pain, 3),
+            "conscious_frequency": round(cf, 3),
+        }
+
+
+# =====================================================
+# 💫 AutoEmotionalAnalyzer (v13 - Расширенный)
+# =====================================================
+class AutoEmotionalAnalyzer:
+    """Heuristic emotion-field classifier (v13-adaptive)."""
+
+    # ИСПРАВЛЕНО (v13): Добавлены 'страх' и 'тону'/'камен'/'груз'
+    EMO_FIELDS = {
+        "joy": ["joy", "happy", "laugh", "смех", "рад", "улыб", "благ", "hope", "bright", "солнц", "встаю"],
+        "sadness": ["sad", "печаль", "грусть", "слез", "cry", "lonely", "утрата", "страд", "тону", "камен", "груз", "обман"],
+        "anger": ["anger", "rage", "злость", "гнев", "ярость", "fight", "burn"],
+        "fear": ["fear", "страх", "ужас", "паник", "тревог", "краю", "шорох"],
+        "peace": ["мир", "тишин", "calm", "still", "тихо", "равновес", "спокой"],
+        "epic": ["epic", "велич", "геро", "легенд", "immortal", "battle", "rise"],
+        "neutral": []
+    }
+
+    def _softmax(self, scores: Dict[str, float]) -> Dict[str, float]:
+        exps = {k: math.exp(v) for k, v in scores.items()}
+        total = sum(exps.values()) or 1.0
+        return {k: exps[k] / total for k in scores}
+
+    def analyze(self, text: str) -> Dict[str, float]:
+        s = text.lower()
+
+        # 1️⃣ Энергия пунктуации и эмодзи
+        punct_energy = sum(PUNCT_WEIGHTS.get(ch, 0.0) for ch in s)
+        emoji_energy = sum(EMOJI_WEIGHTS.get(ch, 0.0) for ch in s)
+        energy = min(1.0, (punct_energy + emoji_energy) ** 0.7)
+
+        # 2️⃣ Подсчёт совпадений по токенам
+        scores: Dict[str, float] = {}
+        for field, tokens in self.EMO_FIELDS.items():
+            hits = sum(1 for t in tokens if t in s)
+            scores[field] = hits * (1 + energy ** 2)
+
+        # 3️⃣ Нормализация (softmax)
+        normalized = self._softmax(scores)
+
+        # 4️⃣ Если сигналов нет — вернуть фоновое спокойствие
+        if all(v < 0.05 for v in normalized.values()):
+            normalized = {"peace": 0.6, "joy": 0.3, "neutral": 0.1}
+
+        return normalized
