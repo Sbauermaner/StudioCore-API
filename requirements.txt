@@ -30,10 +30,10 @@ pydub==0.25.1
 jinja2==3.1.6
 packaging==25.0
 
-### ИИ-Движок (v7 - Inference API) ###
+### AI Engine (v7 - Inference API) ###
 
-Нам больше не нужны 'torch' и 'transformers' локально.
+We don't need 'torch' or 'transformers' locally anymore.
 
-'requests' (уже включен выше) будет обращаться к API HF.
+'requests' (already included above) will handle the HF API call.
 
 sentencepiece==0.2.0
