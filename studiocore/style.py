@@ -5,8 +5,8 @@ StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE + Auto Voice Detect
 Позволяет ядру StudioCore адаптировать жанр, стиль, атмосферу и вокальные техники
 в зависимости от Truth/Love/Pain, Conscious Frequency и пользовательских описаний вокала.
 
-ИСПРАВЛЕНИЕ v5 (ФИНАЛ): Перестроена логика if/elif для
-корректного определения LOVE/JOY/PAIN. (PAIN > LOVE)
+ИСПРАВЛЕНИЕ v6 (ФИНАЛ): Перестроена логика if/elif.
+Проверка PAIN теперь идет ПЕРЕД LOVE.
 """
 
 import re
@@ -76,29 +76,29 @@ def resolve_style_and_form(
     else:
         # AUTO-MODE (эмоциональный анализ)
         
-        # --- ИСПРАВЛЕНИЕ ЛОГИКИ ЖАНРА v5 ---
+        # --- ИСПРАВЛЕНИЕ ЛОГИКИ ЖАНРА v6 ---
+        # Порядок: 1. DRAMA, 2. PAIN, 3. LOVE/JOY, 4. DEFAULT
         if cf > 0.9 or pain >= 0.04 or mood in ("intense", "angry", "dramatic"):
             genre = "cinematic adaptive"
-        # Сначала проверяем LOVE/JOY
-        elif (love >= 0.05 or mood == "joy") and (love > pain):
+        # ПРОВЕРКА 2: Сначала PAIN
+        elif (pain >= 0.01 or mood in ("melancholy", "sad")):
             genre = "lyrical adaptive"
-        # Потом проверяем PAIN
-        elif (pain >= 0.01 or mood in ("melancholy", "sad")) and (pain > love):
+        # ПРОВЕРКА 3: Потом LOVE/JOY
+        elif (love >= 0.05 or mood == "joy"):
             genre = "lyrical adaptive"
-        # Иначе - default
         else:
             genre = "cinematic narrative"
 
-        # --- ИСПРАВЛЕНИЕ ЛОГИКИ СТИЛЯ v5 ---
+        # --- ИСПРАВЛЕНИЕ ЛОГИКИ СТИЛЯ v6 ---
+        # Порядок: 1. DRAMA, 2. PAIN, 3. LOVE/JOY, 4. DEFAULT
         if cf >= 0.92 or (pain >= 0.04 and truth >= 0.05) or mood in ("intense", "angry", "dramatic"):
             style, key_mode = "dramatic harmonic minor", "minor"
-        # Сначала проверяем LOVE/JOY (love > pain)
-        elif (love >= 0.05 or mood == "joy") and (love > pain):
-            style, key_mode = "majestic major", "major"
-        # Потом проверяем PAIN (pain > love)
-        elif (pain >= 0.01 or mood in ("melancholy", "sad")) and (pain > love):
+        # ПРОВЕРКА 2: Сначала PAIN
+        elif (pain >= 0.01 or mood in ("melancholy", "sad")):
             style, key_mode = "melancholic minor", "minor"
-        # Иначе - default
+        # ПРОВЕРКА 3: Потом LOVE/JOY
+        elif (love >= 0.05 or mood == "joy"):
+            style, key_mode = "majestic major", "major"
         else:
             style, key_mode = "neutral modal", "modal"
 
