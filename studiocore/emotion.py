@@ -1,109 +1,170 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore Emotion Engines (v13 - БЫСТРЫЙ СЛОВАРЬ)
-БЫСТРЫЙ, "глупый" (не-ИИ) движок, основанный на расширенных словарях (v3),
-чтобы исправить ошибку 'PAIN' (v13).
+StudioCore Emotion Engines (v13 - "Умные" Словари + Логирование)
+Быстрый эвристический анализ (не ИИ).
 """
 
 import re
 import math
 from typing import Dict, Any
+import logging
 
-# === Весовые карты ===
+# Получаем логгер для этого модуля
+log = logging.getLogger(__name__)
+
+# === Весовые карты (без изменений) ===
 PUNCT_WEIGHTS = {"!": 0.6, "?": 0.4, ".": 0.1, ",": 0.05, "…": 0.5, "—": 0.2, ":": 0.15, ";": 0.1}
 EMOJI_WEIGHTS = {ch: 0.5 for ch in "❤💔💖🔥😭😢✨🌌🌅🌙🌈☀⚡💫"}
 
 
 # =====================================================
-# 💠 Truth × Love × Pain Engine (v13 - Расширенный)
+# 💠 Truth × Love × Pain Engine (v3 Словари)
 # =====================================================
 class TruthLovePainEngine:
-    """Balances three archetypal axes: Truth, Love, Pain → Conscious Frequency."""
+    """Balances TLP axes using expanded v3 dictionaries."""
 
-    # ИСПРАВЛЕНО (v13): Добавлены 'солнц', 'жизн', 'свобод', 'крыш'
-    POSITIVE = [
-        "love", "care", "unity", "truth", "light", "heart", "peace", "hope", "faith", "sun", "life",
-        "любов", "сердц", "мир", "надежд", "истин", "свет", "добро", "вер", "солнц", "жизн", "свобод", "крыш",
-        "простит", "дышит", "бог"
+    # v3 - Расширенные словари с "корнями"
+    TRUTH_WORDS = [
+        "правд", "истин", "честн", "смысл", "знан", "позна", "созна", # ru
+        "мудро", "осозна", "голос", "суть", "reason", "судьб",
+        "truth", "honest", "real", "meaning", "wisdom", "soul", "mind", # en
+        "see", "know", "understand", "realize", "reflect"
     ]
-    # ИСПРАВЛЕНО (v13): Добавлены 'страх', 'тону', 'камен', 'груз', 'обман', 'печал'
-    NEGATIVE = [
-        "pain", "hate", "fear", "lie", "dark", "death", "anger", "cry", "cold", "war", "lost", "stone", "drown",
-        "страд", "боль", "ненав", "лож", "тьм", "смерт", "гнев", "слез", "холод", "войн", "страх", "тону",
-        "камен", "груз", "обман", "печал", "рушит", "гром", "устал"
+    
+    LOVE_WORDS = [
+        "люб", "нежн", "сердц", "забот", "свет", "тепл", "солнц", "жизн", # ru
+        "мир", "надежд", "вер", "добр", "друг", "вмест", "простит", "дом",
+        "love", "care", "unity", "light", "heart", "peace", "hope", "faith", # en
+        "warm", "sun", "life", "friend", "together", "forgive", "home", "kind"
     ]
+
+    PAIN_WORDS = [
+        "боль", "страда", "мук", "горе", "плач", "слез", "рана", "потер", # ru
+        "ненави", "гнев", "зл", "яд", "лож", "тьм", "мрак", "смерт", "крик",
+        "холод", "пусто", "один", "тоск", "пепел", "кров", "воин", "бо", # (бой, боль...)
+        "страх", "ужас", "тревог", "тону", "камен", "груз", "обман", "рухн",
+        "pain", "hate", "fear", "lie", "dark", "death", "anger", "cry", "cold", # en
+        "war", "suffer", "grief", "loss", "scream", "alone", "empty", "blood",
+        "broken", "fall", "lost", "scared"
+    ]
+
+    def __init__(self):
+        # Компилируем регекспы один раз для скорости
+        self.TRUTH = re.compile(r"(" + "|".join(self.TRUTH_WORDS) + r")", re.I)
+        self.LOVE = re.compile(r"(" + "|".join(self.LOVE_WORDS) + r")", re.I)
+        self.PAIN = re.compile(r"(" + "|".join(self.PAIN_WORDS) + r")", re.I)
+        log.debug("TLP Engine (v13) инициализирован с расширенными словарями.")
 
     def analyze(self, text: str) -> Dict[str, float]:
+        log.debug(f"Вызов функции: TruthLovePainEngine.analyze")
         s = text.lower()
-        words = re.findall(r"[a-zа-яё]+", s)
-        n = max(1, len(words))
+        
+        truth_hits = len(self.TRUTH.findall(s))
+        love_hits = len(self.LOVE.findall(s))
+        pain_hits = len(self.PAIN.findall(s))
 
-        pos_hits = sum(1 for w in words if any(p in w for p in self.POSITIVE))
-        neg_hits = sum(1 for w in words if any(nv in w for nv in self.NEGATIVE))
+        total = truth_hits + love_hits + pain_hits
+        
+        log.debug(f"TLP хиты: T={truth_hits}, L={love_hits}, P={pain_hits}, Total={total}")
 
-        positivity = pos_hits / n
-        negativity = neg_hits / n
-        polarity = positivity - negativity
+        if total == 0:
+            # Если нет TLP слов, считаем CF на основе длины (короткие тексты = выше CF)
+            word_count = len(re.findall(r"[a-zа-яё]+", s))
+            cf = 1.0 - min(1.0, word_count / 100.0) * 0.5 # Бонус за краткость
+            truth, love, pain = 0.0, 0.0, 0.0
+        else:
+            truth = truth_hits / total
+            love = love_hits / total
+            pain = pain_hits / total
+            # Сознательная Частота (CF) = Гармония - Диссонанс
+            harmony = (love + truth) / 2
+            dissonance = pain
+            cf = max(0.0, min(1.0, (harmony - dissonance * 0.5 + 0.5))) # Базовая CF
 
-        # (Формулы оставлены без изменений, так как они работают, если словари верны)
-        truth = max(0.0, min(1.0, positivity * (1.0 - negativity)))
-        love = max(0.0, min(1.0, (positivity * 2.4 + polarity * 0.8)))
-        # (v13) Небольшой буст 'pain' (боли), чтобы он был более чувствительным
-        pain = max(0.0, min(1.0, (negativity * 2.2 - polarity * 0.5 + 0.01)))
-
-        # Conscious Frequency = гармония трёх осей
-        cf = 1.0 - (abs(truth - love) + abs(love - pain) * 0.35 + abs(truth - pain) * 0.25)
-        cf = max(0.0, min(cf, 1.0))
-
-        return {
+        result = {
             "truth": round(truth, 3),
             "love": round(love, 3),
             "pain": round(pain, 3),
             "conscious_frequency": round(cf, 3),
         }
+        log.debug(f"TLP результат: {result}")
+        return result
 
 
 # =====================================================
-# 💫 AutoEmotionalAnalyzer (v13 - Расширенный)
+# 💫 AutoEmotionalAnalyzer (v3 Словари)
 # =====================================================
 class AutoEmotionalAnalyzer:
-    """Heuristic emotion-field classifier (v13-adaptive)."""
+    """Heuristic emotion-field classifier (v13, +Logging)."""
 
-    # ИСПРАВЛЕНО (v13): Добавлены 'страх' и 'тону'/'камен'/'груз'
     EMO_FIELDS = {
-        "joy": ["joy", "happy", "laugh", "смех", "рад", "улыб", "благ", "hope", "bright", "солнц", "встаю"],
-        "sadness": ["sad", "печаль", "грусть", "слез", "cry", "lonely", "утрата", "страд", "тону", "камен", "груз", "обман"],
-        "anger": ["anger", "rage", "злость", "гнев", "ярость", "fight", "burn"],
-        "fear": ["fear", "страх", "ужас", "паник", "тревог", "краю", "шорох"],
-        "peace": ["мир", "тишин", "calm", "still", "тихо", "равновес", "спокой"],
-        "epic": ["epic", "велич", "геро", "легенд", "immortal", "battle", "rise"],
-        "neutral": []
+        "joy": ["joy", "happy", "laugh", "смех", "рад", "улыб", "счаст", "весел", "hope", "bright", "солнц"],
+        "sadness": ["sad", "печал", "груст", "слез", "плач", "cry", "lonely", "утрат", "страда", "тоск", "один"],
+        "anger": ["anger", "rage", "злост", "гнев", "ярост", "fight", "burn", "ненави", "крик", "воин"],
+        "fear": ["fear", "страх", "ужас", "паник", "тревог", "боят", "scared"],
+        "peace": ["мир", "тишин", "calm", "still", "тихо", "равновес", "спокой", "умиротвор"],
+        "epic": ["epic", "велич", "геро", "легенд", "immortal", "battle", "rise", "бог", "судьб", "огон", "шторм", "неб", "гимн"],
+        "awe": ["восторг", "awe", "wow", "чудо", "вдохнов", "удив", "прекрас"],
+        "neutral": [] # Остается пустым
     }
 
+    def __init__(self):
+        # "Компилируем" словари для быстрого поиска
+        self.LEXICON = {}
+        for field, tokens in self.EMO_FIELDS.items():
+            if tokens:
+                self.LEXICON[field] = re.compile(r"(" + "|".join(tokens) + r")", re.I)
+        log.debug("AutoEmotionalAnalyzer (v13) инициализирован.")
+
     def _softmax(self, scores: Dict[str, float]) -> Dict[str, float]:
-        exps = {k: math.exp(v) for k, v in scores.items()}
+        if not scores: return {}
+        # Защита от слишком больших чисел (вычитаем максимум)
+        max_score = max(scores.values()) if scores else 0
+        try:
+            exps = {k: math.exp(v - max_score) for k, v in scores.items()}
+        except OverflowError:
+            log.warning("Softmax Overflow. Используется линейная нормализация.")
+            total = sum(v for v in scores.values() if v > 0) or 1.0
+            return {k: max(0, v) / total for k, v in scores.items()}
+            
         total = sum(exps.values()) or 1.0
         return {k: exps[k] / total for k in scores}
 
     def analyze(self, text: str) -> Dict[str, float]:
+        log.debug(f"Вызов функции: AutoEmotionalAnalyzer.analyze")
         s = text.lower()
 
         # 1️⃣ Энергия пунктуации и эмодзи
         punct_energy = sum(PUNCT_WEIGHTS.get(ch, 0.0) for ch in s)
         emoji_energy = sum(EMOJI_WEIGHTS.get(ch, 0.0) for ch in s)
         energy = min(1.0, (punct_energy + emoji_energy) ** 0.7)
+        log.debug(f"Энергия пунктуации/эмодзи: {energy:.2f}")
 
-        # 2️⃣ Подсчёт совпадений по токенам
+        # 2️⃣ Подсчёт совпадений по "корням" (v13)
         scores: Dict[str, float] = {}
-        for field, tokens in self.EMO_FIELDS.items():
-            hits = sum(1 for t in tokens if t in s)
-            scores[field] = hits * (1 + energy ** 2)
+        total_hits = 0
+        for field, pattern in self.LEXICON.items():
+            hits = len(pattern.findall(s))
+            scores[field] = float(hits)
+            total_hits += hits
+        
+        log.debug(f"Хиты по эмоциям (raw): {scores}")
 
-        # 3️⃣ Нормализация (softmax)
+        # 3️⃣ Усиление энергией
+        if energy > 0.1 and total_hits > 0:
+            for field in scores:
+                scores[field] *= (1 + energy ** 2)
+            log.debug(f"Хиты по эмоциям (усиленные): {scores}")
+
+        # 4️⃣ Нормализация (softmax)
         normalized = self._softmax(scores)
 
-        # 4️⃣ Если сигналов нет — вернуть фоновое спокойствие
-        if all(v < 0.05 for v in normalized.values()):
+        # 5️⃣ Если сигналов нет — вернуть фоновое спокойствие
+        if total_hits == 0 or all(v < 0.05 for v in normalized.values()):
+            log.debug("Сигналы эмоций не найдены. Возврат 'peace'.")
             normalized = {"peace": 0.6, "joy": 0.3, "neutral": 0.1}
-
-        return normalized
+        
+        # Округляем для чистоты
+        final_scores = {k: round(v, 3) for k, v in normalized.items() if v > 0.001}
+        log.debug(f"Результат EMO (финал): {final_scores}")
+        return final_scores
