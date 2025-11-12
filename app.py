@@ -4,9 +4,9 @@
 Truth × Love × Pain = Conscious Frequency
 Unified core loader with fallback + Gradio + FastAPI + Inline Log Viewer
 
-ИСПРАВЛЕНИЕ:
+ИСПРАВЛЕНИЕ (v3):
 - Добавлен эндпоинт /api/predict для тестов.
-- Увеличен таймаут self-check до 120с (для ИИ-модели).
+- Увеличен таймаут self-check до 25с (для Inference API).
 """
 
 import os, sys, subprocess, importlib, traceback, threading, time, io
@@ -93,8 +93,8 @@ def auto_core_check():
     print("[Self-Check] Запуск самопроверки эндпоинта /api/predict...")
     
     try:
-        # ИСПРАВЛЕНИЕ: Таймаут увеличен до 120с (для ИИ-модели)
-        r = requests.post("http://127.0.0.1:7860/api/predict", json={"text": "test"}, timeout=120)
+        # ИСПРАВЛЕНИЕ: Таймаут 25с (для Inference API)
+        r = requests.post("http://127.0.0.1:7860/api/predict", json={"text": "test"}, timeout=25)
         print(f"[Self-Check] → Статус: {r.status_code}")
         if r.status_code != 200:
              print(f"[Self-Check] → Ответ: {r.text[:200]}...")
