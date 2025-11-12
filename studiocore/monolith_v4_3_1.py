@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v4.3.11 — Monolith (Duet & Section-Aware)
-ИСПРАВЛЕНИЕ v4: Исправлена ошибка 'NameError: _AUTO_VOCAL_DETECT'
+StudioCore v4.3.11 — Monolith (Section-Aware Duet Mode v2)
+v4: Внедрен централизованный логгер
 """
 
 from __future__ import annotations
 import re, json
 from statistics import mean
 from typing import Dict, Any, List, Tuple
+import logging # <-- Импорт логгера
 
 # --- Core imports ---
 from .config import load_config
@@ -18,14 +19,19 @@ from .adapter import build_suno_prompt
 from .vocals import VocalProfileRegistry
 from .style import StyleMatrix  # безопасный импорт (патч или стандарт)
 
+# Получаем логгер для этого модуля
+log = logging.getLogger(__name__)
+
 # ==========================================================
-# 🗣️ Движок определения вокала (Перемещено из style.py)
+# 🗣️ Встроенные детекторы вокала
+# (Мы оставляем их здесь, так как они специфичны для монолита)
 # ==========================================================
 
 def detect_voice_profile(text: str) -> str | None:
     """
-    Автоматически определяет вокальные подсказки (например, "(growl)")
+    Автоматически определяет вокальные подсказки из текста.
     """
+    log.debug("Вызов функции: detect_voice_profile")
     text_low = text.lower()
     patterns = [
         r"под\s+[а-яa-z\s,]+вокал",
@@ -37,64 +43,59 @@ def detect_voice_profile(text: str) -> str | None:
         match = re.search(pattern, text_low)
         if match:
             hint = match.group(0).strip("() ")
-            print(f"🎙️ [AutoDetect] Найдена вокальная подсказка: {hint}")
+            log.debug(f"Найдено описание вокала: {hint}")
             return hint
+    log.debug("Описание вокала не найдено.")
     return None
 
 def detect_gender_from_grammar(text: str) -> str | None:
     """
-    Анализирует текст на грамматические признаки (я шел / я шла)
+    Определяет грамматический пол (M/F) по глаголам в прошлом времени после "я".
     """
-    matches = re.findall(r"\b(я)\s+([а-яё]+)\b", text.lower())
-    if not matches:
-        return None
-
-    male_verbs = 0
-    female_verbs = 0
-    for _, verb in matches:
-        if verb.endswith("л") and not verb.endswith("ла"):
-            male_verbs += 1
-        elif verb.endswith("ла"):
-            female_verbs += 1
-
+    log.debug("Вызов функции: detect_gender_from_grammar")
+    # Ищем "я [слово на -л]" (M) и "я [слово на -ла]" (F)
+    male_verbs = len(re.findall(r"\bя\s+([а-яё]+л)\b", text, re.I))
+    female_verbs = len(re.findall(r"\bя\s+([а-яё]+ла)\b", text, re.I))
+    
+    log.debug(f"Грамматический анализ: Male хиты={male_verbs}, Female хиты={female_verbs}")
+    
     if male_verbs > female_verbs:
+        log.debug("Грамматика определена как MALE")
         return "male"
-    if female_verbs > male_verbs:
+    elif female_verbs > male_verbs:
+        log.debug("Грамматика определена как FEMALE")
         return "female"
+    
+    log.debug("Грамматика не определена (auto)")
     return None
 
-# --- !! ВОТ ИСПРАВЛЕНИЕ !! ---
-# Определяем _AUTO_VOCAL_DETECT, так как он используется в analyze()
+# Глобальная переменная для _AUTO_VOCAL_DETECT
 _AUTO_VOCAL_DETECT = True
-print("🎙️ [Monolith] Auto voice detection активен (detect_voice_profile встроен).")
-# --- !! КОНЕЦ ИСПРАВЛЕНИЯ !! ---
+log.info("🎙️ [Monolith] Auto voice detection активен (detect_voice_profile встроен).")
 
 
 # ==========================================================
-# 🔹 Adaptive Vocal Allocation (Fallback)
+# 🔹 Adaptive Vocal Allocation (без изменений)
 # ==========================================================
 class AdaptiveVocalAllocator:
-    """ 
-    Определяет *предполагаемую* форму вокала, если грамматика 
-    или подсказки не найдены.
-    """
     def analyze(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int, text: str) -> Dict[str, Any]:
+        # ... (логика этой функции остается прежней) ...
         love, pain, cf, truth = tlp.get("love", 0.0), tlp.get("pain", 0.0), tlp.get("conscious_frequency", 0.0), tlp.get("truth", 0.0)
-        word_count = len(re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text))
+        word_count = len(re.findall(r"[a-zA-Zа-яА-Яё]+", text))
         avg_line_len = word_count / max(1, len(text.split("\n")))
 
         if cf > 0.7 and love > pain and word_count > 80:
             form, gender, count = "choir", "mixed", 4
         elif pain >= 0.6 and cf < 0.6:
-            form, gender, count = "duet_f", "female", 2 # Изменено на duet_f
+            form, gender, count = "duet", "female", 2
         elif truth > 0.5 and bpm > 130:
-            form, gender, count = "trio_m", "male", 3 # Изменено на trio_m
+            form, gender, count = "trio", "male", 3
         elif avg_line_len < 6 and love < 0.3 and bpm < 100:
-            form, gender, count = "solo_m", "male", 1
+            form, gender, count = "solo", "male", 1
         elif bpm > 150 and love > 0.4:
-            form, gender, count = "duet_mixed", "mixed", 2
+            form, gender, count = "duet", "mixed", 2
         else:
-            form, gender, count = "solo_auto", "auto", 1
+            form, gender, count = "solo", "auto", 1
         return {"vocal_form": form, "gender": gender, "vocal_count": count}
 
 
@@ -105,16 +106,29 @@ class PatchedLyricMeter:
     vowels = set("aeiouyауоыиэяюёеAEIOUYАУОЫИЭЯЮЁЕ")
     def _syllables(self, line: str) -> int:
         return max(1, sum(1 for ch in line if ch in self.vowels))
-    def bpm_from_density(self, text: str) -> int:
+    def bpm_from_density(self, text: str, emo: Dict[str, float]) -> int:
+        log.debug("Вызов функции: PatchedLyricMeter.bpm_from_density")
         lines = [l for l in text.split("\n") if l.strip()]
         if not lines: return 100
         avg_syll = sum(self._syllables(l) for l in lines) / max(1, len(lines))
-        bpm = 140 - min(60, (avg_syll - 8) * 6)
-        punct_boost = sum(ch in ",.!?…" for ch in text) * 0.5
-        bpm = bpm + min(20, punct_boost)
-        return int(max(60, min(180, bpm)))
+        
+        # v13 - Учитываем эмоции при расчете BPM
+        pain = emo.get("sadness", 0.0) + emo.get("fear", 0.0)
+        energy = emo.get("joy", 0.0) + emo.get("anger", 0.0) + emo.get("epic", 0.0)
+
+        # База
+        bpm = 130 - (avg_syll * 3)
+        # Коррекция
+        bpm -= pain * 30 # Грусть/страх замедляют
+        bpm += energy * 25 # Радость/гнев/эпик ускоряют
+        
+        bpm_final = int(max(65, min(175, bpm)))
+        log.debug(f"Расчет BPM: Cред. слогов={avg_syll:.2f}, Эмо-коррекция (Pain={pain:.2f}, Energy={energy:.2f}), Итог={bpm_final} BPM")
+        return bpm_final
+
 
 class PatchedUniversalFrequencyEngine:
+    # (без изменений)
     base = 24.5
     def resonance_profile(self, tlp: Dict[str, float]) -> Dict[str, Any]:
         cf = tlp.get("conscious_frequency", 0.0)
@@ -132,8 +146,13 @@ class PatchedUniversalFrequencyEngine:
         }
 
 class PatchedRNSSafety:
+    # (без изменений)
     def __init__(self, cfg: Dict[str, Any]):
-        self.cfg = cfg.get("safety", {})
+        self.cfg = cfg.get("safety", {
+            "safe_octaves": [2, 3, 4, 5], "avoid_freq_bands_hz": [18.0, 30.0],
+            "max_peak_db": -1.0, "max_rms_db": -14.0,
+            "fade_in_ms": 1000, "fade_out_ms": 1500,
+        })
     def clamp_octaves(self, octaves: List[int]) -> List[int]:
         safe = set(self.cfg.get("safe_octaves", [2, 3, 4, 5]))
         arr = [o for o in octaves if o in safe]
@@ -148,6 +167,7 @@ class PatchedRNSSafety:
         }
 
 class PatchedIntegrityScanEngine:
+    # (без изменений)
     def analyze(self, text: str) -> Dict[str, Any]:
         words = re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text.lower())
         sents = [s for s in re.split(r"[.!?]+", text) if s.strip()]
@@ -159,210 +179,318 @@ class PatchedIntegrityScanEngine:
             "form": {"word_count": len(words), "avg_sentence_len": round(avg_sent_len, 2),
                      "lexical_diversity": round(lexical_div, 2)},
             "reflection": {"self_awareness_density": round(reflection, 2)},
-            "vibrational_coherence": vib_coh,
-            "flags": []
+            "vibrational_coherence": vib_coh, "flags": []
         }
 
+
 # ==========================================================
-# StudioCore (Переработанный)
+# 🎶 StudioCore Monolith v4.3.11
 # ==========================================================
 class StudioCore:
     def __init__(self, config_path: str | None = None):
+        log.debug("Инициализация StudioCore...")
         self.cfg = load_config(config_path or "studio_config.json")
+        log.debug("Загрузка: AutoEmotionalAnalyzer")
         self.emotion = AutoEmotionalAnalyzer()
+        log.debug("Загрузка: TruthLovePainEngine")
         self.tlp = TruthLovePainEngine()
+        log.debug("Загрузка: PatchedLyricMeter")
         self.rhythm = PatchedLyricMeter()
+        log.debug("Загрузка: PatchedUniversalFrequencyEngine")
         self.freq = PatchedUniversalFrequencyEngine()
+        log.debug("Загрузка: PatchedRNSSafety")
         self.safety = PatchedRNSSafety(self.cfg)
+        log.debug("Загрузка: PatchedIntegrityScanEngine")
         self.integrity = PatchedIntegrityScanEngine()
+        log.debug("Загрузка: VocalProfileRegistry")
         self.vocals = VocalProfileRegistry()
-        self.style = StyleMatrix() # Использует StyleMatrix (или Patched, если импортирован)
+
+        try:
+            log.debug("Загрузка: PatchedStyleMatrix")
+            from .style import PatchedStyleMatrix
+            self.style = PatchedStyleMatrix()
+            log.info("🎨 [StyleMatrix] Используется патчированная версия (PatchedStyleMatrix).")
+        except ImportError:
+            log.debug("Загрузка: StyleMatrix (стандартная)")
+            self.style = StyleMatrix()
+            log.info("🎨 [StyleMatrix] Используется стандартная версия (StyleMatrix).")
+
+        log.debug("Загрузка: ToneSyncEngine")
         self.tone = ToneSyncEngine()
-        self.vocal_allocator = AdaptiveVocalAllocator() # Fallback
+        log.debug("Загрузка: AdaptiveVocalAllocator")
+        self.vocal_allocator = AdaptiveVocalAllocator()
+        log.info(f"🔹 [StudioCore {STUDIOCORE_VERSION}] Monolith loaded (Section-Aware Duet Mode v2).")
 
     # -------------------------------------------------------
-    def _build_semantic_sections(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int) -> Dict[str, Any]:
-        love, pain, truth = tlp.get("love", 0), tlp.get("pain", 0), tlp.get("truth", 0)
-        cf = tlp.get("conscious_frequency", 0.0)
-        avg_emo = mean(abs(v) for v in emo.values()) if emo else 0.0
-        intro = {"section": "Intro", "mood": "mystic" if cf >= 0.5 else "calm", "intensity": round(bpm * 0.8, 2), "focus": "tone_establish"}
-        verse = {"section": "Verse", "mood": "reflective" if truth > love else "narrative", "intensity": round(bpm, 2), "focus": "story_flow"}
-        bridge = {"section": "Bridge", "mood": "dramatic" if pain > 0.3 else "dreamlike", "intensity": round(bpm * (1.05 + avg_emo / 4), 2), "focus": "contrast"}
-        chorus = {"section": "Chorus", "mood": "uplifting" if love >= pain else "tense", "intensity": round(bpm * 1.15, 2), "focus": "release"}
-        outro = {"section": "Outro", "mood": "peaceful" if cf > 0.6 else "fading", "intensity": round(bpm * 0.7, 2), "focus": "closure"}
-        bpm_adj = int(bpm + (avg_emo * 8) + (cf * 4))
-        overlay = {"depth": round((truth + pain) / 2, 2), "warmth": round(love, 2), "clarity": round(cf, 2),
-                   "sections": [intro, verse, bridge, chorus, outro]}
-        return {"bpm": bpm_adj, "overlay": overlay}
-
+    # v4.3 - АНАЛИЗАТОР СЕКЦИЙ (ДЛЯ ДУЭТОВ)
     # -------------------------------------------------------
-    # ИЗМЕНЕНО: Принимает 'block_genders'
-    def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any],
-                      vocals: List[str], bpm: int, 
-                      block_genders: List[str], # <-- НОВЫЙ ПАРАМЕТР
-                      emotions=None, tlp=None) -> str:
-        
+    def _analyze_sections(self, text: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
+        """
+        Разбивает текст на блоки и анализирует КАЖДЫЙ блок на 
+        грамматический пол (M/F/Mixed/Auto) и хинты.
+        Возвращает: (список блоков с тегами, общий итог по вокалу)
+        """
+        log.debug("Вызов функции: _analyze_sections")
         blocks = [b.strip() for b in re.split(r"\n\s*\n", text.strip()) if b.strip()]
+        if not blocks:
+            log.warning("Текст не содержит блоков, используется raw-анализ.")
+            blocks = [text.strip()]
+
+        tagged_blocks = []
+        vocal_profile_tags = {"male": 0, "female": 0, "mixed": 0, "auto": 0}
+
+        for block_text in blocks:
+            # 1. Грамматика
+            gender = detect_gender_from_grammar(block_text)
+            
+            # 2. Прямые хинты
+            hint = detect_voice_profile(block_text)
+            
+            # 3. Намеки на дуэт/группу
+            if any(k in block_text.lower() for k in ["мы", "we", "вместе", "duet", "choir"]):
+                gender = "mixed"
+            
+            # Если ничего не найдено
+            if not gender:
+                gender = "auto"
+                
+            vocal_profile_tags[gender] += 1
+            tagged_blocks.append({"text": block_text, "gender": gender, "hint": hint})
+            log.debug(f"Блок [{block_text[:20]...}] -> Пол: {gender}, Хинт: {hint}")
+
+        log.debug(f"Итог по вокалу (все блоки): {vocal_profile_tags}")
+        return tagged_blocks, vocal_profile_tags
+
+    # -------------------------------------------------------
+    # v4.3 - СЕМАНТИЧЕСКАЯ РАЗМЕТКА СЕКЦИЙ (OVERLAY)
+    # -------------------------------------------------------
+    def _build_semantic_sections(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int, 
+                                 tagged_blocks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Создает семантическую структуру (Intro, Verse...) и НАКЛАДЫВАЕТ 
+        ее на физические блоки текста, включая теги M/F/Mixed.
+        """
+        log.debug("Вызов функции: _build_semantic_sections")
+        love, pain, truth = tlp.get("love",0), tlp.get("pain",0), tlp.get("truth",0)
+        cf = tlp.get("conscious_frequency",0)
+        avg_emo = mean(abs(v) for v in emo.values()) if emo else 0.0
+        
+        # 1. Создаем БАЗОВУЮ структуру (Intro, Verse...)
+        # (v11 - исправлена логика 'verse' и 'chorus')
+        intro = {"section":"Intro","mood":"mystic" if cf>=0.5 else "calm","intensity":round(bpm*0.8,2),"focus":"tone_establish"}
+        verse = {"section":"Verse","mood":"reflective" if truth > love else "narrative","intensity":round(bpm,2),"focus":"story_flow"}
+        bridge= {"section":"Bridge","mood":"dramatic" if pain>0.3 else "dreamlike","intensity":round(bpm*(1.05+avg_emo/4),2),"focus":"contrast"}
+        chorus= {"section":"Chorus","mood":"uplifting" if (love>=pain and love > 0.05) else "tense","intensity":round(bpm*1.15,2),"focus":"release"}
+        outro = {"section":"Outro","mood":"peaceful" if cf>0.6 else "fading","intensity":round(bpm*0.7,2),"focus":"closure"}
+        
+        # Собираем доступные секции
+        available_sections = [intro, verse, bridge, chorus]
+        
+        # 2. Сопоставляем секции с блоками
+        num_blocks = len(tagged_blocks)
+        final_sections = []
+        
+        # v4.3.11 - Улучшенная логика распределения
+        if num_blocks == 1:
+            final_sections = [verse]
+        elif num_blocks == 2:
+            final_sections = [verse, chorus]
+        elif num_blocks == 3:
+            final_sections = [verse, bridge, chorus]
+        elif num_blocks == 4:
+            final_sections = [verse, chorus, verse, chorus]
+        elif num_blocks == 5:
+            final_sections = [intro, verse, bridge, chorus, outro]
+        else:
+            # Стандартная логика "циклического" назначения
+            final_sections = [available_sections[i % len(available_sections)] for i in range(num_blocks)]
+            # Пытаемся принудительно назначить Intro и Outro
+            if num_blocks > 2:
+                final_sections[0] = intro
+                final_sections[-1] = outro
+
+        # 3. Интегрируем теги M/F/Mixed из блоков
+        final_overlay_sections = []
+        for i, block in enumerate(tagged_blocks):
+            # Берем назначенную секцию (Intro, Verse...)
+            sec_data = final_sections[i].copy()
+            # Добавляем в нее тег M/F/Mixed из блока
+            sec_data["vocal"] = block.get("gender", "auto").upper()
+            sec_data["hint"] = block.get("hint")
+            final_overlay_sections.append(sec_data)
+
+        bpm_adj = int(bpm + (avg_emo*8) + (cf*4))
+        bpm_final = max(65, min(175, bpm_adj))
+        log.debug(f"BPM скорректирован до {bpm_final}")
+
+        return {
+            "bpm_suggested": bpm_final,
+            "overlay": {
+                "depth": round((truth+pain)/2,2),
+                "warmth": round(love,2),
+                "clarity": round(cf,2),
+                "sections": final_overlay_sections # <-- Возвращаем обогащенные секции
+            }
+        }
+
+    # -------------------------------------------------------
+    # v4.3 - АННОТАТОР (ТЕПЕРЬ ИСПОЛЬЗУЕТ OVERLAY)
+    # -------------------------------------------------------
+    def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any],
+                      vocals: List[str], bpm: int, emotions=None, tlp=None) -> str:
+        """
+        Добавляет аннотации к тексту (структура песни, BPM, вокальные техники)
+        ИСПОЛЬЗУЯ УЖЕ ГОТОВЫЙ 'overlay'
+        """
+        log.debug("Вызов функции: annotate_text")
+        # Разделяем текст на блоки так же, как в _analyze_sections
+        blocks = [b.strip() for b in re.split(r"\n\s*\n", text.strip()) if b.strip()]
+        if not blocks:
+            blocks = [text.strip()]
+            
         sections = overlay.get("sections", [])
         annotated_blocks = []
 
-        # ИЗМЕНЕНО: Умная аннотация с полом
+        if len(blocks) != len(sections):
+            log.warning(f"Ошибка аннотации: кол-во блоков ({len(blocks)}) не совпадает с кол-вом секций ({len(sections)})!")
+            # Возвращаем текст как есть, если структура не совпала
+            return text 
+
         for i, block in enumerate(blocks):
-            # 1. Структура (Intro, Verse...)
-            sec = sections[i % len(sections)] if sections else {}
-            sec_name = sec.get('section', 'Block')
-            sec_mood = sec.get('mood', 'neutral')
-            sec_intensity = sec.get('intensity', bpm)
-
-            # 2. Пол (MALE, FEMALE, MIXED)
-            block_gender = block_genders[i] if i < len(block_genders) else "auto"
-            if block_gender == "male":
-                gender_tag = "MALE"
-            elif block_gender == "female":
-                gender_tag = "FEMALE"
-            elif block_gender == "mixed":
-                gender_tag = "MIXED"
-            else:
-                gender_tag = "AUTO" # (Использует основной вокал)
-
-            header = f"[{sec_name} – {gender_tag} – {sec_mood}, intensity≈{sec_intensity}]"
+            sec = sections[i]
+            # Формируем тег [INTRO - MALE - mystic, focus=story, intensity=120]
+            vocal_tag = sec.get('vocal', 'AUTO')
+            header = (
+                f"[{sec.get('section','Block').upper()} - {vocal_tag} - "
+                f"{sec.get('mood','neutral')}, "
+                f"focus={sec.get('focus','flow')}, "
+                f"intensity≈{sec.get('intensity',bpm)}]"
+            )
             annotated_blocks.append(header)
             annotated_blocks.append(block)
-            annotated_blocks.append("")
+            annotated_blocks.append("") # Пустая строка между блоками
 
         vocal_form = style.get("vocal_form", "auto")
         tone_key = style.get("key", "auto")
-        tech = ", ".join([v for v in vocals if v not in ["male","female"]]) or "neutral tone"
-        annotated_blocks.append(f"[End – BPM≈{bpm}, Vocal={vocal_form}, Tone={tone_key}]")
+        # Убираем дубликаты (male/female) из списка техник
+        tech = ", ".join(sorted(list(set(v for v in vocals if v not in [
+            "male","female","duet","trio","quartet","quintet","choir","solo"
+        ])))) or "neutral tone"
+        
+        annotated_blocks.append(f"[End – BPM≈{bpm}, VocalForm={vocal_form}, Tone={tone_key}]")
         annotated_blocks.append(f"[Vocal Techniques: {tech}]")
         return "\n".join(annotated_blocks).strip()
 
     # -------------------------------------------------------
-    # ИЗМЕНЕНО: Логика 'analyze' полностью переработана
-    def analyze(self, text: str, author_style=None, preferred_gender=None, version=None,
+    # 🚀 ГЛАВНЫЙ ПАЙПЛАЙН АНАЛИЗА (v4.3)
+    # -------------------------------------------------------
+    def analyze(self, text: str, author_style=None, preferred_gender="auto", version=None,
                 overlay: Dict[str, Any] | None = None) -> Dict[str, Any]:
         
+        log.debug(f"--- ЗАПУСК АНАЛИЗА (v4.3.11) ---")
+        log.debug(f"Preferred Gender: {preferred_gender}, Text: {text[:50]}...")
+        
         version = version or self.cfg.get("suno_version", "v5")
+        
+        # 1. Базовый анализ текста
+        log.debug("Вызов: normalize_text_preserve_symbols")
         raw = normalize_text_preserve_symbols(text)
-        sections = extract_sections(raw) # (Это [Verse], [Chorus]... не используется)
         
-        # 1. Сначала полный анализ TLP/BPM/Style для всей песни
+        # 2. Анализ Эмоций и TLP
+        log.debug("Вызов: self.emotion.analyze")
         emo = self.emotion.analyze(raw)
+        log.debug(f"Результат EMO: {emo}")
+        
+        log.debug("Вызов: self.tlp.analyze")
         tlp = self.tlp.analyze(raw)
-        bpm = self.rhythm.bpm_from_density(raw)
-        freq = self.freq.resonance_profile(tlp)
-        overlay_pack = self._build_semantic_sections(emo, tlp, bpm)
-        bpm_adj = overlay_pack["bpm"]
+        log.debug(f"Результат TLP: {tlp}")
 
-        # 2. НОВИНКА: По-блочный анализ вокала
-        blocks = [b.strip() for b in re.split(r"\n\s*\n", raw.strip()) if b.strip()]
-        block_genders = [] # Список полов: ['male', 'female', 'mixed', ...]
-        has_male = False
-        has_female = False
-        
-        # 'user_voice_hint' из overlay (Gradio)
+        # 3. Анализ Ритма (BPM)
+        log.debug("Вызов: self.rhythm.bpm_from_density")
+        bpm = self.rhythm.bpm_from_density(raw, emo)
+        log.debug(f"Базовый BPM: {bpm}")
+
+        # 4. v4.3 - По-блочный анализ вокала
+        log.debug("Вызов: self._analyze_sections")
+        tagged_blocks, vocal_profile_tags = self._analyze_sections(raw)
+
+        # 5. v4.3 - Создание семантического Overlay
+        log.debug("Вызов: self._build_semantic_sections")
+        overlay_pack = self._build_semantic_sections(emo, tlp, bpm, tagged_blocks)
+        bpm_adj = overlay_pack["bpm_suggested"] # Используем скорректированный BPM
+        semantic_overlay = overlay_pack["overlay"] # Готовый overlay
+        log.debug(f"Финальный BPM: {bpm_adj}")
+
+        # 6. Анализ стиля (передаем BPM и хинты)
         user_voice_hint = overlay.get("voice_profile_hint") if overlay else None
-
-        for block_text in blocks:
-            gender = "auto"
-            
-            # Приоритет 1: Прямая подсказка из Gradio (если есть)
-            if user_voice_hint:
-                if any(k in user_voice_hint for k in ["female", "женск"]): gender = "female"
-                elif any(k in user_voice_hint for k in ["male", "мужск"]): gender = "male"
-
-            # Приоритет 2: Грамматика ("я шел" / "я шла")
-            if gender == "auto":
-                grammatical_gender = detect_gender_from_grammar(block_text)
-                if grammatical_gender:
-                    gender = grammatical_gender
-            
-            # Приоритет 3: Подсказки в тексте ("(female vocal)")
-            if gender == "auto":
-                text_hint = detect_voice_profile(block_text)
-                if text_hint:
-                    if any(k in text_hint for k in ["female", "женск"]): gender = "female"
-                    elif any(k in text_hint for k in ["male", "мужск"]): gender = "male"
-            
-            block_genders.append(gender)
-            if gender == "male": has_male = True
-            if gender == "female": has_female = True
-
-        # 3. Определение финальной формы вокала
-        final_vocal_form = "solo_auto"
-        dominant_gender = "auto"
-
-        if has_male and has_female:
-            final_vocal_form = "duet_mf" # MALE/FEMALE DUET
-            dominant_gender = "mixed"
-        elif has_male:
-            final_vocal_form = "solo_m"
-            dominant_gender = "male"
-        elif has_female:
-            final_vocal_form = "solo_f"
-            dominant_gender = "female"
-        else:
-            # Если не найдено ни 'male', ни 'female', используем TLP-fallback
-            vocal_meta_fallback = self.vocal_allocator.analyze(emo, tlp, bpm_adj, raw)
-            final_vocal_form = vocal_meta_fallback.get("vocal_form", "solo_auto")
-            dominant_gender = vocal_meta_fallback.get("gender", "auto")
-            
-        # 4. Уважение к выбору пользователя в UI
-        # Если пользователь выбрал "female" в Gradio, он отменяет всё.
-        if preferred_gender and preferred_gender != "auto":
-            gender_final = preferred_gender
-            # И также отменяем по-блочный анализ
-            block_genders = [preferred_gender] * len(blocks)
-            if preferred_gender == "male": final_vocal_form = "solo_m"
-            elif preferred_gender == "female": final_vocal_form = "solo_f"
-        else:
-            gender_final = dominant_gender
-
-        # 5. Получаем Стиль и Вокал
         
-        # Передаем подсказку в Style. (Style не должен решать пол, но может учесть growl)
-        vocal_hint_for_style = user_voice_hint or (detect_voice_profile(raw) if _AUTO_VOCAL_DETECT else None)
-        if vocal_hint_for_style:
-             overlay_pack["overlay"]["voice_profile_hint"] = vocal_hint_for_style
+        # Ищем хинт в первом блоке, если не пришел из UI
+        if not user_voice_hint:
+             block_hints = [b.get("hint") for b in tagged_blocks if b.get("hint")]
+             if block_hints:
+                 user_voice_hint = block_hints[0]
+                 log.debug(f"Используем вокальный хинт из блока: {user_voice_hint}")
 
-        style = self.style.build(emo, tlp, raw, bpm_adj, overlay_pack["overlay"])
+        # Определяем режим
+        mode = "USER-MODE" if user_voice_hint else "AUTO-DETECT"
+        log.debug(f"Режим вокала: {mode}")
 
-        vox, inst, vocal_form_from_registry = self.vocals.get(
-            style["genre"], gender_final, raw, sections
+        log.debug("Вызов: self.style.build")
+        style = self.style.build(emo, tlp, raw, bpm_adj, semantic_overlay, user_voice_hint)
+        log.debug(f"Результат Style: Genre={style.get('genre')}, Style={style.get('style')}")
+
+        # 7. Вокал и Инструменты
+        log.debug("Вызов: self.vocals.get")
+        vox, inst, vocal_form = self.vocals.get(
+            style["genre"], 
+            preferred_gender, 
+            raw, 
+            tagged_blocks, # Передаем тэгированные блоки
+            vocal_profile_tags # Передаем итоги по вокалу
         )
-        
-        # 6. Финализация
-        # Принудительно устанавливаем нашу обнаруженную форму дуэта
-        style["vocal_form"] = final_vocal_form 
-        style["vocal_count"] = 2 if "duet" in final_vocal_form else 1 # Упрощение
+        style["vocal_form"] = vocal_form # Внедряем в стиль
+        style["vocal_count"] = vocal_profile_tags.get(vocal_form.split("_")[0], 1)
+        log.debug(f"Результат Vocals: Form={vocal_form}, Vox={vox}, Inst={inst}")
 
-        mode = "AUTO-DETECT (Duet)" if "duet_mf" in final_vocal_form else "AUTO-DETECT"
+        # 8. Остальная аналитика (Tone, Freq, Integ)
+        log.debug("Вызов: self.freq.resonance_profile")
+        freq = self.freq.resonance_profile(tlp)
+        freq["recommended_octaves"] = self.safety.clamp_octaves(freq["recommended_octaves"])
 
-        print(f"🎧 [StudioCore] Analyze [{mode}]: Gender={gender_final} | Form={final_vocal_form} | Genre={style['genre']} | BPM={bpm_adj}")
-
+        log.debug("Вызов: self.integrity.analyze")
         integ = self.integrity.analyze(raw)
+        
+        log.debug("Вызов: self.tone.colors_for_primary")
         tone = self.tone.colors_for_primary(emo, tlp, style.get("key", "auto"))
+
         philosophy = (f"Truth={tlp.get('truth', 0):.2f}, Love={tlp.get('love', 0):.2f}, "
                       f"Pain={tlp.get('pain', 0):.2f}, CF={tlp.get('conscious_frequency', 0):.2f}")
 
-        prompt_full = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="full")
-        prompt_suno = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="suno")
-        
-        # Вызываем обновленный аннотатор
-        annotated_text = self.annotate_text(raw, overlay_pack["overlay"], style, vox, bpm_adj, 
-                                            block_genders, # <-- Передаем профиль полов
-                                            emo, tlp)
+        # 9. Аннотация текста
+        log.debug("Вызов: self.annotate_text")
+        annotated_text = self.annotate_text(raw, semantic_overlay, style, vox, bpm_adj, emo, tlp)
 
+        # 10. Сборка промптов
+        log.debug("Вызов: build_suno_prompt (STYLE)")
+        prompt_suno_style = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="suno_style")
+        
+        log.debug("Вызов: build_suno_prompt (LYRICS)")
+        prompt_suno_lyrics = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="suno_lyrics")
+
+        log.debug("--- АНАЛИЗ УСПЕШНО ЗАВЕРШЕН ---")
+        
         return {
             "emotions": emo, "tlp": tlp, "bpm": bpm_adj, "frequency": freq,
             "style": style, "vocals": vox, "instruments": inst,
-            "prompt_full": prompt_full, "prompt_suno": prompt_suno,
-            "annotated_text": annotated_text, "preferred_gender": gender_final,
-            "version": version, "mode": mode,
-            "vocal_profile_blocks": block_genders # Для дебага
+            "vocal_form": vocal_form, "integrity": integ, "tone_sync": tone,
+            "semantic_overlay": semantic_overlay,
+            "prompt_suno_style": prompt_suno_style,
+            "prompt_suno_lyrics": prompt_suno_lyrics,
+            "annotated_text": annotated_text,
+            "preferred_gender": preferred_gender,
+            "version": version, "mode": mode
         }
-
 
 # ==========================================================
 STUDIOCORE_VERSION = "v4.3.11"
-print(f"🔹 [StudioCore {STUDIOCORE_VERSION}] Monolith loaded (Section-Aware Duet Mode v2).")
+log.info(f"🔹 [StudioCore {STUDIOCORE_VERSION}] Monolith loaded (Section-Aware Duet Mode v2).")
