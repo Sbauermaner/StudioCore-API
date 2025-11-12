@@ -9,12 +9,9 @@ StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION (v3)
 5. ЗАПУСК ВСЕХ UNIT-ТЕСТОВ (Логика ядра)
 6. Тест Интеграции API (проверка /api/predict)
 
-ИСПРАВЛЕНИЕ (v4):
-- 'unittest.discover' теперь ищет в 'studiocore/tests'
-- 'check_syntax/json' ищет только в папках проекта.
-- Добавлен 'check_internal_dependencies'
-- Таймаут API увеличен до 120с для ИИ-модели.
+ИСПРАВЛЕНИЕ (v5):
 - Исправлен ImportError для PatchedLyricMeter.
+- Увеличен таймаут для API (30с).
 """
 
 # === 🔧 Исправление пути импорта (чтобы test видели пакет) ===
@@ -359,8 +356,8 @@ def test_api_response():
             "text": "Я тону, когда солнце уходит вдаль...",
             "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
         }
-        # ИСПРАВЛЕНИЕ: Таймаут увеличен до 120с (для загрузки ИИ)
-        r = requests.post(api_url, json=payload, timeout=120) 
+        # ИСПРАВЛЕНИЕ: Таймаут 30с (для Inference API)
+        r = requests.post(api_url, json=payload, timeout=30) 
         
         assert r.status_code == 200, f"HTTP {r.status_code}. Ответ: {r.text[:200]}..."
         data = r.json()
@@ -377,24 +374,26 @@ def test_api_response():
 if __name__ == "__main__":
     print("\n===== 🧩 StudioCore v5.2.1 — FULL SYSTEM CHECK =====")
 
-    total = 7
-    results = {
-        "structure": check_directories(),
-        "syntax": check_python_syntax_project(),
-        "json_yaml": check_json_yaml_project(),
-        "imports": test_imports(),
-        "dependencies (AST)": check_internal_dependencies(),
-        "unit_tests (logic)": run_all_unit_tests(),
-        # ИЗМЕНЕНИЕ: integration_api теперь зависит от unit_tests
-        # Сначала прогоняем unit_tests, потом integration_api
-        "integration_api": results.get("unit_tests (logic)", False) and test_prediction_pipeline() and test_api_response()
-    }
+    # Запускаем тесты по порядку
+    results = {}
+    results["structure"] = check_directories()
+    results["syntax"] = check_python_syntax_project()
+    results["json_yaml"] = check_json_yaml_project()
+    results["imports"] = test_imports()
+    results["dependencies (AST)"] = check_internal_dependencies()
     
-    # Обновляем integration_api, так как он зависит от unit_tests
-    # (Это предотвратит запуск integration_api, если unit_tests упали)
-    results["integration_api"] = results.get("unit_tests (logic)", False) and test_prediction_pipeline() and test_api_response()
+    # Сначала запускаем unit_tests
+    results["unit_tests (logic)"] = run_all_unit_tests()
+    
+    # Интеграционные тесты запускаем, только если unit_tests прошли
+    # (чтобы не ждать 30с, если ядро и так сломано)
+    if results["unit_tests (logic)"]:
+        results["integration_api"] = test_prediction_pipeline() and test_api_response()
+    else:
+        print("\n🔬 Пропуск 'integration_api', так как 'unit_tests (logic)' провалились.")
+        results["integration_api"] = False
 
-
+    total = 7
     passed = sum(1 for k in results.values() if k)
     percent = round(passed / total * 100, 2)
 
