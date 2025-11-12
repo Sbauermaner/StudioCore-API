@@ -7,6 +7,7 @@ StudioCore v5.2.1 — System Integrity Test
 - корректный JSON API ответ
 
 ИСПРАВЛЕНО: Код преобразован в unittest-совместимый класс.
+ИСПРАВЛЕНО: URL API обновлен на /api/predict
 """
 
 # === 🔧 Исправление пути импорта (ОБЯЗАТЕЛЬНО) ===
@@ -53,6 +54,8 @@ class TestMainIntegrity(unittest.TestCase):
             from studiocore.rhythm import LyricMeter
         except ImportError as e:
             self.fail(f"Не удалось импортировать модули ядра: {e}")
+        except Exception as e:
+            self.fail(f"Критическая ошибка при импорте модулей ядра (проверьте синтаксис): {e}")
 
         text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
         tlp = {"truth": 0.1, "love": 0.2, "pain": 0.04, "conscious_frequency": 0.85}
@@ -80,8 +83,8 @@ class TestMainIntegrity(unittest.TestCase):
         """
         print("\n[TestIntegrity] 🌐 Checking API endpoint...")
         
-        # !!! ИСПРАВЛЕНИЕ 404: Убран /api/ префикс. !!!
-        api_url = "http://127.0.0.1:7860/predict"
+        # ИСПРАВЛЕНИЕ: URL изменен на /api/predict
+        api_url = "http://127.0.0.1:7860/api/predict"
         
         payload = {
             "text": "Я тону, когда солнце уходит вдаль...",
@@ -90,6 +93,9 @@ class TestMainIntegrity(unittest.TestCase):
         
         try:
             r = requests.post(api_url, json=payload, timeout=10)
+            
+            if r.status_code == 503:
+                self.fail(f"❌ API test failed: {r.status_code} (Service Unavailable). Ядро в режиме Fallback (проверьте синтаксис).")
             
             self.assertEqual(r.status_code, 200, 
                              f"API test failed: HTTP {r.status_code}. "
@@ -106,7 +112,5 @@ class TestMainIntegrity(unittest.TestCase):
         except Exception as e:
             self.fail(f"❌ API test failed: {e}")
 
-# Этот блок позволяет запускать файл напрямую
-# ИЛИ через discover (из test_all.py)
 if __name__ == "__main__":
     unittest.main()
