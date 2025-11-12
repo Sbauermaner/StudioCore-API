@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE)
-ИСПРАВЛЕНИЕ v9 (Рефакторинг): 'detect_voice_profile' был перемещен
-в monolith_v4_3_1.py для по-блочного анализа.
-Этот файл теперь отвечает ТОЛЬКО за TLP/CF-анализ стиля.
+StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE + AutoDetect)
+ИСПРАВЛЕНИЕ v8 (ФИНАЛ): Восстановлен баланс PAIN/LOVE.
+Теперь используется строгая проверка (pain > love) / (love > pain).
 """
 
 from typing import Dict, Any, Tuple
@@ -50,22 +49,28 @@ def resolve_style_and_form(
         # Порядок: 1. DRAMA, 2. PAIN (строго > love), 3. LOVE/JOY (строго > pain), 4. DEFAULT
         if cf > 0.9 or (pain >= 0.04 and truth >= 0.05) or mood in ("intense", "angry", "dramatic"):
             genre = "cinematic adaptive"
+        # ПРОВЕРКА 2: Сначала PAIN (боль)
         elif (pain >= 0.01 and pain > love) or mood in ("melancholy", "sad"):
             genre = "lyrical adaptive"
+        # ПРОВЕРКА 3: Потом LOVE/JOY (любовь/радость)
         elif (love >= 0.05 and love > pain) or mood in ("joy", "peaceful", "hopeful"):
             genre = "lyrical adaptive"
         else:
+            # Fallback
             genre = "cinematic narrative"
 
         # --- Логика СТИЛЯ v8 ---
         # Порядок: 1. DRAMA, 2. PAIN (строго > love), 3. LOVE/JOY (строго > pain), 4. DEFAULT
         if cf >= 0.92 or (pain >= 0.04 and truth >= 0.05) or mood in ("intense", "angry", "dramatic"):
             style, key_mode = "dramatic harmonic minor", "minor"
+        # ПРОВЕРКА 2: Сначала PAIN (боль)
         elif (pain >= 0.01 and pain > love) or mood in ("melancholy", "sad"):
             style, key_mode = "melancholic minor", "minor"
+        # ПРОВЕРКА 3: Потом LOVE/JOY (любовь/радость)
         elif (love >= 0.05 and love > pain) or mood in ("joy", "peaceful", "hopeful"):
             style, key_mode = "majestic major", "major"
         else:
+            # Fallback
             style, key_mode = "neutral modal", "modal"
 
     # Атмосфера
@@ -82,6 +87,7 @@ def resolve_style_and_form(
     elif style == "neutral modal":
         atmosphere = "balanced and reflective"
     else:
+        # Fallback
         atmosphere = "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
 
     # Нарратив
@@ -123,6 +129,7 @@ class PatchedStyleMatrix:
             voice_hint = overlay["voice_profile_hint"]
 
         narrative = ("search", "struggle", "transformation")
+        # Передаем 'dominant' (эмоцию) в резолвер
         resolved = resolve_style_and_form(tlp, cf, dominant, narrative, voice_hint=voice_hint)
 
         # 🎼 Ключ
