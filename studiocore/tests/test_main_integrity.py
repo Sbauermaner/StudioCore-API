@@ -6,8 +6,9 @@ StudioCore v5.2.1 — System Integrity Test (Converted to unittest)
 - генерация BPM, Genre, Style
 - корректный JSON API ответ
 
-ИСПРАВЛЕНО: Преобразовано в unittest.TestCase для запуска через discover.
-ИСПРАВЛЕНО: Таймаут API увеличен до 120с для ИИ-модели.
+ИСПРАВЛЕНО (v3): 
+- Таймаут API увеличен до 120с для ИИ-модели.
+- Исправлен ImportError для PatchedLyricMeter.
 """
 
 # === 🔧 Исправление пути импорта (ОБЯЗАТЕЛЬНО) ===
@@ -54,13 +55,18 @@ class TestMainIntegrity(unittest.TestCase):
         """
         print("\n[TestIntegrity] 🎧 Checking full pipeline...")
         try:
-            # Мы импортируем классы, которые *должны* быть в monolith
-            from studiocore.rhythm import PatchedLyricMeter 
-            from studiocore.style import StyleMatrix 
+            # ИСПРАВЛЕНИЕ: PatchedLyricMeter теперь живет в monolith_v4_3_1
+            from studiocore.monolith_v4_3_1 import PatchedLyricMeter
+            from studiocore.style import StyleMatrix
+            from studiocore.emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 
             text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
-            tlp = {"truth": 0.1, "love": 0.2, "pain": 0.04, "conscious_frequency": 0.85}
-            emo = {"joy": 0.3, "peace": 0.4, "sadness": 0.1}
+            
+            # Симулируем полный прогон, как в test_all.py
+            emo_analyzer = AutoEmotionalAnalyzer()
+            tlp_analyzer = TruthLovePainEngine()
+            emo = emo_analyzer.analyze(text)
+            tlp = tlp_analyzer.analyze(text)
 
             bpm = PatchedLyricMeter().bpm_from_density(text)
             style = StyleMatrix().build(emo, tlp, text, bpm)
