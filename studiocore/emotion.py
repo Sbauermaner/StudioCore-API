@@ -1,4 +1,4 @@
-=# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 StudioCore Emotion Engine (v12 - Local MiniLM AI)
 Использует облегченную локальную модель (Plan B)
@@ -17,12 +17,18 @@ try:
     # Используем "облегченную" (Mini) модель, чтобы она работала на CPU
     MODEL_NAME = "MoritzLaurer/multilingual-MiniLMv2-L6-mnli-xnli"
     print("🧠 [EmotionEngine] Загрузка локальной 'Mini' NLI-модели...")
+    # device="cpu" гарантирует, что он не будет пытаться использовать GPU
     classifier = pipeline("zero-shot-classification", model=MODEL_NAME, device="cpu")
     print(f"✅ [EmotionEngine] Локальная модель '{MODEL_NAME}' успешно загружена.")
     _USE_API = False
 except ImportError:
     print("❌ [EmotionEngine] ОШИБКА: 'transformers' или 'torch' не установлены.")
     print("❌ [EmotionEngine] TLP-анализ будет отключен.")
+    classifier = None
+    _USE_API = False
+except Exception as e:
+    # Ошибка при загрузке модели (например, нет сети в Hugging Face)
+    print(f"❌ [EmotionEngine] ОШИБКА ЗАГРУЗКИ МОДЕЛИ: {e}")
     classifier = None
     _USE_API = False
 
