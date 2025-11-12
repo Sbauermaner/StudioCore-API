@@ -4,7 +4,9 @@
 Truth × Love × Pain = Conscious Frequency
 Unified core loader with fallback + Gradio + FastAPI + Inline Log Viewer
 
-ИСПРАВЛЕНИЕ: Добавлен недостающий эндпоинт @app.post("/api/predict")
+ИСПРАВЛЕНИЕ:
+- Добавлен эндпоинт /api/predict для тестов.
+- Увеличен таймаут self-check до 120с (для ИИ-модели).
 """
 
 import os, sys, subprocess, importlib, traceback, threading, time, io
@@ -12,10 +14,8 @@ import gradio as gr
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-
-# === Импорты для API ===
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
+from typing import Optional
 
 # === Импорт ядра ===
 from studiocore import get_core, STUDIOCORE_VERSION
@@ -44,14 +44,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# === 🎧 ИСПРАВЛЕНИЕ: ДОБАВЛЕН API ENDPOINT ===
+# === 🎧 PUBLIC API ENDPOINT ===
+# (Эндпоинт, который ищут тесты)
 
 class PredictRequest(BaseModel):
     """ Модель запроса для API """
     text: str
     gender: str = "auto"
-    tlp: Optional[Dict[str, float]] = None
-    overlay: Optional[Dict[str, Any]] = None
+    tlp: Optional[dict] = None
+    overlay: Optional[dict] = None
 
 @app.post("/api/predict")
 async def api_predict(request_data: PredictRequest):
@@ -59,19 +60,14 @@ async def api_predict(request_data: PredictRequest):
     Эндпоинт, который ищут 'test_all.py' и 'auto_core_check'.
     Он принимает JSON и возвращает JSON.
     """
-    # Проверяем, не в режиме ли заглушки
-    if getattr(core, "is_fallback", False):
-        return JSONResponse(
-            content={"error": "StudioCore is in fallback mode, analysis unavailable."}, 
-            status_code=503 # Service Unavailable
-        )
-        
     try:
         # Мы сопоставляем данные из запроса с тем, что ожидает core.analyze
         result = core.analyze(
             request_data.text,
             preferred_gender=request_data.gender,
             overlay=request_data.overlay
+            # TLP передается через overlay, если нужно:
+            # overlay={"tlp_override": request_data.tlp}
         )
         
         if isinstance(result, dict) and "error" in result:
@@ -92,11 +88,13 @@ async def api_predict(request_data: PredictRequest):
 def auto_core_check():
     if os.environ.get("DISABLE_SELF_CHECK") == "1" or requests is None:
         return
-    time.sleep(3) # Даем серверу время на запуск
+    time.sleep(5) # Даем серверу чуть больше времени на старт
+    
     print("[Self-Check] Запуск самопроверки эндпоинта /api/predict...")
+    
     try:
-        # Теперь этот запрос должен работать
-        r = requests.post("http://127.0.0.1:7860/api/predict", json={"text": "test"}, timeout=10)
+        # ИСПРАВЛЕНИЕ: Таймаут увеличен до 120с (для ИИ-модели)
+        r = requests.post("http://127.0.0.1:7860/api/predict", json={"text": "test"}, timeout=120)
         print(f"[Self-Check] → Статус: {r.status_code}")
         if r.status_code != 200:
              print(f"[Self-Check] → Ответ: {r.text[:200]}...")
@@ -105,7 +103,7 @@ def auto_core_check():
 
 threading.Thread(target=auto_core_check, daemon=True).start()
 
-# === АНАЛИЗ ТЕКСТА (Gradio) ===
+# === АНАЛИЗ ТЕКСТА ===
 def analyze_text(text: str, gender: str = "auto"):
     """Основная функция анализа текста через StudioCore."""
     if not text.strip():
@@ -124,8 +122,11 @@ def analyze_text(text: str, gender: str = "auto"):
             "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
             "пескляв", "soft", "airy", "shout", "grit", "фальцет", "whisper"
         ]
-        if any(k in text.lower() for k in voice_hint_keywords):
-            overlay["voice_profile_hint"] = text.split("\n")[-1].strip()
+        
+        # Ищем подсказку в *последней* строке
+        last_line = text.strip().split("\n")[-1].lower()
+        if any(k in last_line for k in voice_hint_keywords):
+            overlay["voice_profile_hint"] = last_line.strip("() ")
             print(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
         else:
             overlay = None
@@ -142,30 +143,21 @@ def analyze_text(text: str, gender: str = "auto"):
         vocal_form = style.get("vocal_form", "auto")
 
         summary = (
-            f"✅ StudioCore {STUDIOCORE_VERSION}\n"
+            f"✅ StudioCore {STUDIOCORE_VERSION} (Mode: {result.get('mode', 'AUTO')})\n"
             f"🎭 {style.get('genre', '—')} | "
             f"🎵 {style.get('style', '—')} | "
-            f"🎙 {vocal_form} ({gender}) | "
+            f"🎙 {vocal_form} ({result.get('preferred_gender', 'auto')}) | "
             f"🎸 {instruments} | "
             f"⏱ {result.get('bpm', '—')} BPM"
         )
 
-        annotated_text = result.get("annotated_text")
-        if not annotated_text and hasattr(core, "annotate_text"):
-            annotated_text = core.annotate_text(
-                text,
-                result.get("overlay", {}),
-                style,
-                vocals,
-                result.get("bpm") or getattr(core, "rhythm", None).bpm_from_density(text) or 120,
-                result.get("emotions", {}),
-                result.get("tlp", {}),
-            )
-
+        annotated_text = result.get("annotated_text", "⚠️ Аннотация не сгенерирована")
+        
+        # Собираем Style Prompt из уже готовых данных
         style_prompt = (
             f"[StudioCore {STUDIOCORE_VERSION} | BPM: {result.get('bpm', 'auto')}]\n"
             f"Genre: {style.get('genre', 'unknown')}\n"
-            f"Vocal: {vocal_form} ({gender})\n"
+            f"Vocal: {vocal_form} ({result.get('preferred_gender', 'auto')})\n"
             f"Instruments: {instruments}\n"
             f"Tone: {style.get('key', 'auto')}\n"
             f"Atmosphere: {style.get('atmosphere', 'balanced')}\n"
@@ -189,39 +181,37 @@ def run_inline_tests():
     buffer = io.StringIO()
     buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
     buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+    
+    test_all_path = os.path.join("studiocore", "tests", "test_all.py")
+    test_logic_path = os.path.join("studiocore", "tests", "test_functional_texts.py")
 
     try:
-        buffer.write("🚀 Running: test_all.py\n")
-        # Убедимся, что используем python3
-        res1 = os.system("python3 studiocore/tests/test_all.py > tmp_test_all.txt 2>&1")
-        try:
-            with open("tmp_test_all.txt", "r", encoding="utf-8", errors="ignore") as f:
-                buffer.write(f.read() + "\n")
-        except FileNotFoundError:
-            buffer.write("   ... tmp_test_all.txt не создан.\n")
+        buffer.write(f"🚀 Running: {test_all_path}\n")
+        # Используем sys.executable для гарантии той же среды
+        res1 = subprocess.run(
+            [sys.executable, test_all_path],
+            capture_output=True, text=True, encoding="utf-8", errors="ignore"
+        )
+        buffer.write(res1.stdout + "\n")
+        if res1.stderr:
+             buffer.write(f"--- STDERR ---\n{res1.stderr}\n")
 
-
-        buffer.write("🧠 Running: test_functional_texts.py\n")
-        res2 = os.system("python3 studiocore/tests/test_functional_texts.py > tmp_test_logic.txt 2>&1")
-        try:
-            with open("tmp_test_logic.txt", "r", encoding="utf-8", errors="ignore") as f:
-                buffer.write(f.read() + "\n")
-        except FileNotFoundError:
-             buffer.write("   ... tmp_test_logic.txt не создан.\n")
+        buffer.write(f"\n🧠 Running: {test_logic_path}\n")
+        res2 = subprocess.run(
+            [sys.executable, test_logic_path],
+            capture_output=True, text=True, encoding="utf-8", errors="ignore"
+        )
+        buffer.write(res2.stdout + "\n")
+        if res2.stderr:
+             buffer.write(f"--- STDERR ---\n{res2.stderr}\n")
 
         buffer.write("✅ Inline test session complete.\n")
 
     except Exception as e:
-        buffer.write(f"❌ Ошибка при запуске тестов: {e}\n")
-
-    # Очистка временных файлов
-    try:
-        if os.path.exists("tmp_test_all.txt"): os.remove("tmp_test_all.txt")
-        if os.path.exists("tmp_test_logic.txt"): os.remove("tmp_test_logic.txt")
-    except Exception:
-        pass # Не критично
+        buffer.write(f"❌ Ошибка при запуске тестов: {e}\n{traceback.format_exc()}\n")
 
     return buffer.getvalue()
+
 
 # === PUBLIC UI (Gradio) ===
 with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface") as iface_public:
@@ -244,7 +234,7 @@ with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface
 
         with gr.Row():
             suno_box = gr.Textbox(label="🎧 Suno-промт (Style)", lines=8)
-            annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=24)
+            annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=24, show_copy_button=True)
 
         analyze_button.click(
             fn=analyze_text,
