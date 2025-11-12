@@ -1,4 +1,4 @@
- # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 StudioCore v5.2.1 — System Integrity Test (v6 - Таймаут 20с)
 ИСПРАВЛЕНИЯ (v6):
