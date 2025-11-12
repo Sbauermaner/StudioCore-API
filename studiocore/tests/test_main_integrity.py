@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+ # -*- coding: utf-8 -*-
 """
 StudioCore v5.2.1 — System Integrity Test (v6 - Таймаут 20с)
 ИСПРАВЛЕНИЯ (v6):
@@ -64,6 +64,7 @@ class TestMainIntegrity(unittest.TestCase):
         self.assertIsNotNone(self.emo_analyzer, "Emotion Analyzer не был загружен")
 
         try:
+            # ИСПРАВЛЕНИЕ: Импортируем из monolith, так как rhythm.py не содержит PatchedLyricMeter
             from studiocore.monolith_v4_3_1 import PatchedLyricMeter
             from studiocore.style import PatchedStyleMatrix
 
