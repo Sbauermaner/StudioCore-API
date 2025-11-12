@@ -5,7 +5,7 @@ StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE + Auto Voice Detect
 Позволяет ядру StudioCore адаптировать жанр, стиль, атмосферу и вокальные техники
 в зависимости от Truth/Love/Pain, Conscious Frequency и пользовательских описаний вокала.
 
-ИСПРАВЛЕНИЕ: Понижены пороги (thresholds) для 'love' и 'pain' в AUTO-MODE.
+ИСПРАВЛЕНИЕ v2: Пороги (thresholds) для 'love' и 'pain' понижены ЕЩЕ СИЛЬНЕЕ.
 """
 
 import re
@@ -75,27 +75,24 @@ def resolve_style_and_form(
     else:
         # AUTO-MODE (эмоциональный анализ)
         
-        # --- ИСПРАВЛЕНИЕ ЛОГИКИ ЖАНРА ---
-        # Понижаем пороги, чтобы тексты LOVE/PAIN не проваливались в 'cinematic narrative'
-        if cf > 0.9 or pain >= 0.05 or mood in ("intense", "angry", "dramatic"): # Было: pain >= 0.08
+        # --- ИСПРАВЛЕНИЕ ЛОГИКИ ЖАНРА v2 ---
+        if cf > 0.9 or pain >= 0.04 or mood in ("intense", "angry", "dramatic"): # Было: 0.05
             genre = "cinematic adaptive"
-        elif love >= 0.15 and pain < 0.04 and mood in ("peaceful", "hopeful", "romantic"): # Было: love >= 0.18
+        elif love >= 0.10 and pain < 0.04 and mood in ("peaceful", "hopeful", "romantic"): # Было: 0.15
             genre = "lyrical adaptive"
-        elif mood in ("melancholy", "sad") or (pain >= 0.04 and love < 0.15): # Было: pain >= 0.05
+        elif mood in ("melancholy", "sad") or (pain >= 0.03 and love < 0.15): # Было: 0.04
             genre = "lyrical adaptive"
         else:
             genre = "cinematic narrative"
 
-        # --- ИСПРАВЛЕНИЕ ЛОГИКИ СТИЛЯ ---
-        # Понижаем пороги, чтобы тексты LOVE/PAIN не проваливались в 'neutral modal'
-        if cf >= 0.92 or (pain >= 0.05 and truth >= 0.05): # Было: pain >= 0.08
+        # --- ИСПРАВЛЕНИЕ ЛОГИКИ СТИЛЯ v2 ---
+        if cf >= 0.92 or (pain >= 0.04 and truth >= 0.05): # Было: 0.05
             style, key_mode = "dramatic harmonic minor", "minor"
-        elif pain >= 0.04 and love < 0.15: # Было: pain >= 0.05
+        elif pain >= 0.03 and love < 0.15: # Было: 0.04
             style, key_mode = "melancholic minor", "minor"
-        elif love >= 0.15 and pain < 0.04: # Было: love >= 0.18
+        elif love >= 0.10 and pain < 0.04: # Было: 0.15
             style, key_mode = "majestic major", "major"
         else:
-            # Этот блок все еще может срабатывать, если TLP=0, но шансов меньше
             style, key_mode = "neutral modal", "modal"
 
     # Атмосфера
@@ -109,12 +106,10 @@ def resolve_style_and_form(
         atmosphere = "tense and raw"
     elif style == "soft whisper tone":
         atmosphere = "fragile and ethereal"
+    elif style == "neutral modal":
+        atmosphere = "balanced and reflective"
     else:
-        # ИСПРАВЛЕНИЕ: Добавляем 'neutral modal' в атмосферу
-        if style == "neutral modal":
-            atmosphere = "balanced and reflective"
-        else:
-            atmosphere = "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
+        atmosphere = "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
 
     # Нарратив
     if narrative:
@@ -172,6 +167,7 @@ class PatchedStyleMatrix:
             "dramatic harmonic minor": "light and shadow interplay, emotional contrasts, dynamic framing",
             "aggressive growl": "fire, smoke, chaos, sharp cuts",
             "soft whisper tone": "blurred lights, feathers, close-up breathing",
+            "neutral modal": "shifting colors, abstract transitions" # Добавлено
         }
         visual = visuals.get(resolved["style"], "shifting colors, abstract transitions")
 
