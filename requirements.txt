@@ -1,4 +1,4 @@
-### Core ####
+### Core ###
 
 fastapi==0.121.1
 uvicorn==0.38.0
@@ -6,7 +6,7 @@ gradio==5.49.1
 httpx==0.28.1
 requests==2.32.3
 
-### Data / Parsing ####
+### Data / Parsing ###
 
 pydantic==2.11.10
 pandas==2.3.3
