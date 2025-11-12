@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v4.3.10 — Monolith (Duet & Section-Aware)
-ИСПРАВЛЕНИЕ v3: Переработан для анализа по-блочно.
-Поддерживает определение 'я шел' / 'я шла' для каждой секции.
+StudioCore v4.3.11 — Monolith (Duet & Section-Aware)
+ИСПРАВЛЕНИЕ v4: Исправлена ошибка 'NameError: _AUTO_VOCAL_DETECT'
 """
 
 from __future__ import annotations
@@ -63,6 +62,12 @@ def detect_gender_from_grammar(text: str) -> str | None:
     if female_verbs > male_verbs:
         return "female"
     return None
+
+# --- !! ВОТ ИСПРАВЛЕНИЕ !! ---
+# Определяем _AUTO_VOCAL_DETECT, так как он используется в analyze()
+_AUTO_VOCAL_DETECT = True
+print("🎙️ [Monolith] Auto voice detection активен (detect_voice_profile встроен).")
+# --- !! КОНЕЦ ИСПРАВЛЕНИЯ !! ---
 
 # ==========================================================
 # 🔹 Adaptive Vocal Allocation (Fallback)
@@ -358,5 +363,5 @@ class StudioCore:
 
 
 # ==========================================================
-STUDIOCORE_VERSION = "v4.3.10"
-print(f"🔹 [StudioCore {STUDIOCORE_VERSION}] Monolith loaded (Section-Aware Duet Mode).")
+STUDIOCORE_VERSION = "v4.3.11"
+print(f"🔹 [StudioCore {STUDIOCORE_VERSION}] Monolith loaded (Section-Aware Duet Mode v2).")
