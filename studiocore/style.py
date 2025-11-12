@@ -80,10 +80,10 @@ def resolve_style_and_form(
         # Порядок: 1. DRAMA, 2. PAIN, 3. LOVE/JOY, 4. DEFAULT
         if cf > 0.9 or pain >= 0.04 or mood in ("intense", "angry", "dramatic"):
             genre = "cinematic adaptive"
-        # ПРОВЕРКА 2: Сначала PAIN
+        # ПРОВЕРКА 2: Сначала PAIN (боль)
         elif (pain >= 0.01 or mood in ("melancholy", "sad")):
             genre = "lyrical adaptive"
-        # ПРОВЕРКА 3: Потом LOVE/JOY
+        # ПРОВЕРКА 3: Потом LOVE/JOY (любовь/радость)
         elif (love >= 0.05 or mood == "joy"):
             genre = "lyrical adaptive"
         else:
@@ -93,10 +93,10 @@ def resolve_style_and_form(
         # Порядок: 1. DRAMA, 2. PAIN, 3. LOVE/JOY, 4. DEFAULT
         if cf >= 0.92 or (pain >= 0.04 and truth >= 0.05) or mood in ("intense", "angry", "dramatic"):
             style, key_mode = "dramatic harmonic minor", "minor"
-        # ПРОВЕРКА 2: Сначала PAIN
+        # ПРОВЕРКА 2: Сначала PAIN (боль)
         elif (pain >= 0.01 or mood in ("melancholy", "sad")):
             style, key_mode = "melancholic minor", "minor"
-        # ПРОВЕРКА 3: Потом LOVE/JOY
+        # ПРОВЕРКА 3: Потом LOVE/JOY (любовь/радость)
         elif (love >= 0.05 or mood == "joy"):
             style, key_mode = "majestic major", "major"
         else:
@@ -116,6 +116,7 @@ def resolve_style_and_form(
     elif style == "neutral modal":
         atmosphere = "balanced and reflective"
     else:
+        # Fallback
         atmosphere = "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
 
     # Нарратив
@@ -194,12 +195,15 @@ class PatchedStyleMatrix:
             else:
                 techniques += ["neutral blend", "harmonic balance"]
         else:
+            # Auto-mode techniques
             if emo.get("anger", 0) > 0.4 or resolved["style"].startswith("dramatic"):
                 techniques += ["belt", "rasp", "grit"]
             if emo.get("sadness", 0) > 0.3 or p > 0.4:
                 techniques += ["vibrato", "soft cry"]
             if emo.get("joy", 0) > 0.3 or l > 0.3:
                 techniques += ["falsetto", "bright tone"]
+            
+            # Fallback
             if not techniques:
                 techniques += ["resonant layering", "harmonic blend"]
 
