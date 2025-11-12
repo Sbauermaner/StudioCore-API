@@ -9,11 +9,12 @@ StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION (v3)
 5. ЗАПУСК ВСЕХ UNIT-ТЕСТОВ (Логика ядра)
 6. Тест Интеграции API (проверка /api/predict)
 
-ИСПРАВЛЕНИЕ:
+ИСПРАВЛЕНИЕ (v4):
 - 'unittest.discover' теперь ищет в 'studiocore/tests'
 - 'check_syntax/json' ищет только в папках проекта.
 - Добавлен 'check_internal_dependencies'
 - Таймаут API увеличен до 120с для ИИ-модели.
+- Исправлен ImportError для PatchedLyricMeter.
 """
 
 # === 🔧 Исправление пути импорта (чтобы test видели пакет) ===
@@ -62,12 +63,14 @@ def _is_ignored(path):
 # ==========================================================
 def check_directories():
     print("📂 Проверка структуры...")
-    # Проверяем только 'studiocore', а не весь ROOT
-    # Убедимся, что ROOT_DIR это /app
-    scan_root = ROOT_DIR if "app" in ROOT_DIR else os.path.join(ROOT_DIR, "app")
     
+    # Пытаемся найти корень приложения (обычно /app в Docker)
+    scan_root = ROOT_DIR
+    if not os.path.isdir(os.path.join(scan_root, "studiocore")):
+        scan_root = os.getcwd() # Откатываемся до текущей директории
+
     required = [os.path.join(scan_root, "studiocore"), os.path.join(scan_root, "studiocore/tests")]
-    
+
     # В среде HF, пути могут быть относительными
     if not os.path.isdir(required[0]):
          required = ["studiocore", "studiocore/tests"]
@@ -105,6 +108,10 @@ def check_python_syntax_project():
                     except SyntaxError as e:
                         print(f"❌ Ошибка синтаксиса: {path} → {e}")
                         all_ok = False
+                    except Exception as e:
+                        print(f"❌ Ошибка чтения файла (возможно, UTF-8?): {path} → {e}")
+                        all_ok = False
+
 
     # 2. Проверяем отдельные файлы в корне
     for f in PROJECT_FILES_TO_SCAN:
@@ -116,6 +123,9 @@ def check_python_syntax_project():
                 print(f"✅ OK: {path}")
             except SyntaxError as e:
                 print(f"❌ Ошибка синтаксиса: {path} → {e}")
+                all_ok = False
+            except Exception as e:
+                print(f"❌ Ошибка чтения файла (возможно, UTF-8?): {path} → {e}")
                 all_ok = False
         else:
             print(f"⚠️  Файл {path} не найден, пропускаем.")
@@ -223,6 +233,9 @@ def check_internal_dependencies():
                               .replace(os.path.sep, ".") \
                               .replace(".py", "")
             
+            # Убираем возможные артефакты (например, если ROOT_DIR = /app)
+            module_name = module_name.lstrip(".") 
+            
             dependencies[module_name] = []
             
             try:
@@ -238,7 +251,6 @@ def check_internal_dependencies():
                     elif isinstance(node, ast.ImportFrom):
                         # Учитываем относительные импорты (from .style import X)
                         if node.level > 0: # Относительный импорт
-                             # 'from .style' -> 'studiocore.style'
                              base_module = ".".join(module_name.split(".")[:-1])
                              imported_module = f"{base_module}.{node.module}" if node.module else base_module
                              dependencies[module_name].append(imported_module)
@@ -253,9 +265,12 @@ def check_internal_dependencies():
     print("--- Карта зависимостей ядра ---")
     for module, imports in dependencies.items():
         if imports:
-            print(f"📄 {module} импортирует:")
+            # Очищаем имя модуля, если оно начинается с 'app.'
+            clean_module = module.lstrip("app.")
+            print(f"📄 {clean_module} импортирует:")
             for imp in sorted(list(set(imports))):
-                print(f"    └── {imp}")
+                clean_imp = imp.lstrip("app.")
+                print(f"    └── {clean_imp}")
     print("---------------------------------")
     return ok
 
@@ -273,6 +288,10 @@ def run_all_unit_tests():
         loader = unittest.TestLoader()
         # ИСПРАВЛЕНИЕ: Ищем только в папке tests
         test_dir = os.path.join(ROOT_DIR, "studiocore", "tests")
+        # Если мы не в /app, ищем относительно
+        if not os.path.isdir(test_dir):
+            test_dir = "studiocore/tests"
+            
         suite = loader.discover(start_dir=test_dir, pattern="test_*.py") 
         
         runner = unittest.TextTestRunner(verbosity=1)
@@ -287,7 +306,7 @@ def run_all_unit_tests():
             print(f"⚠️  НИ ОДНОГО ТЕСТА НЕ НАЙДЕНО. Проверьте {test_dir}!")
             return True # Не проваливаем сборку, но предупреждаем
 
-        print("✅ Все Unit-тесты пройдены.")
+        print(f"✅ Все Unit-тесты ({result.testsRun}) пройдены.")
         return True
     except Exception:
         print("❌ КРИТИЧЕСКАЯ ОШИБКА при запуске тестов:")
@@ -301,12 +320,19 @@ def test_prediction_pipeline():
     """Интеграционный тест: Убеждается, что модули могут работать вместе."""
     print("\n🎧 Проверка (интеграционная) ядра StudioCore...")
     try:
+        # ИСПРАВЛЕНИЕ: PatchedLyricMeter теперь живет в monolith_v4_3_1
+        from studiocore.monolith_v4_3_1 import PatchedLyricMeter
         from studiocore.style import StyleMatrix
-        from studiocore.rhythm import PatchedLyricMeter # (из monolith_v4_3_1)
+        from studiocore.emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
+
 
         text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
-        tlp = {"truth": 0.1, "love": 0.2, "pain": 0.04, "conscious_frequency": 0.85}
-        emo = {"joy": 0.3, "peace": 0.4, "sadness": 0.1}
+        
+        # Для интеграционного теста мы должны симулировать полный прогон
+        emo_analyzer = AutoEmotionalAnalyzer()
+        tlp_analyzer = TruthLovePainEngine()
+        emo = emo_analyzer.analyze(text)
+        tlp = tlp_analyzer.analyze(text)
 
         bpm = PatchedLyricMeter().bpm_from_density(text)
         style = StyleMatrix().build(emo, tlp, text, bpm)
@@ -359,8 +385,15 @@ if __name__ == "__main__":
         "imports": test_imports(),
         "dependencies (AST)": check_internal_dependencies(),
         "unit_tests (logic)": run_all_unit_tests(),
-        "integration_api": test_prediction_pipeline() and test_api_response()
+        # ИЗМЕНЕНИЕ: integration_api теперь зависит от unit_tests
+        # Сначала прогоняем unit_tests, потом integration_api
+        "integration_api": results.get("unit_tests (logic)", False) and test_prediction_pipeline() and test_api_response()
     }
+    
+    # Обновляем integration_api, так как он зависит от unit_tests
+    # (Это предотвратит запуск integration_api, если unit_tests упали)
+    results["integration_api"] = results.get("unit_tests (logic)", False) and test_prediction_pipeline() and test_api_response()
+
 
     passed = sum(1 for k in results.values() if k)
     percent = round(passed / total * 100, 2)
