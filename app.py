@@ -4,8 +4,8 @@
 Truth × Love × Pain = Conscious Frequency
 Unified core loader with fallback + Gradio + FastAPI + Inline Log Viewer
 
-ИСПРАВЛЕНИЕ (v4):
-- Возвращаем таймаут 20с (движок v13 быстрый)
+ИСПРАВЛЕНИЯ (v4):
+- Таймаут Self-Check возвращен на 20с (т.к. 'emotion.py' v3 быстрый)
 """
 
 import os, sys, subprocess, importlib, traceback, threading, time, io
@@ -44,7 +44,9 @@ app.add_middleware(
 )
 
 # === 🎧 PUBLIC API ENDPOINT ===
+
 class PredictRequest(BaseModel):
+    """ Модель запроса для API """
     text: str
     gender: str = "auto"
     tlp: Optional[dict] = None
@@ -52,7 +54,12 @@ class PredictRequest(BaseModel):
 
 @app.post("/api/predict")
 async def api_predict(request_data: PredictRequest):
+    """
+    Эндпоинт, который ищут 'test_all.py' и 'auto_core_check'.
+    Он принимает JSON и возвращает JSON.
+    """
     try:
+        # Мы сопоставляем данные из запроса с тем, что ожидает core.analyze
         result = core.analyze(
             request_data.text,
             preferred_gender=request_data.gender,
@@ -60,8 +67,10 @@ async def api_predict(request_data: PredictRequest):
         )
         
         if isinstance(result, dict) and "error" in result:
+             # Если ядро вернуло ошибку, передаем ее
              return JSONResponse(content=result, status_code=400)
         
+        # Возвращаем полный результат (тесты ожидают 'bpm' и 'style')
         return JSONResponse(content=result, status_code=200)
 
     except Exception as e:
@@ -75,16 +84,16 @@ async def api_predict(request_data: PredictRequest):
 def auto_core_check():
     if os.environ.get("DISABLE_SELF_CHECK") == "1" or requests is None:
         return
-    time.sleep(5) 
     
     print("[Self-Check] Запуск самопроверки эндпоинта /api/predict...")
+    time.sleep(3)
     
     try:
-        # ИСПРАВЛЕНИЕ: Таймаут 20с (движок v13 быстрый)
-        r = requests.post("http://127.0.0.1:7860/api/predict", json={"text": "test"}, timeout=20)
+        # ИСПРАВЛЕНИЕ: Таймаут возвращен на 20 секунд
+        r = requests.post("http://127.0.0.1:7860/api/predict", json={"text": "test self-check"}, timeout=20)
         print(f"[Self-Check] → Статус: {r.status_code}")
         if r.status_code != 200:
-             print(f"[Self-Check] → Ответ: {r.text[:200]}...")
+             print(f"[Self-Check] → Ответ: {r.text[:100]}...")
     except Exception as e:
         print(f"❌ Self-Check ошибка: {e}")
 
@@ -103,20 +112,9 @@ def analyze_text(text: str, gender: str = "auto"):
                 "Анализ временно недоступен.", "", "", ""
             )
 
-        overlay = {}
-        voice_hint_keywords = [
-            "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
-            "пескляв", "soft", "airy", "shout", "grit", "фальцет", "whisper"
-        ]
-        
-        last_line = text.strip().split("\n")[-1].lower()
-        if any(k in last_line for k in voice_hint_keywords):
-            overlay["voice_profile_hint"] = last_line.strip("() ")
-            print(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
-        else:
-            overlay = None
-
-        result = core.analyze(text, preferred_gender=gender, overlay=overlay)
+        # --- Вызов ядра ---
+        # (v4.3.11+ использует 'overlay' для подсказок вокала)
+        result = core.analyze(text, preferred_gender=gender, overlay=None)
 
         if isinstance(result, dict) and "error" in result:
             return f"❌ Ошибка: {result['error']}", "", "", ""
@@ -127,20 +125,20 @@ def analyze_text(text: str, gender: str = "auto"):
         vocal_form = style.get("vocal_form", "auto")
 
         summary = (
-            f"✅ StudioCore {STUDIOCORE_VERSION} (Mode: {result.get('mode', 'AUTO')})\n"
+            f"✅ StudioCore {STUDIOCORE_VERSION}\n"
             f"🎭 {style.get('genre', '—')} | "
             f"🎵 {style.get('style', '—')} | "
-            f"🎙 {vocal_form} ({result.get('preferred_gender', 'auto')}) | "
+            f"🎙 {vocal_form} ({result.get('final_gender_decision', gender)}) | "
             f"🎸 {instruments} | "
             f"⏱ {result.get('bpm', '—')} BPM"
         )
 
-        annotated_text = result.get("annotated_text", "⚠️ Аннотация не сгенерирована")
+        annotated_text = result.get("annotated_text", "⚠️ Аннотация не удалась")
         
         style_prompt = (
             f"[StudioCore {STUDIOCORE_VERSION} | BPM: {result.get('bpm', 'auto')}]\n"
             f"Genre: {style.get('genre', 'unknown')}\n"
-            f"Vocal: {vocal_form} ({result.get('preferred_gender', 'auto')})\n"
+            f"Vocal: {vocal_form} ({result.get('final_gender_decision', gender)})\n"
             f"Instruments: {instruments}\n"
             f"Tone: {style.get('key', 'auto')}\n"
             f"Atmosphere: {style.get('atmosphere', 'balanced')}\n"
@@ -162,38 +160,41 @@ def analyze_text(text: str, gender: str = "auto"):
 def run_inline_tests():
     """Выполняет тесты и возвращает stdout прямо в интерфейс."""
     buffer = io.StringIO()
-    buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
+    buffer.write(f"🧩 StudioCore v5.2.1 — Inline Test Session\n")
     buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
-    
-    test_all_path = os.path.join("studiocore", "tests", "test_all.py")
-    test_logic_path = os.path.join("studiocore", "tests", "test_functional_texts.py")
 
     try:
+        # Убедимся, что мы используем правильный путь к тестам
+        test_all_path = os.path.join("studiocore", "tests", "test_all.py")
+        test_logic_path = os.path.join("studiocore", "tests", "test_functional_texts.py")
+
         buffer.write(f"🚀 Running: {test_all_path}\n")
-        res1 = subprocess.run(
+        
+        # Используем sys.executable для гарантии
+        process_all = subprocess.run(
             [sys.executable, test_all_path],
             capture_output=True, text=True, encoding="utf-8", errors="ignore"
         )
-        buffer.write(res1.stdout + "\n")
-        if res1.stderr:
-             buffer.write(f"--- STDERR ---\n{res1.stderr}\n")
+        buffer.write(process_all.stdout + "\n")
+        if process_all.stderr:
+            buffer.write("--- STDERR ---\n" + process_all.stderr + "\n")
 
-        buffer.write(f"\n🧠 Running: {test_logic_path}\n")
-        res2 = subprocess.run(
+
+        buffer.write(f"🧠 Running: {test_logic_path}\n")
+        process_logic = subprocess.run(
             [sys.executable, test_logic_path],
             capture_output=True, text=True, encoding="utf-8", errors="ignore"
         )
-        buffer.write(res2.stdout + "\n")
-        if res2.stderr:
-             buffer.write(f"--- STDERR ---\n{res2.stderr}\n")
+        buffer.write(process_logic.stdout + "\n")
+        if process_logic.stderr:
+            buffer.write("--- STDERR ---\n" + process_logic.stderr + "\n")
 
         buffer.write("✅ Inline test session complete.\n")
 
     except Exception as e:
-        buffer.write(f"❌ Ошибка при запуске тестов: {e}\n{traceback.format_exc()}\n")
+        buffer.write(f"❌ Ошибка при запуске тестов: {e}\n")
 
     return buffer.getvalue()
-
 
 # === PUBLIC UI (Gradio) ===
 with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface") as iface_public:
@@ -211,11 +212,11 @@ with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface
         analyze_button = gr.Button("🔍 Анализировать")
 
         with gr.Row():
-            result_box = gr.Textbox(label="📊 Результат", lines=6)
-            style_box = gr.Textbox(label="🎼 Стиль и инструменты", lines=8)
+            result_box = gr.Textbox(label="📊 Результат", lines=6, show_copy_button=True)
+            style_box = gr.Textbox(label="🎼 Стиль и инструменты", lines=8, show_copy_button=True)
 
         with gr.Row():
-            suno_box = gr.Textbox(label="🎧 Suno-промт (Style)", lines=8)
+            suno_box = gr.Textbox(label="🎧 Suno-промт (Style)", lines=8, show_copy_button=True)
             annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=24, show_copy_button=True)
 
         analyze_button.click(
