@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — Vocal Profile Registry (v4 - f-string ИСПРАВЛЕН)
+StudioCore v5 — Vocal Profile Registry (v5 - 'in' syntax fixed)
 """
 
 import re
@@ -150,10 +150,7 @@ class VocalProfileRegistry:
             if form == "solo": return f"solo_{gender_code}"
             if form == "duet": return f"duet_{gender_code}{gender_code}" 
             
-            # === ИСПРАВЛЕНИЕ ОШИБКИ v4 (f-string) ===
-            # Было: if "choir" in form: return f"choir_{"male" if gender_code == 'm' else 'female'}"
             if "choir" in form: return f"choir_{'male' if gender_code == 'm' else 'female'}"
-            # === Конец исправления ===
             
             return f"{form}_{gender_code}"
 
@@ -171,7 +168,10 @@ class VocalProfileRegistry:
 
         if "choir" in form:
             if "женск" in t or "female choir" in t: return "choir_female"
-            if "мужск" в t or "male choir" in t: return "choir_male"
+            # === ИСПРАВЛЕНИЕ ОШИБКИ v5 (f-string) ===
+            # Было: if "мужск" в t or "male choir" in t: return "choir_male"
+            if "мужск" in t or "male choir" in t: return "choir_male"
+            # === Конец исправления ===
             return "choir_mixed"
 
         return f"{form}_mixed"
