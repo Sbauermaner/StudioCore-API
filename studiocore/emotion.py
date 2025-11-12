@@ -1,177 +1,90 @@
-# -*- coding: utf-8 -*-
+=# -*- coding: utf-8 -*-
 """
-StudioCore Emotion Engines (v11 - Inference API)
-Использует Hugging Face Inference API (Zero-Shot) для
-быстрого, мультиязычного анализа на CPU-спейсах.
-
-ИСПРАВЛЕНИЕ (v11):
-- Заменена удаленная модель (410 GONE) 'Narsil/deberta-v3-base-tasksource-nli'
-- Новая модель: 'joeddav/xlm-roberta-large-xnli' (стабильная XNLI модель)
-
-ТРЕБУЕТ СЕКРЕТА: HUGGING_FACE_TOKEN
+StudioCore Emotion Engine (v12 - Local MiniLM AI)
+Использует облегченную локальную модель (Plan B)
 """
 
 import os
 import requests
 import time
-import math
-from typing import Dict, Any
+from typing import Dict, Any, List
 
-# =====================================================
-# 🧠 ИИ-Движок (Inference API)
-# =====================================================
-
-# ИСПРАВЛЕНИЕ: Мы используем 'joeddav/xlm-roberta-large-xnli'
-API_URL = "https://api-inference.huggingface.co/models/joeddav/xlm-roberta-large-xnli"
-HF_TOKEN = os.environ.get("HUGGING_FACE_TOKEN") # Загружаем токен из Секретов
-
-if not HF_TOKEN:
-    print("⚠️ [EmotionEngine] ВНИМАНИЕ! Секрет 'HUGGING_FACE_TOKEN' не найден.")
-    print("⚠️ [EmotionEngine] Анализ будет недоступен или очень медленным.")
-else:
-    print("✅ [EmotionEngine] Секрет 'HUGGING_FACE_TOKEN' успешно загружен.")
-
-
-class NLIClassifier:
-    """
-    Класс-оболочка для обращения к HF Inference API.
-    Гарантирует, что мы используем токен и обрабатываем ошибки/таймауты.
-    """
-    def __init__(self, api_url: str, token: str | None):
-        self.api_url = api_url
-        self.headers = {"Authorization": f"Bearer {token}"} if token else {}
-        print(f"🧠 [EmotionEngine] Инициализация клиента NLI. Токен {'загружен' if token else 'ОТСУТСТВУЕТ'}.")
-
-    def query_api(self, payload: Dict[str, Any], retries: int = 3, delay: int = 5) -> Dict[str, Any]:
-        """ Отправляет запрос к API с повторными попытками """
-        if not self.headers:
-            # Если токена нет, мы не можем сделать запрос.
-            print("❌ [EmotionEngine] Ошибка: Запрос к API невозможен без HUGGING_FACE_TOKEN.")
-            return {} # Возвращаем пустой результат
-
-        try:
-            # Увеличиваем таймаут соединения на всякий случай
-            response = requests.post(self.api_url, headers=self.headers, json=payload, timeout=25)
-            
-            # Обработка ошибок
-            if response.status_code == 503: # Model is loading
-                if retries > 0:
-                    print(f"⏳ [EmotionEngine] Модель (xlm-roberta) на сервере HF загружается, ждем {delay}с...")
-                    time.sleep(delay)
-                    return self.query_api(payload, retries - 1, delay * 2)
-                else:
-                    print("❌ [EmotionEngine] Модель не смогла загрузиться вовремя на сервере HF.")
-                    return {}
-            
-            response.raise_for_status() # Вызовет ошибку для 4xx/5xx (включая 410)
-            return response.json()
-        
-        except requests.exceptions.ReadTimeout:
-            print(f"❌ [EmotionEngine] API ReadTimeout (ожидание > {25}с).")
-            return {}
-        except Exception as e:
-            print(f"❌ [EmotionEngine] Ошибка API: {e}")
-            return {}
-
-    def analyze(self, text: str, labels: list[str]) -> Dict[str, float]:
-        """ Выполняет zero-shot классификацию через API """
-        payload = {
-            "inputs": text,
-            "parameters": {"candidate_labels": labels, "multi_label": False},
-        }
-        
-        result = self.query_api(payload)
-        
-        if not result or 'scores' not in result or 'labels' not in result:
-            print(f"⚠️  [EmotionEngine] API вернул неверный формат: {result}")
-            # Возвращаем заглушку, чтобы система не упала
-            return {label: 0.0 for label in labels}
-
-        # Собираем результат
-        # result = {'sequence': '...', 'labels': ['love', 'truth', 'pain'], 'scores': [0.9, 0.05, 0.05]}
-        scores_dict = {label: score for label, score in zip(result['labels'], result['scores'])}
-        
-        # Убедимся, что все запрошенные метки присутствуют
-        final_scores = {label: scores_dict.get(label, 0.0) for label in labels}
-        return final_scores
-
-# --- Инициализация классификатора ---
+# === ИСПОЛЬЗОВАНИЕ ЛОКАЛЬНОЙ МОДЕЛИ ===
+# Мы используем локальную 'pipeline' из transformers.
+# Это медленнее, чем API, но надежнее.
 try:
-    classifier = NLIClassifier(API_URL, HF_TOKEN)
-    print("✅ [EmotionEngine] ИИ-движок (Inference API) инициализирован.")
-except Exception as e:
-    print(f"❌ [EmotionEngine] Не удалось инициализировать NLIClassifier: {e}")
+    from transformers import pipeline
+    # Используем "облегченную" (Mini) модель, чтобы она работала на CPU
+    MODEL_NAME = "MoritzLaurer/multilingual-MiniLMv2-L6-mnli-xnli"
+    print("🧠 [EmotionEngine] Загрузка локальной 'Mini' NLI-модели...")
+    classifier = pipeline("zero-shot-classification", model=MODEL_NAME, device="cpu")
+    print(f"✅ [EmotionEngine] Локальная модель '{MODEL_NAME}' успешно загружена.")
+    _USE_API = False
+except ImportError:
+    print("❌ [EmotionEngine] ОШИБКА: 'transformers' или 'torch' не установлены.")
+    print("❌ [EmotionEngine] TLP-анализ будет отключен.")
     classifier = None
+    _USE_API = False
 
-# =====================================================
-# 💠 Truth × Love × Pain Engine
-# =====================================================
-class TruthLovePainEngine:
-    """
-    (v7) Использует NLI-модель для определения TLP (Truth, Love, Pain).
-    """
-    def __init__(self):
-        self.labels = ["truth", "love", "pain"]
-        if not classifier:
-            print("❌ [TLPEngine] КЛАССИФИКАТОР НЕ ЗАГРУЖЕН.")
 
-    def analyze(self, text: str) -> Dict[str, float]:
-        if not classifier:
-            return {"truth": 0.0, "love": 0.0, "pain": 0.0, "conscious_frequency": 0.0}
+# === Метки ===
+TLP_LABELS = ["truth", "love", "pain"]
+EMO_LABELS = ["joy", "sadness", "anger", "fear", "peace", "epic"]
 
-        # 1. Получаем TLP через ИИ
-        scores = classifier.analyze(text, self.labels)
-        
-        truth = scores.get("truth", 0.0)
-        love = scores.get("love", 0.0)
-        pain = scores.get("pain", 0.0)
-
-        # 2. Conscious Frequency = гармония трёх осей
-        # (Эта логика остается неизменной)
-        cf = 1.0 - (abs(truth - love) + abs(love - pain) * 0.35 + abs(truth - pain) * 0.25)
-        cf = max(0.0, min(cf, 1.0))
-
-        return {
-            "truth": round(truth, 3),
-            "love": round(love, 3),
-            "pain": round(pain, 3),
-            "conscious_frequency": round(cf, 3),
-        }
-
-# =====================================================
-# 💫 AutoEmotionalAnalyzer
-# =====================================================
 class AutoEmotionalAnalyzer:
-    """
-    (v7) Использует NLI-модель для определения Эмоций.
-    """
-    def __init__(self):
-        self.labels = ["joy", "sadness", "anger", "fear", "peace", "epic", "awe"]
-        if not classifier:
-            print("❌ [AutoEmotionalAnalyzer] КЛАССИФИКАТОР НЕ ЗАГРУЖЕН.")
-
-    def _softmax(self, scores: Dict[str, float]) -> Dict[str, float]:
-        """ Нормализует NLI-оценки, если они не нормализованы """
-        total = sum(scores.values())
-        if total == 0 or (0.99 < total < 1.01):
-             return scores # Уже нормализованы
-        
-        exps = {k: math.exp(v) for k, v in scores.items()}
-        total_exp = sum(exps.values()) or 1.0
-        return {k: exps[k] / total_exp for k in scores}
-
+    """v12: Анализатор EMO (Радость, Грусть...)"""
     def analyze(self, text: str) -> Dict[str, float]:
         if not classifier:
             return {"neutral": 1.0}
 
-        # 1. Получаем Эмоции через ИИ
-        scores = classifier.analyze(text, self.labels)
+        try:
+            # multi_label=True, так как в тексте может быть и радость, и страх
+            output = classifier(text, EMO_LABELS, multi_label=True)
+            
+            scores = {label: 0.0 for label in EMO_LABELS}
+            if output and 'labels' in output and 'scores' in output:
+                for label, score in zip(output['labels'], output['scores']):
+                    scores[label] = score
+                return scores
+            else:
+                print("⚠️  [EmotionEngine] EMO: Модель вернула неверный формат.")
+                return {"neutral": 1.0}
+        except Exception as e:
+            print(f"❌ [EmotionEngine] EMO Ошибка: {e}")
+            return {"neutral": 1.0}
 
-        # 2. Нормализация (NLI API уже должен возвращать softmax)
-        normalized = self._softmax(scores)
+class TruthLovePainEngine:
+    """v12: Анализатор TLP (Истина, Любовь, Боль)"""
+    def analyze(self, text: str) -> Dict[str, float]:
+        if not classifier:
+            return {"truth": 0.33, "love": 0.33, "pain": 0.33, "conscious_frequency": 0.5}
 
-        # 3. Если сигналов нет — вернуть фоновое спокойствие
-        if all(v < 0.05 for v in normalized.values()):
-            return {"peace": 0.6, "joy": 0.3, "neutral": 0.1}
+        try:
+            # multi_label=False, чтобы TLP конкурировали друг с другом
+            output = classifier(text, TLP_LABELS, multi_label=False)
+            
+            scores = {label: 0.0 for label in TLP_LABELS}
+            if output and 'labels' in output and 'scores' in output:
+                # 'output' уже отсортирован по убыванию
+                scores[output['labels'][0]] = output['scores'][0]
+                scores[output['labels'][1]] = output['scores'][1]
+                scores[output['labels'][2]] = output['scores'][2]
+            else:
+                 print("⚠️  [EmotionEngine] TLP: Модель вернула неверный формат.")
+                 return {"truth": 0.33, "love": 0.33, "pain": 0.33, "conscious_frequency": 0.5}
 
-        return normalized
+            t, l, p = scores.get("truth", 0.0), scores.get("love", 0.0), scores.get("pain", 0.0)
+            
+            # Сознательная частота (CF)
+            cf = 1.0 - (abs(t - l) * 0.5 + abs(l - p) * 0.5 + abs(t - p) * 0.5)
+            cf = max(0.0, min(cf, 1.0))
+
+            return {
+                "truth": round(t, 3),
+                "love": round(l, 3),
+                "pain": round(p, 3),
+                "conscious_frequency": round(cf, 3),
+            }
+        except Exception as e:
+            print(f"❌ [EmotionEngine] TLP Ошибка: {e}")
+            return {"truth": 0.33, "love": 0.33, "pain": 0.33, "conscious_frequency": 0.5}
