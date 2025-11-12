@@ -50,6 +50,8 @@ def setup_logging():
     # Приглушаем слишком "болтливые" сторонние библиотеки
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     root_logger.info("=" * 50)
     root_logger.info("🚀 Централизованное логирование (УРОВЕНЬ DEBUG) активировано.")
