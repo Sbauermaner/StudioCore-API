@@ -6,8 +6,8 @@ StudioCore v5.2.1 — System Integrity Test (Converted to unittest)
 - генерация BPM, Genre, Style
 - корректный JSON API ответ
 
-ИСПРАВЛЕНО (v3): 
-- Таймаут API увеличен до 120с для ИИ-модели.
+ИСПРАВЛЕНО (v4): 
+- Таймаут API увеличен до 30с (для Inference API).
 - Исправлен ImportError для PatchedLyricMeter.
 """
 
@@ -33,6 +33,20 @@ MODULES = [
 
 class TestMainIntegrity(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        # Загружаем ИИ-модули один раз для всех тестов
+        # Это предотвращает многократную медленную загрузку
+        try:
+            from studiocore.emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
+            cls.EmoAnalyzer = AutoEmotionalAnalyzer
+            cls.TlpAnalyzer = TruthLovePainEngine
+            print("[TestIntegrity] Emo/TLP Analyzers pre-loaded.")
+        except Exception as e:
+            print(f"[TestIntegrity] Ошибка предзагрузки ИИ: {e}")
+            cls.EmoAnalyzer = None
+            cls.TlpAnalyzer = None
+
     def test_imports(self):
         """
         Тест: [Integrity] Проверяет, что все основные модули ядра импортируются.
@@ -54,17 +68,19 @@ class TestMainIntegrity(unittest.TestCase):
         Тест: [Integrity] Проверяет внутренний конвейер (BPM + Style).
         """
         print("\n[TestIntegrity] 🎧 Checking full pipeline...")
+        self.assertIsNotNone(self.EmoAnalyzer, "ИИ-движок Emo не загружен")
+        self.assertIsNotNone(self.TlpAnalyzer, "ИИ-движок TLP не загружен")
+
         try:
             # ИСПРАВЛЕНИЕ: PatchedLyricMeter теперь живет в monolith_v4_3_1
             from studiocore.monolith_v4_3_1 import PatchedLyricMeter
             from studiocore.style import StyleMatrix
-            from studiocore.emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 
             text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
             
             # Симулируем полный прогон, как в test_all.py
-            emo_analyzer = AutoEmotionalAnalyzer()
-            tlp_analyzer = TruthLovePainEngine()
+            emo_analyzer = self.EmoAnalyzer()
+            tlp_analyzer = self.TlpAnalyzer()
             emo = emo_analyzer.analyze(text)
             tlp = tlp_analyzer.analyze(text)
 
@@ -93,8 +109,8 @@ class TestMainIntegrity(unittest.TestCase):
         }
         
         try:
-            # ИСПРАВЛЕНИЕ: Таймаут увеличен до 120с (для загрузки ИИ)
-            r = requests.post(api_url, json=payload, timeout=120) 
+            # ИСПРАВЛЕНИЕ: Таймаут 30с (для Inference API)
+            r = requests.post(api_url, json=payload, timeout=30) 
             
             self.assertEqual(
                 r.status_code, 200,
