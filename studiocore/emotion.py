@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore Emotion Engines (v13 - "Умные" Словари + Логирование)
+StudioCore Emotion Engines (v14 - "Умные" Словари + Оригинальные Имена)
 Быстрый эвристический анализ (не ИИ).
 """
 
@@ -10,9 +10,10 @@ from typing import Dict, Any
 import logging
 
 # Получаем логгер для этого модуля
+# (Он будет настроен app.py или test_all.py)
 log = logging.getLogger(__name__)
 
-# === Весовые карты (без изменений) ===
+# === Весовые карты ===
 PUNCT_WEIGHTS = {"!": 0.6, "?": 0.4, ".": 0.1, ",": 0.05, "…": 0.5, "—": 0.2, ":": 0.15, ";": 0.1}
 EMOJI_WEIGHTS = {ch: 0.5 for ch in "❤💔💖🔥😭😢✨🌌🌅🌙🌈☀⚡💫"}
 
@@ -20,7 +21,7 @@ EMOJI_WEIGHTS = {ch: 0.5 for ch in "❤💔💖🔥😭😢✨🌌🌅🌙🌈�
 # =====================================================
 # 💠 Truth × Love × Pain Engine (v3 Словари)
 # =====================================================
-class TruthLovePainEngine:
+class TruthLovePainEngine: # <-- Оригинальное имя
     """Balances TLP axes using expanded v3 dictionaries."""
 
     # v3 - Расширенные словари с "корнями"
@@ -53,7 +54,7 @@ class TruthLovePainEngine:
         self.TRUTH = re.compile(r"(" + "|".join(self.TRUTH_WORDS) + r")", re.I)
         self.LOVE = re.compile(r"(" + "|".join(self.LOVE_WORDS) + r")", re.I)
         self.PAIN = re.compile(r"(" + "|".join(self.PAIN_WORDS) + r")", re.I)
-        log.debug("TLP Engine (v13) инициализирован с расширенными словарями.")
+        log.debug("TLP Engine (v14) инициализирован с расширенными словарями.")
 
     def analyze(self, text: str) -> Dict[str, float]:
         log.debug(f"Вызов функции: TruthLovePainEngine.analyze")
@@ -94,8 +95,8 @@ class TruthLovePainEngine:
 # =====================================================
 # 💫 AutoEmotionalAnalyzer (v3 Словари)
 # =====================================================
-class AutoEmotionalAnalyzer:
-    """Heuristic emotion-field classifier (v13, +Logging)."""
+class AutoEmotionalAnalyzer: # <-- Оригинальное имя
+    """Heuristic emotion-field classifier (v14, +Logging)."""
 
     EMO_FIELDS = {
         "joy": ["joy", "happy", "laugh", "смех", "рад", "улыб", "счаст", "весел", "hope", "bright", "солнц"],
@@ -114,7 +115,7 @@ class AutoEmotionalAnalyzer:
         for field, tokens in self.EMO_FIELDS.items():
             if tokens:
                 self.LEXICON[field] = re.compile(r"(" + "|".join(tokens) + r")", re.I)
-        log.debug("AutoEmotionalAnalyzer (v13) инициализирован.")
+        log.debug("AutoEmotionalAnalyzer (v14) инициализирован.")
 
     def _softmax(self, scores: Dict[str, float]) -> Dict[str, float]:
         if not scores: return {}
