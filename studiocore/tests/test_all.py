@@ -387,8 +387,12 @@ if __name__ == "__main__":
     
     # Интеграционные тесты запускаем, только если unit_tests прошли
     # (чтобы не ждать 30с, если ядро и так сломано)
+    integration_tests_ok = False
     if results["unit_tests (logic)"]:
-        results["integration_api"] = test_prediction_pipeline() and test_api_response()
+        print("\n🔬 'unit_tests' пройдены, запускаем 'integration_api'...")
+        # Объединяем integration_api и prediction_pipeline
+        integration_tests_ok = test_prediction_pipeline() and test_api_response()
+        results["integration_api"] = integration_tests_ok
     else:
         print("\n🔬 Пропуск 'integration_api', так как 'unit_tests (logic)' провалились.")
         results["integration_api"] = False
