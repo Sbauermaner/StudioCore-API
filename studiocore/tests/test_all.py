@@ -348,10 +348,12 @@ if __name__ == "__main__":
     # Запускаем интеграционные тесты
     results["integration_core"] = test_prediction_pipeline()
     
-    if not results["unit_tests (logic)"]:
-        print("\n⚠️  Unit-тесты провалились, интеграционный API-тест может быть неточным.")
-    
-    results["integration_api"] = test_api_response()
+    # Пропускаем API-тест, если Unit-тесты провалились (т.к. API все равно упадет)
+    if not results["unit_tests (logic)"] or not results["integration_core"]:
+        print("\n🔬 Пропуск 'integration_api', так как 'unit_tests (logic)' или 'integration_core' провалились.")
+        results["integration_api"] = False
+    else:
+        results["integration_api"] = test_api_response()
     
     passed = sum(1 for k in results.values() if k)
     
