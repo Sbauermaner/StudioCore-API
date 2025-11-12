@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore Emotion Engines (v10 - Inference API)
+StudioCore Emotion Engines (v11 - Inference API)
 Использует Hugging Face Inference API (Zero-Shot) для
 быстрого, мультиязычного анализа на CPU-спейсах.
 
-ИСПРАВЛЕНИЕ (v10):
-- Заменена удаленная модель (410 GONE) 'valhalla/distilbart-mnli-12-3'
-- Новая модель: 'Narsil/deberta-v3-base-tasksource-nli'
+ИСПРАВЛЕНИЕ (v11):
+- Заменена удаленная модель (410 GONE) 'Narsil/deberta-v3-base-tasksource-nli'
+- Новая модель: 'joeddav/xlm-roberta-large-xnli' (стабильная XNLI модель)
 
 ТРЕБУЕТ СЕКРЕТА: HUGGING_FACE_TOKEN
 """
@@ -21,8 +21,8 @@ from typing import Dict, Any
 # 🧠 ИИ-Движок (Inference API)
 # =====================================================
 
-# ИСПРАВЛЕНИЕ: Мы используем 'Narsil/deberta-v3-base-tasksource-nli'
-API_URL = "https://api-inference.huggingface.co/models/Narsil/deberta-v3-base-tasksource-nli"
+# ИСПРАВЛЕНИЕ: Мы используем 'joeddav/xlm-roberta-large-xnli'
+API_URL = "https://api-inference.huggingface.co/models/joeddav/xlm-roberta-large-xnli"
 HF_TOKEN = os.environ.get("HUGGING_FACE_TOKEN") # Загружаем токен из Секретов
 
 if not HF_TOKEN:
@@ -56,7 +56,7 @@ class NLIClassifier:
             # Обработка ошибок
             if response.status_code == 503: # Model is loading
                 if retries > 0:
-                    print(f"⏳ [EmotionEngine] Модель (Narsil/deberta) на сервере HF загружается, ждем {delay}с...")
+                    print(f"⏳ [EmotionEngine] Модель (xlm-roberta) на сервере HF загружается, ждем {delay}с...")
                     time.sleep(delay)
                     return self.query_api(payload, retries - 1, delay * 2)
                 else:
