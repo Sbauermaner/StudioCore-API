@@ -5,7 +5,8 @@ StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE + Auto Voice Detect
 Позволяет ядру StudioCore адаптировать жанр, стиль, атмосферу и вокальные техники
 в зависимости от Truth/Love/Pain, Conscious Frequency и пользовательских описаний вокала.
 
-ИСПРАВЛЕНИЕ v3 (ФИНАЛ): Пороги (thresholds) для 'love' и 'pain' понижены до минимума.
+ИСПРАВЛЕНИЕ v4 (ФИНАЛ): Перестроена логика if/elif для
+корректного определения LOVE/JOY/PAIN.
 """
 
 import re
@@ -45,7 +46,7 @@ def detect_voice_profile(text: str) -> str | None:
 def resolve_style_and_form(
     tlp: Dict[str, float],
     cf: float,
-    mood: str,
+    mood: str, # 'mood' - это dominant emotion
     narrative: Tuple[str, str, str] | None = None,
     key_hint: str | None = None,
     voice_hint: str | None = None,
@@ -75,26 +76,30 @@ def resolve_style_and_form(
     else:
         # AUTO-MODE (эмоциональный анализ)
         
-        # --- ИСПРАВЛЕНИЕ ЛОГИКИ ЖАНРА v3 ---
-        # Пороги понижены до минимума
-        if cf > 0.9 or pain >= 0.04 or mood in ("intense", "angry", "dramatic"): # Было: 0.05
+        # --- ИСПРАВЛЕНИЕ ЛОГИКИ ЖАНРА v4 ---
+        if cf > 0.9 or pain >= 0.04 or mood in ("intense", "angry", "dramatic"):
             genre = "cinematic adaptive"
-        elif love >= 0.05 and pain < 0.04 and mood in ("peaceful", "hopeful", "romantic"): # Было: 0.10
+        # Сначала проверяем LOVE/JOY
+        elif (love >= 0.05 or mood == "joy") and pain < 0.04:
             genre = "lyrical adaptive"
-        elif mood in ("melancholy", "sad") or (pain >= 0.01 and love < 0.15): # Было: 0.03
+        # Потом проверяем PAIN
+        elif mood in ("melancholy", "sad") or (pain >= 0.01 and love < 0.15):
             genre = "lyrical adaptive"
+        # Иначе - default
         else:
             genre = "cinematic narrative"
 
-        # --- ИСПРАВЛЕНИЕ ЛОГИКИ СТИЛЯ v3 ---
-        if cf >= 0.92 or (pain >= 0.04 and truth >= 0.05): # Было: 0.05
+        # --- ИСПРАВЛЕНИЕ ЛОГИКИ СТИЛЯ v4 ---
+        if cf >= 0.92 or (pain >= 0.04 and truth >= 0.05) or mood in ("intense", "angry", "dramatic"):
             style, key_mode = "dramatic harmonic minor", "minor"
-        elif pain >= 0.01 and love < 0.15: # Было: 0.03
-            style, key_mode = "melancholic minor", "minor"
-        elif love >= 0.05 and pain < 0.04: # Было: 0.10
+        # Сначала проверяем LOVE/JOY
+        elif (love >= 0.05 or mood == "joy") and pain < 0.04:
             style, key_mode = "majestic major", "major"
+        # Потом проверяем PAIN
+        elif (pain >= 0.01 or mood in ("melancholy", "sad")) and love < 0.15:
+            style, key_mode = "melancholic minor", "minor"
+        # Иначе - default
         else:
-            # Этот блок все еще может срабатывать, если TLP=0, но шансов меньше
             style, key_mode = "neutral modal", "modal"
 
     # Атмосфера
@@ -154,6 +159,7 @@ class PatchedStyleMatrix:
             voice_hint = detect_voice_profile(text)
 
         narrative = ("search", "struggle", "transformation")
+        # Передаем 'dominant' (эмоцию) в резолвер
         resolved = resolve_style_and_form(tlp, cf, dominant, narrative, voice_hint=voice_hint)
 
         # 🎼 Ключ
