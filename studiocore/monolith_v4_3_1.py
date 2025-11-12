@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 StudioCore v4.3.11 — Monolith (Section-Aware Duet Mode v2)
-v4: Внедрен централизованный логгер
+v5: f-string syntax error fixed
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import logging # <-- Импорт логгера
 # --- Core imports ---
 from .config import load_config
 from .text_utils import normalize_text_preserve_symbols, extract_sections
-from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
+from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine 
 from .tone import ToneSyncEngine
 from .adapter import build_suno_prompt
 from .vocals import VocalProfileRegistry
@@ -24,7 +24,6 @@ log = logging.getLogger(__name__)
 
 # ==========================================================
 # 🗣️ Встроенные детекторы вокала
-# (Мы оставляем их здесь, так как они специфичны для монолита)
 # ==========================================================
 
 def detect_voice_profile(text: str) -> str | None:
@@ -53,7 +52,6 @@ def detect_gender_from_grammar(text: str) -> str | None:
     Определяет грамматический пол (M/F) по глаголам в прошлом времени после "я".
     """
     log.debug("Вызов функции: detect_gender_from_grammar")
-    # Ищем "я [слово на -л]" (M) и "я [слово на -ла]" (F)
     male_verbs = len(re.findall(r"\bя\s+([а-яё]+л)\b", text, re.I))
     female_verbs = len(re.findall(r"\bя\s+([а-яё]+ла)\b", text, re.I))
     
@@ -79,7 +77,6 @@ log.info("🎙️ [Monolith] Auto voice detection активен (detect_voice_p
 # ==========================================================
 class AdaptiveVocalAllocator:
     def analyze(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int, text: str) -> Dict[str, Any]:
-        # ... (логика этой функции остается прежней) ...
         love, pain, cf, truth = tlp.get("love", 0.0), tlp.get("pain", 0.0), tlp.get("conscious_frequency", 0.0), tlp.get("truth", 0.0)
         word_count = len(re.findall(r"[a-zA-Zа-яА-Яё]+", text))
         avg_line_len = word_count / max(1, len(text.split("\n")))
@@ -112,15 +109,12 @@ class PatchedLyricMeter:
         if not lines: return 100
         avg_syll = sum(self._syllables(l) for l in lines) / max(1, len(lines))
         
-        # v13 - Учитываем эмоции при расчете BPM
         pain = emo.get("sadness", 0.0) + emo.get("fear", 0.0)
         energy = emo.get("joy", 0.0) + emo.get("anger", 0.0) + emo.get("epic", 0.0)
 
-        # База
         bpm = 130 - (avg_syll * 3)
-        # Коррекция
-        bpm -= pain * 30 # Грусть/страх замедляют
-        bpm += energy * 25 # Радость/гнев/эпик ускоряют
+        bpm -= pain * 30 
+        bpm += energy * 25 
         
         bpm_final = int(max(65, min(175, bpm)))
         log.debug(f"Расчет BPM: Cред. слогов={avg_syll:.2f}, Эмо-коррекция (Pain={pain:.2f}, Energy={energy:.2f}), Итог={bpm_final} BPM")
@@ -128,7 +122,6 @@ class PatchedLyricMeter:
 
 
 class PatchedUniversalFrequencyEngine:
-    # (без изменений)
     base = 24.5
     def resonance_profile(self, tlp: Dict[str, float]) -> Dict[str, Any]:
         cf = tlp.get("conscious_frequency", 0.0)
@@ -146,7 +139,6 @@ class PatchedUniversalFrequencyEngine:
         }
 
 class PatchedRNSSafety:
-    # (без изменений)
     def __init__(self, cfg: Dict[str, Any]):
         self.cfg = cfg.get("safety", {
             "safe_octaves": [2, 3, 4, 5], "avoid_freq_bands_hz": [18.0, 30.0],
@@ -167,7 +159,6 @@ class PatchedRNSSafety:
         }
 
 class PatchedIntegrityScanEngine:
-    # (без изменений)
     def analyze(self, text: str) -> Dict[str, Any]:
         words = re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text.lower())
         sents = [s for s in re.split(r"[.!?]+", text) if s.strip()]
@@ -256,7 +247,11 @@ class StudioCore:
                 
             vocal_profile_tags[gender] += 1
             tagged_blocks.append({"text": block_text, "gender": gender, "hint": hint})
-            log.debug(f"Блок [{block_text[:20]...}] -> Пол: {gender}, Хинт: {hint}")
+            
+            # === ИСПРАВЛЕНИЕ ОШИБКИ v5 (f-string) ===
+            # Было: log.debug(f"Блок [{block_text[:20]...}] -> Пол: {gender}, Хинт: {hint}")
+            log.debug(f"Блок [{block_text[:20]}...] -> Пол: {gender}, Хинт: {hint}")
+            # === Конец исправления ===
 
         log.debug(f"Итог по вокалу (все блоки): {vocal_profile_tags}")
         return tagged_blocks, vocal_profile_tags
@@ -275,22 +270,17 @@ class StudioCore:
         cf = tlp.get("conscious_frequency",0)
         avg_emo = mean(abs(v) for v in emo.values()) if emo else 0.0
         
-        # 1. Создаем БАЗОВУЮ структуру (Intro, Verse...)
-        # (v11 - исправлена логика 'verse' и 'chorus')
         intro = {"section":"Intro","mood":"mystic" if cf>=0.5 else "calm","intensity":round(bpm*0.8,2),"focus":"tone_establish"}
         verse = {"section":"Verse","mood":"reflective" if truth > love else "narrative","intensity":round(bpm,2),"focus":"story_flow"}
         bridge= {"section":"Bridge","mood":"dramatic" if pain>0.3 else "dreamlike","intensity":round(bpm*(1.05+avg_emo/4),2),"focus":"contrast"}
         chorus= {"section":"Chorus","mood":"uplifting" if (love>=pain and love > 0.05) else "tense","intensity":round(bpm*1.15,2),"focus":"release"}
         outro = {"section":"Outro","mood":"peaceful" if cf>0.6 else "fading","intensity":round(bpm*0.7,2),"focus":"closure"}
         
-        # Собираем доступные секции
         available_sections = [intro, verse, bridge, chorus]
         
-        # 2. Сопоставляем секции с блоками
         num_blocks = len(tagged_blocks)
         final_sections = []
         
-        # v4.3.11 - Улучшенная логика распределения
         if num_blocks == 1:
             final_sections = [verse]
         elif num_blocks == 2:
@@ -302,19 +292,20 @@ class StudioCore:
         elif num_blocks == 5:
             final_sections = [intro, verse, bridge, chorus, outro]
         else:
-            # Стандартная логика "циклического" назначения
-            final_sections = [available_sections[i % len(available_sections)] for i in range(num_blocks)]
-            # Пытаемся принудительно назначить Intro и Outro
-            if num_blocks > 2:
-                final_sections[0] = intro
-                final_sections[-1] = outro
+            log.debug(f"Назначение {num_blocks} блоков на {len(available_sections)} секций...")
+            for i in range(num_blocks):
+                if i == num_blocks - 1:
+                    final_sections.append(outro)
+                elif i == 0:
+                    final_sections.append(intro)
+                else:
+                    sec_index = (i - 1) % (len(available_sections) - 1) 
+                    final_sections.append(available_sections[sec_index + 1]) 
 
-        # 3. Интегрируем теги M/F/Mixed из блоков
+
         final_overlay_sections = []
         for i, block in enumerate(tagged_blocks):
-            # Берем назначенную секцию (Intro, Verse...)
             sec_data = final_sections[i].copy()
-            # Добавляем в нее тег M/F/Mixed из блока
             sec_data["vocal"] = block.get("gender", "auto").upper()
             sec_data["hint"] = block.get("hint")
             final_overlay_sections.append(sec_data)
@@ -329,7 +320,7 @@ class StudioCore:
                 "depth": round((truth+pain)/2,2),
                 "warmth": round(love,2),
                 "clarity": round(cf,2),
-                "sections": final_overlay_sections # <-- Возвращаем обогащенные секции
+                "sections": final_overlay_sections 
             }
         }
 
@@ -338,12 +329,8 @@ class StudioCore:
     # -------------------------------------------------------
     def annotate_text(self, text: str, overlay: Dict[str, Any], style: Dict[str, Any],
                       vocals: List[str], bpm: int, emotions=None, tlp=None) -> str:
-        """
-        Добавляет аннотации к тексту (структура песни, BPM, вокальные техники)
-        ИСПОЛЬЗУЯ УЖЕ ГОТОВЫЙ 'overlay'
-        """
+        
         log.debug("Вызов функции: annotate_text")
-        # Разделяем текст на блоки так же, как в _analyze_sections
         blocks = [b.strip() for b in re.split(r"\n\s*\n", text.strip()) if b.strip()]
         if not blocks:
             blocks = [text.strip()]
@@ -353,26 +340,24 @@ class StudioCore:
 
         if len(blocks) != len(sections):
             log.warning(f"Ошибка аннотации: кол-во блоков ({len(blocks)}) не совпадает с кол-вом секций ({len(sections)})!")
-            # Возвращаем текст как есть, если структура не совпала
-            return text 
-
-        for i, block in enumerate(blocks):
-            sec = sections[i]
-            # Формируем тег [INTRO - MALE - mystic, focus=story, intensity=120]
-            vocal_tag = sec.get('vocal', 'AUTO')
-            header = (
-                f"[{sec.get('section','Block').upper()} - {vocal_tag} - "
-                f"{sec.get('mood','neutral')}, "
-                f"focus={sec.get('focus','flow')}, "
-                f"intensity≈{sec.get('intensity',bpm)}]"
-            )
-            annotated_blocks.append(header)
-            annotated_blocks.append(block)
-            annotated_blocks.append("") # Пустая строка между блоками
+            annotated_blocks.append(f"[Full Text – BPM≈{bpm}, VocalForm={style.get('vocal_form', 'auto')}]")
+            annotated_blocks.append(text)
+        else:
+            for i, block in enumerate(blocks):
+                sec = sections[i]
+                vocal_tag = sec.get('vocal', 'AUTO')
+                header = (
+                    f"[{sec.get('section','Block').upper()} - {vocal_tag} - "
+                    f"{sec.get('mood','neutral')}, "
+                    f"focus={sec.get('focus','flow')}, "
+                    f"intensity≈{sec.get('intensity',bpm)}]"
+                )
+                annotated_blocks.append(header)
+                annotated_blocks.append(block)
+                annotated_blocks.append("") 
 
         vocal_form = style.get("vocal_form", "auto")
         tone_key = style.get("key", "auto")
-        # Убираем дубликаты (male/female) из списка техник
         tech = ", ".join(sorted(list(set(v for v in vocals if v not in [
             "male","female","duet","trio","quartet","quintet","choir","solo"
         ])))) or "neutral tone"
@@ -392,11 +377,9 @@ class StudioCore:
         
         version = version or self.cfg.get("suno_version", "v5")
         
-        # 1. Базовый анализ текста
         log.debug("Вызов: normalize_text_preserve_symbols")
         raw = normalize_text_preserve_symbols(text)
         
-        # 2. Анализ Эмоций и TLP
         log.debug("Вызов: self.emotion.analyze")
         emo = self.emotion.analyze(raw)
         log.debug(f"Результат EMO: {emo}")
@@ -405,33 +388,27 @@ class StudioCore:
         tlp = self.tlp.analyze(raw)
         log.debug(f"Результат TLP: {tlp}")
 
-        # 3. Анализ Ритма (BPM)
         log.debug("Вызов: self.rhythm.bpm_from_density")
         bpm = self.rhythm.bpm_from_density(raw, emo)
         log.debug(f"Базовый BPM: {bpm}")
 
-        # 4. v4.3 - По-блочный анализ вокала
         log.debug("Вызов: self._analyze_sections")
         tagged_blocks, vocal_profile_tags = self._analyze_sections(raw)
 
-        # 5. v4.3 - Создание семантического Overlay
         log.debug("Вызов: self._build_semantic_sections")
         overlay_pack = self._build_semantic_sections(emo, tlp, bpm, tagged_blocks)
-        bpm_adj = overlay_pack["bpm_suggested"] # Используем скорректированный BPM
-        semantic_overlay = overlay_pack["overlay"] # Готовый overlay
+        bpm_adj = overlay_pack["bpm_suggested"] 
+        semantic_overlay = overlay_pack["overlay"] 
         log.debug(f"Финальный BPM: {bpm_adj}")
 
-        # 6. Анализ стиля (передаем BPM и хинты)
         user_voice_hint = overlay.get("voice_profile_hint") if overlay else None
         
-        # Ищем хинт в первом блоке, если не пришел из UI
         if not user_voice_hint:
              block_hints = [b.get("hint") for b in tagged_blocks if b.get("hint")]
              if block_hints:
                  user_voice_hint = block_hints[0]
                  log.debug(f"Используем вокальный хинт из блока: {user_voice_hint}")
 
-        # Определяем режим
         mode = "USER-MODE" if user_voice_hint else "AUTO-DETECT"
         log.debug(f"Режим вокала: {mode}")
 
@@ -439,20 +416,24 @@ class StudioCore:
         style = self.style.build(emo, tlp, raw, bpm_adj, semantic_overlay, user_voice_hint)
         log.debug(f"Результат Style: Genre={style.get('genre')}, Style={style.get('style')}")
 
-        # 7. Вокал и Инструменты
         log.debug("Вызов: self.vocals.get")
         vox, inst, vocal_form = self.vocals.get(
             style["genre"], 
             preferred_gender, 
             raw, 
-            tagged_blocks, # Передаем тэгированные блоки
-            vocal_profile_tags # Передаем итоги по вокалу
+            tagged_blocks, 
+            vocal_profile_tags 
         )
-        style["vocal_form"] = vocal_form # Внедряем в стиль
-        style["vocal_count"] = vocal_profile_tags.get(vocal_form.split("_")[0], 1)
-        log.debug(f"Результат Vocals: Form={vocal_form}, Vox={vox}, Inst={inst}")
+        style["vocal_form"] = vocal_form 
+        style["vocal_count"] = (
+            vocal_profile_tags.get("male", 0) + 
+            vocal_profile_tags.get("female", 0) +
+            vocal_profile_tags.get("mixed", 0) * 2
+        )
+        if style["vocal_count"] == 0: style["vocal_count"] = 1 
+        
+        log.debug(f"Результат Vocals: Form={vocal_form}, Vox={vox}, Inst={inst}, Count={style['vocal_count']}")
 
-        # 8. Остальная аналитика (Tone, Freq, Integ)
         log.debug("Вызов: self.freq.resonance_profile")
         freq = self.freq.resonance_profile(tlp)
         freq["recommended_octaves"] = self.safety.clamp_octaves(freq["recommended_octaves"])
@@ -466,11 +447,9 @@ class StudioCore:
         philosophy = (f"Truth={tlp.get('truth', 0):.2f}, Love={tlp.get('love', 0):.2f}, "
                       f"Pain={tlp.get('pain', 0):.2f}, CF={tlp.get('conscious_frequency', 0):.2f}")
 
-        # 9. Аннотация текста
         log.debug("Вызов: self.annotate_text")
         annotated_text = self.annotate_text(raw, semantic_overlay, style, vox, bpm_adj, emo, tlp)
 
-        # 10. Сборка промптов
         log.debug("Вызов: build_suno_prompt (STYLE)")
         prompt_suno_style = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="suno_style")
         
