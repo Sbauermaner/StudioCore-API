@@ -1,79 +1,98 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (USER-MODE + AutoDetect)
-ИСПРАВЛЕНИЕ v8 (ФИНАЛ): Восстановлен баланс PAIN/LOVE.
-Теперь используется строгая проверка (pain > love) / (love > pain).
+StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (v9 - Исправление опечатки)
+
+ИСПРАВЛЕНИЕ (v9):
+- Исправлена опечатка 'sad' -> 'sadness' в логике жанра.
 """
 
 from typing import Dict, Any, Tuple
 from statistics import mean
 
-
 # ==========================================================
-# 🧠 Адаптивный резолвер стиля (v8 Логика)
+# 🧠 Адаптивный резолвер стиля (v9)
 # ==========================================================
 def resolve_style_and_form(
     tlp: Dict[str, float],
     cf: float,
-    mood: str, # 'mood' - это dominant emotion
+    mood: str, # (e.g., "joy", "sadness", "fear")
     narrative: Tuple[str, str, str] | None = None,
     key_hint: str | None = None,
-    voice_hint: str | None = None, # (Принимает подсказку от монолита)
+    voice_hint: str | None = None,
 ) -> Dict[str, str]:
+    
     love = tlp.get("love", 0.0)
     pain = tlp.get("pain", 0.0)
     truth = tlp.get("truth", 0.0)
 
     user_mode = bool(voice_hint)
-    if user_mode:
+    
+    # ==================
+    # 1. ОПРЕДЕЛЕНИЕ ЖАНРА (Genre)
+    # ==================
+    if user_mode and voice_hint:
+        # --- USER-MODE ---
         hint = voice_hint.lower()
         if any(k in hint for k in ["growl", "scream", "хрип", "крич", "grit"]):
             genre = "metal adaptive"
-            style, key_mode = "aggressive growl", "minor"
         elif any(k in hint for k in ["soft", "airy", "whisper", "пескляв", "тихо"]):
             genre = "ambient lyrical"
-            style, key_mode = "soft whisper tone", "major"
         elif any(k in hint for k in ["female", "женск"]):
             genre = "pop emotional"
-            style, key_mode = "bright major", "major"
         elif any(k in hint for k in ["male", "мужск"]):
             genre = "rock narrative"
-            style, key_mode = "warm baritone", "minor"
         else:
             genre = "cinematic adaptive"
-            style, key_mode = "neutral modal", "modal"
     else:
-        # AUTO-MODE (эмоциональный анализ)
+        # --- AUTO-MODE (v9) ---
+        # (v9) Сначала проверяем "PAIN", чтобы "LOVE" его не перехватил
         
-        # --- Логика ЖАНРА v8 ---
-        # Порядок: 1. DRAMA, 2. PAIN (строго > love), 3. LOVE/JOY (строго > pain), 4. DEFAULT
-        if cf > 0.9 or (pain >= 0.04 and truth >= 0.05) or mood in ("intense", "angry", "dramatic"):
+        # ИСПРАВЛЕНО (v9): 'sad' -> 'sadness'
+        if (pain >= 0.01 and pain > love) or mood in ("sadness", "melancholy"):
+            genre = "lyrical adaptive"
+        
+        # (v8) Проверяем "LOVE" и "JOY"
+        elif (love >= 0.01 and love > pain) or mood in ("joy", "peace", "romantic"):
+            genre = "lyrical adaptive"
+            
+        # (v8) Проверяем "FEAR" / "DRAMA"
+        elif cf > 0.9 or pain >= 0.04 or mood in ("intense", "angry", "dramatic", "fear", "epic"):
             genre = "cinematic adaptive"
-        # ПРОВЕРКА 2: Сначала PAIN (боль)
-        elif (pain >= 0.01 and pain > love) or mood in ("melancholy", "sad"):
-            genre = "lyrical adaptive"
-        # ПРОВЕРКА 3: Потом LOVE/JOY (любовь/радость)
-        elif (love >= 0.05 and love > pain) or mood in ("joy", "peaceful", "hopeful"):
-            genre = "lyrical adaptive"
+            
+        # (v8) Запасной вариант
         else:
-            # Fallback
             genre = "cinematic narrative"
 
-        # --- Логика СТИЛЯ v8 ---
-        # Порядок: 1. DRAMA, 2. PAIN (строго > love), 3. LOVE/JOY (строго > pain), 4. DEFAULT
-        if cf >= 0.92 or (pain >= 0.04 and truth >= 0.05) or mood in ("intense", "angry", "dramatic"):
-            style, key_mode = "dramatic harmonic minor", "minor"
-        # ПРОВЕРКА 2: Сначала PAIN (боль)
-        elif (pain >= 0.01 and pain > love) or mood in ("melancholy", "sad"):
-            style, key_mode = "melancholic minor", "minor"
-        # ПРОВЕРКА 3: Потом LOVE/JOY (любовь/радость)
-        elif (love >= 0.05 and love > pain) or mood in ("joy", "peaceful", "hopeful"):
-            style, key_mode = "majestic major", "major"
-        else:
-            # Fallback
-            style, key_mode = "neutral modal", "modal"
+    # ==================
+    # 2. ОПРЕДЕЛЕНИЕ СТИЛЯ (Style)
+    # ==================
+    if genre == "metal adaptive":
+        style, key_mode = "aggressive growl", "minor"
+    elif genre == "ambient lyrical":
+        style, key_mode = "soft whisper tone", "major"
+    elif genre == "pop emotional":
+        style, key_mode = "bright major", "major"
+    elif genre == "rock narrative":
+         style, key_mode = "warm baritone", "minor"
+    
+    # (v8) Логика стиля для AUTO-MODE
+    elif cf >= 0.92 or (pain >= 0.08 and truth >= 0.05):
+        style, key_mode = "dramatic harmonic minor", "minor"
+        
+    # (v9) ИСПРАВЛЕН ПОРЯДОК: Сначала PAIN
+    elif (pain >= 0.01 and pain > love) or mood == "sadness":
+        style, key_mode = "melancholic minor", "minor"
+        
+    elif (love >= 0.01 and love > pain) or mood == "joy":
+        style, key_mode = "majestic major", "major"
+        
+    else:
+        style, key_mode = "neutral modal", "modal"
 
-    # Атмосфера
+
+    # ==================
+    # 3. АТМОСФЕРА
+    # ==================
     if style == "majestic major":
         atmosphere = "serene and hopeful"
     elif style == "melancholic minor":
@@ -84,13 +103,12 @@ def resolve_style_and_form(
         atmosphere = "tense and raw"
     elif style == "soft whisper tone":
         atmosphere = "fragile and ethereal"
-    elif style == "neutral modal":
-        atmosphere = "balanced and reflective"
     else:
-        # Fallback
         atmosphere = "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
 
-    # Нарратив
+    # ==================
+    # 4. НАРРАТИВ
+    # ==================
     if narrative:
         phases = "→".join(narrative)
         if "struggle" in phases and "transformation" in phases and cf >= 0.9:
@@ -110,26 +128,26 @@ def resolve_style_and_form(
 # 🎨 PatchedStyleMatrix (v5.2.3)
 # ==========================================================
 class PatchedStyleMatrix:
-    """Adaptive emotional-to-style mapping engine (hybrid v5.2.3)."""
+    """Adaptive emotional-to-style mapping engine (hybrid v5.2.3, USER-MODE + AutoDetect)."""
 
     def build(
         self,
         emo: Dict[str, float],
         tlp: Dict[str, float],
-        text: str, # (text больше не используется для 'detect_voice_profile' здесь)
+        text: str,
         bpm: int,
         overlay: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
+        
         cf = tlp.get("conscious_frequency", 0.0)
         dominant = max(emo, key=emo.get) if emo else "neutral"
 
-        # 🔹 Вокальный намёк теперь передается из Monolith
+        # 🔹 Определяем вокальный намёк (из monolith_v4_3_1)
         voice_hint = None
         if overlay and "voice_profile_hint" in overlay:
             voice_hint = overlay["voice_profile_hint"]
-
+        
         narrative = ("search", "struggle", "transformation")
-        # Передаем 'dominant' (эмоцию) в резолвер
         resolved = resolve_style_and_form(tlp, cf, dominant, narrative, voice_hint=voice_hint)
 
         # 🎼 Ключ
@@ -145,7 +163,6 @@ class PatchedStyleMatrix:
             "dramatic harmonic minor": "light and shadow interplay, emotional contrasts, dynamic framing",
             "aggressive growl": "fire, smoke, chaos, sharp cuts",
             "soft whisper tone": "blurred lights, feathers, close-up breathing",
-            "neutral modal": "shifting colors, abstract transitions"
         }
         visual = visuals.get(resolved["style"], "shifting colors, abstract transitions")
 
@@ -164,14 +181,12 @@ class PatchedStyleMatrix:
             else:
                 techniques += ["neutral blend", "harmonic balance"]
         else:
-            # Auto-mode techniques
             if emo.get("anger", 0) > 0.4 or resolved["style"].startswith("dramatic"):
                 techniques += ["belt", "rasp", "grit"]
             if emo.get("sadness", 0) > 0.3 or p > 0.4:
                 techniques += ["vibrato", "soft cry"]
             if emo.get("joy", 0) > 0.3 or l > 0.3:
                 techniques += ["falsetto", "bright tone"]
-            
             if not techniques:
                 techniques += ["resonant layering", "harmonic blend"]
 
