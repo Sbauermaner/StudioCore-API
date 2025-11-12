@@ -8,6 +8,8 @@ StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION
 4. АНАЛИЗ ВНУТРЕННИХ СВЯЗЕЙ (AST)
 5. ЗАПУСК ВСЕХ UNIT-ТЕСТОВ (логика ядра)
 6. Тест API /api/predict
+
+ИСПРАВЛЕНИЕ: Обновлен URL API на /api/predict
 """
 
 # === 🔧 Исправление пути импорта (чтобы test видели пакет) ===
@@ -33,7 +35,7 @@ MODULES = [
     "studiocore.adapter"
 ]
 
-# ИСПРАВЛЕНИЕ: Сканируем только эти папки и файлы, чтобы не трогать /usr/lib
+# Сканируем только эти папки и файлы, чтобы не трогать /usr/lib
 PROJECT_FOLDERS_TO_SCAN = ["studiocore"]
 # Добавьте сюда другие корневые файлы .py или .json, если они есть
 PROJECT_FILES_TO_SCAN = ["app.py", "studio_config.json"]
@@ -76,6 +78,9 @@ def check_python_syntax_project():
                     except SyntaxError as e:
                         print(f"❌ Ошибка синтаксиса: {path} → {e}")
                         all_ok = False
+                    except Exception as e:
+                        print(f"❌ Ошибка чтения (возможно, U+00A0): {path} → {e}")
+                        all_ok = False
 
     # 2. Проверяем отдельные файлы в корне
     for f in PROJECT_FILES_TO_SCAN:
@@ -88,6 +93,9 @@ def check_python_syntax_project():
                 print(f"✅ OK: {path}")
             except SyntaxError as e:
                 print(f"❌ Ошибка синтаксиса: {path} → {e}")
+                all_ok = False
+            except Exception as e:
+                print(f"❌ Ошибка чтения (возможно, U+00A0): {path} → {e}")
                 all_ok = False
                 
     return all_ok
@@ -178,10 +186,13 @@ def check_internal_dependencies():
             
             path = os.path.join(root, f)
             # Превращаем путь в имя модуля (studiocore/rhythm.py -> studiocore.rhythm)
-            rel_path = os.path.relpath(path, ROOT_DIR)
+            try:
+                rel_path = os.path.relpath(path, ROOT_DIR)
+            except ValueError:
+                continue 
+                
             module_name = rel_path.replace(os.path.sep, ".").replace(".py", "")
             
-            # Пропускаем __init__ файлы, если они пустые или для связей
             if f == "__init__.py":
                 module_name = module_name.replace(".__init__", "")
 
@@ -191,14 +202,12 @@ def check_internal_dependencies():
                 with open(path, "r", encoding="utf-8") as fp:
                     tree = ast.parse(fp.read(), filename=path)
                 
-                # Ищем все 'import X' и 'from X import Y'
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Import):
                         for alias in node.names:
                             if alias.name.startswith("studiocore"):
                                 dependencies[module_name].append(alias.name)
                     elif isinstance(node, ast.ImportFrom):
-                        # Убеждаемся, что node.module не None (для 'from . import X')
                         if node.module and node.module.startswith("studiocore"):
                             dependencies[module_name].append(node.module)
                             
@@ -210,7 +219,6 @@ def check_internal_dependencies():
     print("--- Карта зависимостей ядра ---")
     for module, imports in sorted(dependencies.items()):
         if imports:
-            # Убираем дубликаты
             unique_imports = sorted(list(set(imports)))
             print(f"📄 {module} импортирует:")
             for imp in unique_imports:
@@ -225,27 +233,25 @@ def run_all_unit_tests():
     """
     Автоматически находит и запускает все файлы 'test_*.py'
     во всех папках проекта (в ROOT_DIR).
-    Это и есть проверка "логики ядра" и "связей".
     """
     print("\n🔬 Запуск всех Unit-тестов (проверка логики)...")
     try:
         loader = unittest.TestLoader()
         
-        # ИСПРАВЛЕНИЕ: Ищем тесты только в папке tests, а не во всем проекте.
+        # ИСПРАВЛЕНИЕ: Ищем тесты только в папке tests
         test_dir = os.path.join(ROOT_DIR, "studiocore", "tests")
         suite = loader.discover(start_dir=test_dir, pattern="test_*.py")
         
-        runner = unittest.TextTestRunner(verbosity=1) # verbosity=2 для деталей
+        runner = unittest.TextTestRunner(verbosity=1)
         result = runner.run(suite)
 
         if not result.wasSuccessful():
             print("❌ Обнаружены ошибки в Unit-тестах.")
             return False
 
-        # Проверяем, были ли тесты вообще запущены
         if result.testsRun == 0:
-             print("⚠️  НИ ОДНОГО ТЕСТА НЕ НАЙДЕНО. (Это может быть нормально, если их пока нет)")
-             return True 
+             print("⚠️  НИ ОДНОГО ТЕСТА НЕ НАЙДЕНО. (Это не должно было случиться)")
+             return False
 
         print(f"✅ Все {result.testsRun} Unit-теста пройдены.")
         return True
@@ -262,7 +268,14 @@ def test_prediction_pipeline():
     try:
         from studiocore.style import PatchedStyleMatrix
         from studiocore.rhythm import LyricMeter
-
+    except ImportError as e:
+         print(f"❌ ОШИБКА: Не удалось импортировать модули ядра: {e}")
+         return False
+    except Exception as e:
+         print(f"❌ КРИТИЧЕСКАЯ ОШИБКА ИМПОРТА (проверьте синтаксис): {e}")
+         return False
+        
+    try:
         text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
         tlp = {"truth": 0.1, "love": 0.2, "pain": 0.04, "conscious_frequency": 0.85}
         emo = {"joy": 0.3, "peace": 0.4, "sadness": 0.1}
@@ -287,8 +300,8 @@ def test_prediction_pipeline():
 def test_api_response():
     print("\n🌐 Проверка /api/predict ...")
     
-    # !!! ИСПРАВЛЕНИЕ 404: Убран /api/ префикс. Проверьте ваш app.py!
-    api_url = "http://127.0.0.1:7860/predict" 
+    # ИСПРАВЛЕНИЕ: URL изменен на /api/predict, который мы добавили в app.py
+    api_url = "http://127.0.0.1:7860/api/predict"
     
     try:
         payload = {
@@ -296,10 +309,18 @@ def test_api_response():
             "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
         }
         r = requests.post(api_url, json=payload, timeout=10)
-        assert r.status_code == 200, f"HTTP {r.status_code}"
+        
+        if r.status_code == 503:
+             print(f"❌ Ошибка API: {r.status_code} (Service Unavailable). Ядро в режиме Fallback (вероятно, из-за ошибки синтаксиса).")
+             return False
+             
+        assert r.status_code == 200, f"HTTP {r.status_code}. Ответ: {r.text[:200]}"
         data = r.json()
         print(f"✅ API OK | BPM={data.get('bpm')} | Style={data.get('style')}")
         return True
+    except requests.exceptions.ConnectionError:
+        print(f"❌ Ошибка API: Connection refused. Убедитесь, что сервер запущен на {api_url}")
+        return False
     except Exception as e:
         print(f"❌ Ошибка API: {e} (Проверьте URL: {api_url})")
         return False
@@ -314,11 +335,11 @@ if __name__ == "__main__":
     total = 7
     results = {
         "structure": check_directories(),
-        "syntax": check_python_syntax_project(), # <-- Вызов исправленной функции
-        "json_yaml": check_json_yaml_project(), # <-- Вызов исправленной функции
+        "syntax": check_python_syntax_project(),
+        "json_yaml": check_json_yaml_project(),
         "imports": test_imports(),
-        "dependencies (AST)": check_internal_dependencies(), # <-- НОВЫЙ ТЕСТ СВЯЗЕЙ
-        "unit_tests (logic)": run_all_unit_tests(), # <-- Вызов исправленной функции
+        "dependencies (AST)": check_internal_dependencies(),
+        "unit_tests (logic)": run_all_unit_tests(),
         "integration_api": test_prediction_pipeline() and test_api_response()
     }
 
