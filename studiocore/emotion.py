@@ -6,28 +6,42 @@ v6.0 - AI-Powered Zero-Shot Classification Engine
 """
 
 import math
-from typing import Dict, Any
-from transformers import pipeline
+from typing import Dict, Any, List
+
+# Попытка импорта transformers. Hugging Face Spaces установит их из requirements.txt
+try:
+    from transformers import pipeline
+except ImportError:
+    print("="*50)
+    print("❌ [EmotionEngine] КРИТИЧЕСКАЯ ОШИБКА: 'transformers' не найдены.")
+    print("   Пожалуйста, добавьте 'transformers', 'sentencepiece' и 'torch' в requirements.txt")
+    print("="*50)
+    pipeline = None
 
 # =====================================================
 # 🧠 Загрузка мультиязычной ИИ-модели
 # =====================================================
 # Эта модель может классифицировать текст на 100+ языках
 # по любым заданным меткам (zero-shot).
-try:
-    print("🧠 [EmotionEngine] Загрузка мультиязычной NLI-модели...")
-    # Используем DeBERTa - она легче и быстрее, чем BART, для многоязычности
-    classifier = pipeline(
-        "zero-shot-classification",
-        model="MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
-    )
-    print("✅ [EmotionEngine] Модель NLI (Zero-Shot) успешно загружена.")
-except Exception as e:
-    print(f"❌ [EmotionEngine] КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модель transformers.")
-    print(f"   Убедитесь, что 'transformers' и 'sentencepiece' добавлены в requirements.txt")
-    print(f"   Ошибка: {e}")
-    # Создаем заглушку, чтобы система не упала
-    classifier = None
+def load_classifier():
+    if not pipeline:
+        return None
+    try:
+        print("🧠 [EmotionEngine] Загрузка мультиязычной NLI-модели...")
+        # Используем DeBERTa - она легче и быстрее, чем BART, для многоязычности
+        classifier = pipeline(
+            "zero-shot-classification",
+            model="MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
+        )
+        print("✅ [EmotionEngine] Модель NLI (Zero-Shot) успешно загружена.")
+        return classifier
+    except Exception as e:
+        print(f"❌ [EmotionEngine] КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модель transformers.")
+        print(f"   Ошибка: {e}")
+        return None
+
+# Загружаем модель один раз при старте
+classifier = load_classifier()
 
 # =====================================================
 # 💠 Truth × Love × Pain Engine (AI-Powered)
@@ -86,7 +100,7 @@ class AutoEmotionalAnalyzer:
         "awe"        # Восторг, удивление
     ]
 
-    def _softmax(self, scores: list) -> list:
+    def _softmax(self, scores: List[float]) -> List[float]:
         exps = [math.exp(s) for s in scores]
         total = sum(exps) or 1.0
         return [e / total for e in exps]
@@ -107,6 +121,8 @@ class AutoEmotionalAnalyzer:
 
             # Если сигналов нет — вернуть фоновое спокойствие
             if all(v < 0.1 for v in final_scores.values()):
+                # Назначаем 'peace' по умолчанию, если нет явных эмоций
+                final_scores = {label: 0.0 for label in self.EMO_LABELS}
                 final_scores["peace"] = 1.0
 
             return final_scores
