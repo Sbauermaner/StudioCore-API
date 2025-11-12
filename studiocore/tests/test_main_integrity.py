@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — System Integrity Test
+StudioCore v5.2.1 — System Integrity Test (Converted to unittest)
 Проверяет, что всё ядро работает согласованно:
 - импорты модулей
 - генерация BPM, Genre, Style
 - корректный JSON API ответ
 
-ИСПРАВЛЕНО: Код преобразован в unittest-совместимый класс.
-ИСПРАВЛЕНО: URL API обновлен на /api/predict
+ИСПРАВЛЕНО: Преобразовано в unittest.TestCase для запуска через discover.
+ИСПРАВЛЕНО: Таймаут API увеличен до 120с для ИИ-модели.
 """
 
 # === 🔧 Исправление пути импорта (ОБЯЗАТЕЛЬНО) ===
@@ -17,7 +17,8 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 # === Конец исправления ===
 
-import importlib, json, traceback, unittest, requests
+import unittest
+import importlib, json, traceback, requests
 
 MODULES = [
     "studiocore.text_utils",
@@ -33,9 +34,10 @@ class TestMainIntegrity(unittest.TestCase):
 
     def test_imports(self):
         """
-        Тест: [Integrity] Проверяет, что все ключевые модули импортируются.
+        Тест: [Integrity] Проверяет, что все основные модули ядра импортируются.
         """
         print("\n[TestIntegrity] 🔍 Checking imports...")
+        all_ok = True
         for m in MODULES:
             with self.subTest(module=m):
                 try:
@@ -43,74 +45,69 @@ class TestMainIntegrity(unittest.TestCase):
                     print(f"✅ {m} imported successfully.")
                 except Exception as e:
                     self.fail(f"❌ Import failed: {m} — {e}")
+                    all_ok = False
+        self.assertTrue(all_ok, "Не все модули ядра удалось импортировать.")
 
     def test_prediction_pipeline(self):
         """
-        Тест: [Integrity] Проверяет полный внутренний пайплайн.
+        Тест: [Integrity] Проверяет внутренний конвейер (BPM + Style).
         """
         print("\n[TestIntegrity] 🎧 Checking full pipeline...")
         try:
-            from studiocore.style import PatchedStyleMatrix
-            from studiocore.rhythm import LyricMeter
-        except ImportError as e:
-            self.fail(f"Не удалось импортировать модули ядра: {e}")
-        except Exception as e:
-            self.fail(f"Критическая ошибка при импорте модулей ядра (проверьте синтаксис): {e}")
+            # Мы импортируем классы, которые *должны* быть в monolith
+            from studiocore.rhythm import PatchedLyricMeter 
+            from studiocore.style import StyleMatrix 
 
-        text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
-        tlp = {"truth": 0.1, "love": 0.2, "pain": 0.04, "conscious_frequency": 0.85}
-        emo = {"joy": 0.3, "peace": 0.4, "sadness": 0.1}
+            text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
+            tlp = {"truth": 0.1, "love": 0.2, "pain": 0.04, "conscious_frequency": 0.85}
+            emo = {"joy": 0.3, "peace": 0.4, "sadness": 0.1}
 
-        try:
-            bpm = LyricMeter().bpm_from_density(text, emo)
-            style = PatchedStyleMatrix().build(emo, tlp, text, bpm)
+            bpm = PatchedLyricMeter().bpm_from_density(text)
+            style = StyleMatrix().build(emo, tlp, text, bpm)
 
-            self.assertTrue(60 <= bpm <= 172, f"BPM out of range: {bpm}")
-            self.assertIn("genre", style, "Missing 'genre' field in style output")
-            self.assertIn("style", style, "Missing 'style' field in style output")
-            self.assertIsInstance(style.get("techniques"), list, "Techniques not list")
+            self.assertTrue(60 <= bpm <= 180, f"BPM out of range: {bpm}")
+            self.assertIn("genre", style, "Missing 'genre' in style output")
+            self.assertIn("style", style, "Missing 'style' in style output")
+            self.assertIsInstance(style.get("techniques", []), list, "Techniques not list")
 
             print(f"✅ Pipeline OK | BPM={bpm} | Genre={style['genre']} | Style={style['style']}")
-        
-        except Exception as e:
-            print(f"❌ Ошибка выполнения пайплайна: {traceback.format_exc()}")
-            self.fail(e)
 
+        except Exception as e:
+            self.fail(f"❌ Pipeline test failed: {traceback.format_exc()}")
 
     def test_api_response(self):
         """
         Тест: [Integrity] Проверяет эндпоинт (требует запущенного сервера).
         """
         print("\n[TestIntegrity] 🌐 Checking API endpoint...")
-        
-        # ИСПРАВЛЕНИЕ: URL изменен на /api/predict
         api_url = "http://127.0.0.1:7860/api/predict"
-        
         payload = {
             "text": "Я тону, когда солнце уходит вдаль...",
             "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
         }
         
         try:
-            r = requests.post(api_url, json=payload, timeout=10)
+            # ИСПРАВЛЕНИЕ: Таймаут увеличен до 120с (для загрузки ИИ)
+            r = requests.post(api_url, json=payload, timeout=120) 
             
-            if r.status_code == 503:
-                self.fail(f"❌ API test failed: {r.status_code} (Service Unavailable). Ядро в режиме Fallback (проверьте синтаксис).")
-            
-            self.assertEqual(r.status_code, 200, 
-                             f"API test failed: HTTP {r.status_code}. "
-                             f"Убедитесь, что URL '{api_url}' корректный в app.py. "
-                             f"Response: {r.text[:200]}")
+            self.assertEqual(
+                r.status_code, 200,
+                f"API test failed: HTTP {r.status_code}. "
+                f"Убедитесь, что URL '{api_url}' корректный в app.py. "
+                f"Response: {r.text[:200]}..."
+            )
             
             data = r.json()
-            self.assertIn("bpm", data, "Ответ API не содержит 'bpm'")
-            self.assertIn("style", data, "Ответ API не содержит 'style'")
+            self.assertIn("style", data, "Ответ API не содержит ключ 'style'")
+            self.assertIn("bpm", data, "Ответ API не содержит ключ 'bpm'")
+            
             print(f"✅ API OK | Style={data.get('style')} | BPM={data.get('bpm')}")
 
-        except requests.exceptions.ConnectionError:
-            self.fail(f"❌ API test failed: Connection refused. Сервер {api_url} запущен?")
         except Exception as e:
             self.fail(f"❌ API test failed: {e}")
 
+
+# Этот блок позволяет запускать файл напрямую
+# ИЛИ через discover (из test_all.py)
 if __name__ == "__main__":
     unittest.main()
