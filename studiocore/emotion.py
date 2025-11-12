@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore Emotion Engines (v9 - Inference API)
+StudioCore Emotion Engines (v10 - Inference API)
 Использует Hugging Face Inference API (Zero-Shot) для
 быстрого, мультиязычного анализа на CPU-спейсах.
 
-ИСПРАВЛЕНИЕ (v9):
-- Заменена удаленная модель (410 GONE) 'MoritzLaurer/mDeBERTa-v3-base-mnli-xnli'
-- Новая модель: 'facebook/bart-large-mnli' (стандартная NLI-модель)
+ИСПРАВЛЕНИЕ (v10):
+- Заменена удаленная модель (410 GONE) 'facebook/bart-large-mnli'
+- Новая модель: 'valhalla/distilbart-mnli-12-3' (надежная NLI-модель)
 
 ТРЕБУЕТ СЕКРЕТА: HUGGING_FACE_TOKEN
 """
@@ -21,8 +21,8 @@ from typing import Dict, Any
 # 🧠 ИИ-Движок (Inference API)
 # =====================================================
 
-# ИСПРАВЛЕНИЕ: Мы используем 'facebook/bart-large-mnli'
-API_URL = "https://api-inference.huggingface.co/models/facebook/bart-large-mnli"
+# ИСПРАВЛЕНИЕ: Мы используем 'valhalla/distilbart-mnli-12-3'
+API_URL = "https://api-inference.huggingface.co/models/valhalla/distilbart-mnli-12-3"
 HF_TOKEN = os.environ.get("HUGGING_FACE_TOKEN") # Загружаем токен из Секретов
 
 if not HF_TOKEN:
@@ -56,14 +56,14 @@ class NLIClassifier:
             # Обработка ошибок
             if response.status_code == 503: # Model is loading
                 if retries > 0:
-                    print(f"⏳ [EmotionEngine] Модель (bart-large) на сервере HF загружается, ждем {delay}с...")
+                    print(f"⏳ [EmotionEngine] Модель (distilbart) на сервере HF загружается, ждем {delay}с...")
                     time.sleep(delay)
                     return self.query_api(payload, retries - 1, delay * 2)
                 else:
                     print("❌ [EmotionEngine] Модель не смогла загрузиться вовремя на сервере HF.")
                     return {}
             
-            response.raise_for_status() # Вызовет ошибку для 4xx/5xx
+            response.raise_for_status() # Вызовет ошибку для 4xx/5xx (включая 410)
             return response.json()
         
         except requests.exceptions.ReadTimeout:
