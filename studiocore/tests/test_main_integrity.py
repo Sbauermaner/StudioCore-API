@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — System Integrity Test (v5 - Unittest + Monolith Import Fix)
-Проверяет, что всё ядро работает согласованно в формате Unittest:
-- импорты модулей
-- генерация BPM, Genre, Style
-- корректный JSON API ответ
-
-ИСПРАВЛЕНИЯ (v5):
-- Исправлен ImportError для PatchedLyricMeter (теперь импортируется из monolith)
-- Увеличен таймаут API до 120с
+StudioCore v5.2.1 — System Integrity Test (v6 - Таймаут 20с)
+ИСПРАВЛЕНИЯ (v6):
+- Таймаут API возвращен на 20с (т.к. 'emotion.py' v3 быстрый)
 """
 
 # === 🔧 Исправление пути импорта ===
@@ -22,9 +16,8 @@ import unittest
 import importlib
 import json
 import traceback
-import requests # Убедитесь, что requests установлен
+import requests 
 
-# --- Модули для проверки ---
 MODULES = [
     "studiocore.text_utils",
     "studiocore.emotion",
@@ -39,10 +32,8 @@ class TestMainIntegrity(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        """Загружаем анализаторы один раз для всех тестов класса."""
         print("\n[TestIntegrity] Emo/TLP Analyzers pre-loaded.")
         try:
-            # Импортируем движки, чтобы убедиться, что они загружаются
             from studiocore.emotion import TruthLovePainEngine, AutoEmotionalAnalyzer
             cls.tlp_engine = TruthLovePainEngine()
             cls.emo_analyzer = AutoEmotionalAnalyzer()
@@ -69,18 +60,15 @@ class TestMainIntegrity(unittest.TestCase):
         """Тест: [Integrity] Проверяет внутренний конвейер (BPM + Style)."""
         print("\n[TestIntegrity] 🎧 Checking full pipeline...")
         
-        # Проверяем, что движки загрузились в setUpClass
         self.assertIsNotNone(self.tlp_engine, "TLP Engine не был загружен")
         self.assertIsNotNone(self.emo_analyzer, "Emotion Analyzer не был загружен")
 
         try:
-            # ИСПРАВЛЕНИЕ: PatchedLyricMeter теперь в monolith_v4_3_1
             from studiocore.monolith_v4_3_1 import PatchedLyricMeter
             from studiocore.style import PatchedStyleMatrix
 
             text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
             
-            # Эмулируем пайплайн
             emo = self.emo_analyzer.analyze(text)
             tlp = self.tlp_engine.analyze(text)
             bpm = PatchedLyricMeter().bpm_from_density(text)
@@ -102,15 +90,15 @@ class TestMainIntegrity(unittest.TestCase):
     def test_api_response(self):
         """Тест: [Integrity] Проверяет эндпоинт (требует запущенного сервера)."""
         print("\n[TestIntegrity] 🌐 Checking API endpoint...")
-        api_url = "http://127.0.0.1:7860/api/predict" # Используем /api/predict
+        api_url = "http://127.0.0.1:7860/api/predict"
         payload = {
             "text": "Я тону, когда солнце уходит вдаль...",
             "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
         }
         
         try:
-            # ИСПРАВЛЕНИЕ: Таймаут увеличен до 120 секунд
-            r = requests.post(api_url, json=payload, timeout=120)
+            # ИСПРАВЛЕНИЕ: Таймаут возвращен на 20 секунд
+            r = requests.post(api_url, json=payload, timeout=20)
             
             self.assertEqual(r.status_code, 200, 
                              f"API test failed: HTTP {r.status_code}. Убедитесь, что URL '{api_url}' корректный в app.py. Response: {r.text}")
