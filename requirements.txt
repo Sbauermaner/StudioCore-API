@@ -6,31 +6,31 @@ gradio==5.49.1
 httpx==0.28.1
 requests==2.32.3
 
-=== Data / Parsing ===
+### Data / Parsing ###
 
 pydantic==2.11.10
 pandas==2.3.3
 numpy==2.2.6
 
-=== Text / Utils ===
+### Text / Utils ####
 
 markdown-it-py==4.0.0
 pyyaml==6.0.3
 tqdm==4.67.1
 
-=== Safety / Encoding ===
+### Safety / Encoding ###
 
 orjson==3.11.4
 typing-extensions==4.15.0
 anyio==4.11.0
 
-=== Optional (для студийных модулей, без тяжёлых зависимостей) ===
+### Optional (для студийных модулей, без тяжёлых зависимостей) ###
 
 pydub==0.25.1
 jinja2==3.1.6
 packaging==25.0
 
-=== AI / ML (НОВЫЕ ДОБАВЛЕНИЯ ДЛЯ ИИ) ===
+### AI / ML (НОВЫЕ ДОБАВЛЕНИЯ ДЛЯ ИИ) ####
 
 transformers
 sentencepiece
