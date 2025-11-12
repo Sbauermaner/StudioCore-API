@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore Emotion Engines (v7 - Inference API)
+StudioCore Emotion Engines (v9 - Inference API)
 Использует Hugging Face Inference API (Zero-Shot) для
 быстрого, мультиязычного анализа на CPU-спейсах.
+
+ИСПРАВЛЕНИЕ (v9):
+- Заменена удаленная модель (410 GONE) 'MoritzLaurer/mDeBERTa-v3-base-mnli-xnli'
+- Новая модель: 'facebook/bart-large-mnli' (стандартная NLI-модель)
 
 ТРЕБУЕТ СЕКРЕТА: HUGGING_FACE_TOKEN
 """
@@ -17,8 +21,8 @@ from typing import Dict, Any
 # 🧠 ИИ-Движок (Inference API)
 # =====================================================
 
-# Модель, которую мы используем на серверах HF
-API_URL = "https://api-inference.huggingface.co/models/MoritzLaurer/mDeBERTa-v3-base-mnli-xnli"
+# ИСПРАВЛЕНИЕ: Мы используем 'facebook/bart-large-mnli'
+API_URL = "https://api-inference.huggingface.co/models/facebook/bart-large-mnli"
 HF_TOKEN = os.environ.get("HUGGING_FACE_TOKEN") # Загружаем токен из Секретов
 
 if not HF_TOKEN:
@@ -52,7 +56,7 @@ class NLIClassifier:
             # Обработка ошибок
             if response.status_code == 503: # Model is loading
                 if retries > 0:
-                    print(f"⏳ [EmotionEngine] Модель (mDeBERTa) на сервере HF загружается, ждем {delay}с...")
+                    print(f"⏳ [EmotionEngine] Модель (bart-large) на сервере HF загружается, ждем {delay}с...")
                     time.sleep(delay)
                     return self.query_api(payload, retries - 1, delay * 2)
                 else:
