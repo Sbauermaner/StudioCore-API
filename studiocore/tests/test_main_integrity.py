@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — System Integrity Test (v3 - Unittest)
+StudioCore v5.2.1 — System Integrity Test (v4 - Unittest)
 Проверяет, что всё ядро работает согласованно в формате Unittest:
 - импорты модулей
 - генерация BPM, Genre, Style
