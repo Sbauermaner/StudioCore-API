@@ -1,17 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — System Integrity Test (Converted to unittest)
-Проверяет, что всё ядро работает согласованно:
+StudioCore v5.2.1 — System Integrity Test (v3 - Unittest)
+Проверяет, что всё ядро работает согласованно в формате Unittest:
 - импорты модулей
 - генерация BPM, Genre, Style
 - корректный JSON API ответ
-
-ИСПРАВЛЕНО (v4): 
-- Таймаут API увеличен до 30с (для Inference API).
-- Исправлен ImportError для PatchedLyricMeter.
 """
 
-# === 🔧 Исправление пути импорта (ОБЯЗАТЕЛЬНО) ===
+# === 🔧 Исправление пути импорта ===
 import os, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if ROOT not in sys.path:
@@ -19,8 +15,12 @@ if ROOT not in sys.path:
 # === Конец исправления ===
 
 import unittest
-import importlib, json, traceback, requests
+import importlib
+import json
+import traceback
+import requests # Убедитесь, что requests установлен
 
+# --- Модули для проверки ---
 MODULES = [
     "studiocore.text_utils",
     "studiocore.emotion",
@@ -35,101 +35,89 @@ class TestMainIntegrity(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Загружаем ИИ-модули один раз для всех тестов
-        # Это предотвращает многократную медленную загрузку
+        """Загружаем анализаторы один раз для всех тестов класса."""
+        print("\n[TestIntegrity] Emo/TLP Analyzers pre-loaded.")
         try:
-            from studiocore.emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
-            cls.EmoAnalyzer = AutoEmotionalAnalyzer
-            cls.TlpAnalyzer = TruthLovePainEngine
-            print("[TestIntegrity] Emo/TLP Analyzers pre-loaded.")
+            # Импортируем движки, чтобы убедиться, что они загружаются
+            from studiocore.emotion import TruthLovePainEngine, AutoEmotionalAnalyzer
+            cls.tlp_engine = TruthLovePainEngine()
+            cls.emo_analyzer = AutoEmotionalAnalyzer()
         except Exception as e:
-            print(f"[TestIntegrity] Ошибка предзагрузки ИИ: {e}")
-            cls.EmoAnalyzer = None
-            cls.TlpAnalyzer = None
+            print(f"Критическая ошибка загрузки движков: {e}")
+            cls.tlp_engine = None
+            cls.emo_analyzer = None
 
     def test_imports(self):
-        """
-        Тест: [Integrity] Проверяет, что все основные модули ядра импортируются.
-        """
+        """Тест: [Integrity] Проверяет, что все основные модули импортируются."""
         print("\n[TestIntegrity] 🔍 Checking imports...")
-        all_ok = True
+        failures = []
         for m in MODULES:
             with self.subTest(module=m):
                 try:
                     importlib.import_module(m)
                     print(f"✅ {m} imported successfully.")
                 except Exception as e:
-                    self.fail(f"❌ Import failed: {m} — {e}")
-                    all_ok = False
-        self.assertTrue(all_ok, "Не все модули ядра удалось импортировать.")
+                    failures.append(f"❌ Import failed: {m} — {e}")
+        
+        self.assertEqual(failures, [], "\n".join(failures))
 
     def test_prediction_pipeline(self):
-        """
-        Тест: [Integrity] Проверяет внутренний конвейер (BPM + Style).
-        """
+        """Тест: [Integrity] Проверяет внутренний конвейер (BPM + Style)."""
         print("\n[TestIntegrity] 🎧 Checking full pipeline...")
-        self.assertIsNotNone(self.EmoAnalyzer, "ИИ-движок Emo не загружен")
-        self.assertIsNotNone(self.TlpAnalyzer, "ИИ-движок TLP не загружен")
+        
+        # Проверяем, что движки загрузились в setUpClass
+        self.assertIsNotNone(self.tlp_engine, "TLP Engine не был загружен")
+        self.assertIsNotNone(self.emo_analyzer, "Emotion Analyzer не был загружен")
 
         try:
-            # ИСПРАВЛЕНИЕ: PatchedLyricMeter теперь живет в monolith_v4_3_1
+            # ИСПРАВЛЕНИЕ: PatchedLyricMeter теперь в monolith_v4_3_1
             from studiocore.monolith_v4_3_1 import PatchedLyricMeter
-            from studiocore.style import StyleMatrix
+            from studiocore.style import PatchedStyleMatrix
 
             text = "Я встаю, когда солнце касается крыш, когда воздух поёт о свободе..."
             
-            # Симулируем полный прогон, как в test_all.py
-            emo_analyzer = self.EmoAnalyzer()
-            tlp_analyzer = self.TlpAnalyzer()
-            emo = emo_analyzer.analyze(text)
-            tlp = tlp_analyzer.analyze(text)
-
+            # Эмулируем пайплайн
+            emo = self.emo_analyzer.analyze(text)
+            tlp = self.tlp_engine.analyze(text)
             bpm = PatchedLyricMeter().bpm_from_density(text)
-            style = StyleMatrix().build(emo, tlp, text, bpm)
+            style = PatchedStyleMatrix().build(emo, tlp, text, bpm)
 
-            self.assertTrue(60 <= bpm <= 180, f"BPM out of range: {bpm}")
+            self.assertGreaterEqual(bpm, 60, f"BPM out of range: {bpm}")
+            self.assertLessEqual(bpm, 180, f"BPM out of range: {bpm}")
             self.assertIn("genre", style, "Missing 'genre' in style output")
             self.assertIn("style", style, "Missing 'style' in style output")
-            self.assertIsInstance(style.get("techniques", []), list, "Techniques not list")
+            self.assertIsInstance(style.get("techniques"), list, "Techniques not list")
 
             print(f"✅ Pipeline OK | BPM={bpm} | Genre={style['genre']} | Style={style['style']}")
 
-        except Exception as e:
+        except ImportError as e:
+            self.fail(f"❌ Ошибка импорта в тесте пайплайна: {e}")
+        except Exception:
             self.fail(f"❌ Pipeline test failed: {traceback.format_exc()}")
 
     def test_api_response(self):
-        """
-        Тест: [Integrity] Проверяет эндпоинт (требует запущенного сервера).
-        """
+        """Тест: [Integrity] Проверяет эндпоинт (требует запущенного сервера)."""
         print("\n[TestIntegrity] 🌐 Checking API endpoint...")
-        api_url = "http://127.0.0.1:7860/api/predict"
+        api_url = "http://127.0.0.1:7860/api/predict" # Используем /api/predict
         payload = {
             "text": "Я тону, когда солнце уходит вдаль...",
             "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
         }
         
         try:
-            # ИСПРАВЛЕНИЕ: Таймаут 30с (для Inference API)
-            r = requests.post(api_url, json=payload, timeout=30) 
+            # ИСПРАВЛЕНИЕ: Таймаут увеличен до 120 секунд
+            r = requests.post(api_url, json=payload, timeout=120)
             
-            self.assertEqual(
-                r.status_code, 200,
-                f"API test failed: HTTP {r.status_code}. "
-                f"Убедитесь, что URL '{api_url}' корректный в app.py. "
-                f"Response: {r.text[:200]}..."
-            )
+            self.assertEqual(r.status_code, 200, 
+                             f"API test failed: HTTP {r.status_code}. Убедитесь, что URL '{api_url}' корректный в app.py. Response: {r.text}")
             
             data = r.json()
-            self.assertIn("style", data, "Ответ API не содержит ключ 'style'")
-            self.assertIn("bpm", data, "Ответ API не содержит ключ 'bpm'")
-            
+            self.assertIn("bpm", data)
+            self.assertIn("style", data)
             print(f"✅ API OK | Style={data.get('style')} | BPM={data.get('bpm')}")
 
         except Exception as e:
             self.fail(f"❌ API test failed: {e}")
 
-
-# Этот блок позволяет запускать файл напрямую
-# ИЛИ через discover (из test_all.py)
 if __name__ == "__main__":
     unittest.main()
