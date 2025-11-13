@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION (v7 - Таймаут 20с)
+StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION (v8 - Включено логирование)
 """
 
 # === 🔧 Исправление пути импорта ===
@@ -24,22 +24,21 @@ import time
 # === 1. АКТИВАЦИЯ ЛОГГЕРА ===
 try:
     from studiocore.logger import setup_logging
-    setup_logging()
+    # Устанавливаем уровень DEBUG, чтобы видеть все
+    setup_logging(level=logging.DEBUG) 
 except ImportError:
     print("WARNING: studiocore.logger не найден. Используется стандартный print.")
-    # (Продолжаем работу без логгера)
+    # Fallback
+    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)-5.5s] [%(name)-20s] %(message)s")
     pass
 
-import logging
-log = logging.getLogger(__name__)
+log = logging.getLogger("test_all")
 # === Конец активации логгера ===
 
 # Папки для сканирования (только наши)
 ROOT_DIR = ROOT 
 PROJECT_FOLDERS_TO_SCAN = ["studiocore"]
-# v7: Убираем app.py из сканирования синтаксиса, 
-# так как он может быть в корне и вызывать ошибки доступа
-PROJECT_FILES_TO_SCAN = [] 
+PROJECT_FILES_TO_SCAN = ["app.py"] 
 
 log.info(f"ROOT проекта: {ROOT_DIR}")
 log.info(f"Папки для сканирования: {PROJECT_FOLDERS_TO_SCAN}")
@@ -193,10 +192,10 @@ def check_internal_dependencies():
     
     scan_dir = os.path.join(ROOT_DIR, "studiocore")
     
-    for root, _, files in os.walk(scan_dir):
+    for root, dirs, files in os.walk(scan_dir):
         # Игнорируем папку tests
-        if "tests" in root:
-            continue
+        if "tests" in dirs:
+            dirs.remove("tests")
             
         for f in files:
             if not f.endswith(".py"):
@@ -205,10 +204,17 @@ def check_internal_dependencies():
             path = os.path.join(root, f)
             # v7: Улучшенная нормализация имени модуля
             module_name = os.path.splitext(os.path.relpath(path, scan_dir))[0]
+            # v8: Заменяем os.path.sep на точку
             module_name = module_name.replace(os.path.sep, ".")
+            
+            # v8: Убираем __init__
             if module_name.endswith(".__init__"):
                  module_name = module_name.replace(".__init__", "")
             
+            # v8: Пропускаем сам logger
+            if module_name == "logger":
+                continue
+
             dependencies[module_name] = []
             
             try:
@@ -316,6 +322,7 @@ def test_prediction_pipeline():
         log.debug(f"Вызов: PatchedLyricMeter.bpm_from_density (integration test)")
         bpm = lyric_meter.bpm_from_density(text, emo)
         log.debug(f"Вызов: StyleMatrix.build (integration test)")
+        # v6: Добавлен voice_hint=None
         style = style_matrix.build(emo, tlp, text, bpm, {}, None)
 
         assert "genre" in style and "style" in style, "Отсутствуют ключевые поля"
