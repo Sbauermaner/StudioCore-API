@@ -22,6 +22,7 @@ from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 from .tone import ToneSyncEngine
 from .adapter import build_suno_prompt
 from .vocals import VocalProfileRegistry
+from .rhythm import LyricMeter
 # v11: 'PatchedStyleMatrix' - это наш 'StyleMatrix'
 from .style import PatchedStyleMatrix, STYLE_VERSION 
 
@@ -83,34 +84,49 @@ def detect_gender_from_grammar(text: str) -> str | None:
 # ==========================================================
 
 class PatchedLyricMeter:
-    """ Расчет BPM по плотности слогов. """
-    VOWELS = set("aeiouyауоыиэяюёеAEIOUYАУОЫИЭЯЮЁЕ")
+    """Обёртка над новым LyricMeter для обратной совместимости."""
 
-    def _syllables(self, line: str) -> int:
-        l = line.lower()
-        return max(1, sum(1 for ch in l if ch in self.VOWELS))
+    def __init__(self) -> None:
+        self._engine = LyricMeter()
 
-    def bpm_from_density(self, text: str, emo: Dict[str, float] = {}) -> int:
+    def analyze(
+        self,
+        text: str,
+        *,
+        emotions: Dict[str, float] | None = None,
+        cf: float | None = None,
+        tlp: Dict[str, float] | None = None,
+        header_bpm: float | None = None,
+    ):
+        log.debug("Вызов функции: PatchedLyricMeter.analyze")
+        tlp = tlp or {}
+        if cf is None:
+            cf = tlp.get("conscious_frequency")
+        return self._engine.analyze(
+            text,
+            emotions=emotions,
+            cf=cf,
+            tlp=tlp,
+            header_bpm=header_bpm,
+        )
+
+    def bpm_from_density(
+        self,
+        text: str,
+        emo: Dict[str, float] | None = None,
+        cf: float | None = None,
+        tlp: Dict[str, float] | None = None,
+    ) -> int:
         log.debug("Вызов функции: PatchedLyricMeter.bpm_from_density")
-        lines = [ln for ln in text.split("\n") if ln.strip() and not ln.strip().startswith("[")]
-        if not lines:
-            return 100
-            
-        avg_syll = sum(self._syllables(ln) for ln in lines) / len(lines)
-        
-        # Базовая шкала: 10 слогов = 120 BPM
-        bpm = 180 - (avg_syll * 6) 
-        
-        # Эмоциональная коррекция
-        pain_factor = emo.get("sadness", 0.0) + emo.get("fear", 0.0)
-        energy_factor = emo.get("joy", 0.0) + emo.get("anger", 0.0) + emo.get("epic", 0.0)
-        
-        bpm = bpm - (pain_factor * 40) # Грусть/Страх замедляют
-        bpm = bpm + (energy_factor * 20) # Радость/Злость ускоряют
-        
-        final_bpm = int(max(60, min(180, bpm)))
-        log.debug(f"Расчет BPM: Cред. слогов={avg_syll:.2f}, Эмо-коррекция (Pain={pain_factor:.2f}, Energy={energy_factor:.2f}), Итог={final_bpm} BPM")
-        return final_bpm
+        analysis = self.analyze(text, emotions=emo, cf=cf, tlp=tlp)
+        bpm = int(round(analysis["global_bpm"]))
+        log.debug(
+            "Расчет BPM (patched): resolved=%s, header=%s, estimated=%s",
+            bpm,
+            analysis.get("header_bpm"),
+            analysis.get("estimated_bpm"),
+        )
+        return bpm
 
 class PatchedUniversalFrequencyEngine:
     def resonance_profile(self, tlp: Dict[str, float]) -> Dict[str, Any]:
@@ -424,9 +440,20 @@ class StudioCore:
         tlp = self.tlp.analyze(raw)
         log.debug(f"Результат TLP: {tlp}")
         
-        log.debug("Вызов: self.rhythm.bpm_from_density")
-        bpm_base = self.rhythm.bpm_from_density(raw, emo)
-        log.debug(f"Базовый BPM: {bpm_base}")
+        log.debug("Вызов: self.rhythm.analyze")
+        rhythm_analysis = self.rhythm.analyze(
+            raw,
+            emotions=emo,
+            tlp=tlp,
+            cf=tlp.get("conscious_frequency"),
+        )
+        bpm_base = int(round(rhythm_analysis.get("global_bpm", 120)))
+        log.debug(
+            "Базовый BPM: %s (header=%s, estimated=%s)",
+            bpm_base,
+            rhythm_analysis.get("header_bpm"),
+            rhythm_analysis.get("estimated_bpm"),
+        )
 
         # 2. Анализ вокала по секциям
         log.debug("Вызов: self._analyze_sections")
@@ -501,6 +528,7 @@ class StudioCore:
             "style": style, "vocals": vox, "instruments": inst,
             "vocal_form": vocal_form, "final_gender_preference": final_gender_preference,
             "integrity": integ, "tone_sync": tone,
+            "rhythm": rhythm_analysis,
             
             "annotated_text_ui": annotated_text_ui,     # v6: Для Gradio UI
             "annotated_text_suno": annotated_text_suno, # v6: Для Suno Lyrics
