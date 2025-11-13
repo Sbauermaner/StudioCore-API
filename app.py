@@ -221,7 +221,8 @@ def analyze_text(text: str, gender: str = "auto"):
 
     except Exception as e:
         log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА в analyze_text (Gradio): {traceback.format_exc()}")
-        return f"❌ Внутреннее исключение: {e}", "", ""
+        # v10: Возвращаем traceback в UI для легкой отладки
+        return f"❌ Внутреннее исключение: {e}\n\n{traceback.format_exc()}", "", ""
 
 # === 9. INLINE TEST RUNNER ===
 def run_inline_tests():
