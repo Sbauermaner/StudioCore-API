@@ -23,7 +23,8 @@ if ROOT not in sys.path:
 # ДО импорта ядра
 try:
     from studiocore.logger import setup_logging
-    # Устанавливаем уровень DEBUG, чтобы видеть все
+    # v6: Устанавливаем уровень DEBUG, чтобы видеть все
+    # v16: Исправлен TypeError (logger.py v2)
     setup_logging(level=logging.DEBUG) 
 except ImportError:
     print("WARNING: studiocore.logger не найден. Используется стандартный print.")
@@ -113,7 +114,7 @@ async def api_predict(request_data: PredictRequest):
 # === 7. SELF-CHECK ===
 def auto_core_check():
     """ 
-    Фоновая проверка API-эндпоинта (v4 - таймаут 20с).
+    Фоновая проверка API-эндпоинта (v7 - таймаут 20с).
     Дает серверу 5 секунд на запуск, затем пингует /api/predict.
     """
     log.debug("[Self-Check] Поток запущен, ожидание 5с...")
@@ -135,7 +136,7 @@ def auto_core_check():
     
     try:
         # v7: Таймаут 20с (для "Плана C" - быстрые словари)
-        r = requests.post(api_url, json=payload, timeout=20)
+        r = requests.post(api_url, json=payload, timeout=20) 
         log.info(f"[Self-Check] → Статус: {r.status_code}")
         if r.status_code != 200:
              log.warning(f"[Self-Check] → Ответ: {r.text[:200]}...")
@@ -172,12 +173,16 @@ def analyze_text(text: str, gender: str = "auto"):
         
         # v8: Улучшенная логика: ищем хинт только в ПОСЛЕДНЕЙ строке, 
         # если она в скобках или начинается с "под"
-        last_line = text.strip().splitlines()[-1].strip().lower()
-        if (last_line.startswith("(") and last_line.endswith(")")) or \
-           last_line.startswith("под "):
-            if any(k in last_line for k in voice_hint_keywords):
-                overlay["voice_profile_hint"] = last_line
-                log.info(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
+        if text.strip():
+            try:
+                last_line = text.strip().splitlines()[-1].strip().lower()
+                if (last_line.startswith("(") and last_line.endswith(")")) or \
+                   last_line.startswith("под "):
+                    if any(k in last_line for k in voice_hint_keywords):
+                        overlay["voice_profile_hint"] = last_line
+                        log.info(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
+            except IndexError:
+                pass # (Если текст пустой)
         
         log.debug("Gradio -> core.analyze...")
         result = CORE.analyze(text, preferred_gender=gender, overlay=overlay or None)
