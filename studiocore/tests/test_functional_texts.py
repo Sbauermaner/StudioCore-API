@@ -61,7 +61,7 @@ texts = {
 И я чувствую жизнь на свете."""
 }
 
-# --- Эталонные ожидания (v12 - для словарей v13 + style v12) ---
+# --- Эталонные ожидания (v12 - для словарей v15 + style v12) ---
 expected = {
     "LOVE": {
         "genre": "lyrical adaptive", # (Mood=joy/peace ИЛИ Love > Pain)
