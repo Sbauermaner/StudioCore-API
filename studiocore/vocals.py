@@ -8,7 +8,8 @@ v8: Добавлены 'lyrical' и 'edm' в DEFAULT_VOCAL_MAP.
 
 import re
 from typing import Dict, Any, List, Tuple
-from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine # v15: Исправлен ImportError
+# v15: Исправлен ImportError (возвращаем оригинальные имена)
+from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine 
 import logging
 
 log = logging.getLogger(__name__)
@@ -160,7 +161,6 @@ class VocalProfileRegistry:
             
             # v8: Если пользователь выбрал M или F, но форма - ДУЭТ (из хинта или грамматики),
             # мы ПРЕДПОЛАГАЕМ, что это M/F дуэт, чтобы он звучал интереснее.
-            # (Раньше здесь было duet_mm или duet_ff, что было ошибкой)
             if form == "duet": 
                 log.debug("Логика _mixed_code: UI-хинт (M/F) + форма (Duet) = duet_mf")
                 return "duet_mf" 
@@ -184,8 +184,8 @@ class VocalProfileRegistry:
             return "duet_mf" # По умолчанию (если нет грамматики)
 
         if "choir" in form:
-            if "женск" in t or "female choir" in t: return "choir_female"
             # v5: Исправлена ошибка 'в' на 'in'
+            if "женск" in t or "female choir" in t: return "choir_female"
             if "мужск" in t or "male choir" in t: return "choir_male"
             return "choir_mixed"
 
