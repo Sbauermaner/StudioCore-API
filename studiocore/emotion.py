@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore Emotion Engines (v14 - "Умные" Словари + Оригинальные Имена)
+StudioCore Emotion Engines (v15 - "Умные" Словари + Оригинальные Имена + Логи)
 Быстрый эвристический анализ (не ИИ).
 """
 
@@ -54,7 +54,7 @@ class TruthLovePainEngine: # <-- Оригинальное имя
         self.TRUTH = re.compile(r"(" + "|".join(self.TRUTH_WORDS) + r")", re.I)
         self.LOVE = re.compile(r"(" + "|".join(self.LOVE_WORDS) + r")", re.I)
         self.PAIN = re.compile(r"(" + "|".join(self.PAIN_WORDS) + r")", re.I)
-        log.debug("TLP Engine (v14) инициализирован с расширенными словарями.")
+        log.debug("TLP Engine (v15) инициализирован с расширенными словарями.")
 
     def analyze(self, text: str) -> Dict[str, float]:
         log.debug(f"Вызов функции: TruthLovePainEngine.analyze")
@@ -69,18 +69,16 @@ class TruthLovePainEngine: # <-- Оригинальное имя
         log.debug(f"TLP хиты: T={truth_hits}, L={love_hits}, P={pain_hits}, Total={total}")
 
         if total == 0:
-            # Если нет TLP слов, считаем CF на основе длины (короткие тексты = выше CF)
             word_count = len(re.findall(r"[a-zа-яё]+", s))
-            cf = 1.0 - min(1.0, word_count / 100.0) * 0.5 # Бонус за краткость
+            cf = 1.0 - min(1.0, word_count / 100.0) * 0.5 
             truth, love, pain = 0.0, 0.0, 0.0
         else:
             truth = truth_hits / total
             love = love_hits / total
             pain = pain_hits / total
-            # Сознательная Частота (CF) = Гармония - Диссонанс
             harmony = (love + truth) / 2
             dissonance = pain
-            cf = max(0.0, min(1.0, (harmony - dissonance * 0.5 + 0.5))) # Базовая CF
+            cf = max(0.0, min(1.0, (harmony - dissonance * 0.5 + 0.5))) 
 
         result = {
             "truth": round(truth, 3),
@@ -96,7 +94,7 @@ class TruthLovePainEngine: # <-- Оригинальное имя
 # 💫 AutoEmotionalAnalyzer (v3 Словари)
 # =====================================================
 class AutoEmotionalAnalyzer: # <-- Оригинальное имя
-    """Heuristic emotion-field classifier (v14, +Logging)."""
+    """Heuristic emotion-field classifier (v15, +Logging)."""
 
     EMO_FIELDS = {
         "joy": ["joy", "happy", "laugh", "смех", "рад", "улыб", "счаст", "весел", "hope", "bright", "солнц"],
@@ -110,16 +108,14 @@ class AutoEmotionalAnalyzer: # <-- Оригинальное имя
     }
 
     def __init__(self):
-        # "Компилируем" словари для быстрого поиска
         self.LEXICON = {}
         for field, tokens in self.EMO_FIELDS.items():
             if tokens:
                 self.LEXICON[field] = re.compile(r"(" + "|".join(tokens) + r")", re.I)
-        log.debug("AutoEmotionalAnalyzer (v14) инициализирован.")
+        log.debug("AutoEmotionalAnalyzer (v15) инициализирован.")
 
     def _softmax(self, scores: Dict[str, float]) -> Dict[str, float]:
         if not scores: return {}
-        # Защита от слишком больших чисел (вычитаем максимум)
         max_score = max(scores.values()) if scores else 0
         try:
             exps = {k: math.exp(v - max_score) for k, v in scores.items()}
@@ -135,13 +131,11 @@ class AutoEmotionalAnalyzer: # <-- Оригинальное имя
         log.debug(f"Вызов функции: AutoEmotionalAnalyzer.analyze")
         s = text.lower()
 
-        # 1️⃣ Энергия пунктуации и эмодзи
         punct_energy = sum(PUNCT_WEIGHTS.get(ch, 0.0) for ch in s)
         emoji_energy = sum(EMOJI_WEIGHTS.get(ch, 0.0) for ch in s)
         energy = min(1.0, (punct_energy + emoji_energy) ** 0.7)
         log.debug(f"Энергия пунктуации/эмодзи: {energy:.2f}")
 
-        # 2️⃣ Подсчёт совпадений по "корням" (v13)
         scores: Dict[str, float] = {}
         total_hits = 0
         for field, pattern in self.LEXICON.items():
@@ -151,21 +145,17 @@ class AutoEmotionalAnalyzer: # <-- Оригинальное имя
         
         log.debug(f"Хиты по эмоциям (raw): {scores}")
 
-        # 3️⃣ Усиление энергией
         if energy > 0.1 and total_hits > 0:
             for field in scores:
                 scores[field] *= (1 + energy ** 2)
             log.debug(f"Хиты по эмоциям (усиленные): {scores}")
 
-        # 4️⃣ Нормализация (softmax)
         normalized = self._softmax(scores)
 
-        # 5️⃣ Если сигналов нет — вернуть фоновое спокойствие
         if total_hits == 0 or all(v < 0.05 for v in normalized.values()):
             log.debug("Сигналы эмоций не найдены. Возврат 'peace'.")
             normalized = {"peace": 0.6, "joy": 0.3, "neutral": 0.1}
         
-        # Округляем для чистоты
         final_scores = {k: round(v, 3) for k, v in normalized.items() if v > 0.001}
         log.debug(f"Результат EMO (финал): {final_scores}")
         return final_scores
