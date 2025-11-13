@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — System Integrity Test (v7 - 'UnboundLocal' ИСПРАВЛЕН)
+StudioCore v5.2.1 — System Integrity Test (v6 - Таймаут 20с)
 Проверяет, что всё ядро работает согласованно.
 """
 
@@ -65,11 +65,12 @@ class TestMainIntegrity(unittest.TestCase):
         log.info("[TestIntegrity] Emo/TLP Analyzers pre-loaded.")
         # v7: Исправлена ошибка UnboundLocalError
         if not CORE_LOADED:
-            # Если движки не загрузились, мы должны прервать тесты, 
-            # которые от них зависят, иначе они все равно упадут.
-            # Мы создаем "фиктивный" сбой, чтобы unittest это увидел.
-            # Этот assert НЕ должен сработать, если CORE_LOADED=False
-            pass
+            # Этот assert должен провалить тест, если ядро не загрузилось
+            cls.fail("КРИТИЧЕСКАЯ ОШИБКА: Движки Emo/TLP не смогли загрузиться.")
+        
+        cls.emo_engine = EMO_ENGINE
+        cls.tlp_engine = TLP_ENGINE
+
 
     def test_imports(self):
         """Тест: [Integrity] Проверяет, что все основные модули импортируются."""
@@ -92,8 +93,8 @@ class TestMainIntegrity(unittest.TestCase):
         log.debug("Запуск: test_prediction_pipeline")
         
         # v7: Проверяем, что движки из setUpClass загрузились
-        self.assertIsNotNone(EMO_ENGINE, "EMO Engine не был загружен")
-        self.assertIsNotNone(TLP_ENGINE, "TLP Engine не был загружен")
+        self.assertIsNotNone(self.emo_engine, "EMO Engine не был загружен")
+        self.assertIsNotNone(self.tlp_engine, "TLP Engine не был загружен")
 
         try:
             # v6: Исправлен ImportError
@@ -104,8 +105,8 @@ class TestMainIntegrity(unittest.TestCase):
             style_matrix = PatchedStyleMatrix()
 
             text = "Я встаю, когда солнце касается крыш..."
-            emo = EMO_ENGINE.analyze(text)
-            tlp = TLP_ENGINE.analyze(text)
+            emo = self.emo_engine.analyze(text)
+            tlp = self.tlp_engine.analyze(text)
 
             bpm = lyric_meter.bpm_from_density(text, emo)
             style = style_matrix.build(emo, tlp, text, bpm, {}, None)
