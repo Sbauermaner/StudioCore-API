@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (v5 - Logger Activated)
+🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (v6 - uvicorn ИСПРАВЛЕН)
 """
 
 import os, sys, subprocess, importlib, traceback, threading, time, io
@@ -10,16 +10,14 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import uvicorn # <-- ИСПРАВЛЕНИЕ: Этот импорт был потерян
 
 # === 1. АКТИВАЦИЯ ЛОГГЕРА ===
-# Это должно быть ДО импорта studiocore, чтобы логгер успел 
-# настроиться до того, как модули ядра начнут его использовать.
 try:
     from studiocore.logger import setup_logging
     setup_logging()
 except ImportError:
     print("WARNING: studiocore.logger не найден. Используется стандартный print.")
-    # (Продолжаем работу без логгера)
     pass
 
 import logging
@@ -131,8 +129,8 @@ def auto_core_check():
     payload = {"text": "self-check test"}
     
     try:
-        # Таймаут 20с (для "холодного старта" словарей)
-        r = requests.post(api_url, json=payload, timeout=20)
+        # v7: Таймаут 20с (для "Плана C" - быстрые словари)
+        r = requests.post(api_url, json=payload, timeout=20) 
         log.info(f"[Self-Check] → Статус: {r.status_code}")
         if r.status_code != 200:
              log.warning(f"[Self-Check] → Ответ: {r.text[:100]}...")
