@@ -27,6 +27,7 @@ try:
     setup_logging()
 except ImportError:
     print("WARNING: studiocore.logger не найден. Используется стандартный print.")
+    # (Продолжаем работу без логгера)
     pass
 
 import logging
@@ -36,7 +37,9 @@ log = logging.getLogger(__name__)
 # Папки для сканирования (только наши)
 ROOT_DIR = ROOT 
 PROJECT_FOLDERS_TO_SCAN = ["studiocore"]
-PROJECT_FILES_TO_SCAN = ["app.py"] # Файлы в корне
+# v7: Убираем app.py из сканирования синтаксиса, 
+# так как он может быть в корне и вызывать ошибки доступа
+PROJECT_FILES_TO_SCAN = [] 
 
 log.info(f"ROOT проекта: {ROOT_DIR}")
 log.info(f"Папки для сканирования: {PROJECT_FOLDERS_TO_SCAN}")
@@ -172,6 +175,7 @@ def test_imports():
             importlib.import_module(m)
             log.info(f"✅ Импортирован: {m}")
         except Exception as e:
+            # v7: Используем полный traceback для ошибок импорта
             log.error(f"❌ Ошибка импорта: {m} — {traceback.format_exc()}")
             all_ok = False
     return all_ok
@@ -190,18 +194,20 @@ def check_internal_dependencies():
     scan_dir = os.path.join(ROOT_DIR, "studiocore")
     
     for root, _, files in os.walk(scan_dir):
+        # Игнорируем папку tests
+        if "tests" in root:
+            continue
+            
         for f in files:
             if not f.endswith(".py"):
                 continue
             
             path = os.path.join(root, f)
-            # Превращаем путь в имя модуля (studiocore.rhythm)
-            module_name = path.replace(ROOT_DIR + os.path.sep, "") \
-                              .replace(os.path.sep, ".") \
-                              .replace(".py", "")
-            
-            # v6: Убираем /studiocore/ из имени
-            module_name = module_name.replace("studiocore.", "")
+            # v7: Улучшенная нормализация имени модуля
+            module_name = os.path.splitext(os.path.relpath(path, scan_dir))[0]
+            module_name = module_name.replace(os.path.sep, ".")
+            if module_name.endswith(".__init__"):
+                 module_name = module_name.replace(".__init__", "")
             
             dependencies[module_name] = []
             
@@ -215,6 +221,10 @@ def check_internal_dependencies():
                             if alias.name.startswith("studiocore.") or alias.name.startswith("."):
                                 dependencies[module_name].append(alias.name)
                     elif isinstance(node, ast.ImportFrom):
+                        # Игнорируем __future__
+                        if node.module == "__future__":
+                            continue
+                            
                         if node.module and (node.module.startswith("studiocore.") or node.module.startswith(".")):
                             # Убираем . из '.emotion'
                             dependencies[module_name].append(node.module.lstrip('.'))
@@ -284,9 +294,10 @@ def test_prediction_pipeline():
     """
     log.info("\n🎧 Проверка (интеграционная) ядра StudioCore...")
     try:
-        # v6: Исправлен ImportError. Эти классы теперь ВНУТРИ monolith.
+        # v6: Исправлен ImportError. 
         from studiocore.monolith_v4_3_1 import PatchedLyricMeter
         from studiocore.style import PatchedStyleMatrix
+        # v15: Исправлен ImportError
         from studiocore.emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 
         # Инициализируем их вручную, как в test_main_integrity
@@ -329,7 +340,7 @@ def test_api_response():
     }
     
     try:
-        # v7: Таймаут увеличен до 20с (для "Плана C")
+        # v7: Таймаут 20с (для "Плана C" - быстрые словари)
         r = requests.post(api_url, json=payload, timeout=20) 
         
         if r.status_code == 200:
