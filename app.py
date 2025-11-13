@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5.2.1 — Adaptive Annotation Engine
-v5: Внедрен централизованный логгер (studiocore.logger)
+🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (v5 - Logger Activated)
 """
 
 import os, sys, subprocess, importlib, traceback, threading, time, io
@@ -11,41 +10,55 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
-import logging # <-- 1. Импортируем logging
 
-# === 2. Импортируем и АКТИВИРУЕМ наш логгер ===
-from studiocore.logger import setup_logging
-setup_logging()
-# === Логирование активировано ===
+# === 1. АКТИВАЦИЯ ЛОГГЕРА ===
+# Это должно быть ДО импорта studiocore, чтобы логгер успел 
+# настроиться до того, как модули ядра начнут его использовать.
+try:
+    from studiocore.logger import setup_logging
+    setup_logging()
+except ImportError:
+    print("WARNING: studiocore.logger не найден. Используется стандартный print.")
+    # (Продолжаем работу без логгера)
+    pass
 
-# Получаем наш логгер (он уже настроен)
+import logging
 log = logging.getLogger(__name__)
+log.info("Запуск app.py...")
+# === Конец активации логгера ===
+
 
 # === Импорт ядра ===
-# (Импорты ядра должны идти ПОСЛЕ настройки логгера)
 try:
     from studiocore import get_core, STUDIOCORE_VERSION
-except ImportError as e:
-    log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА ИМПОРТА ЯДРА: {e}")
-    log.critical("Убедитесь, что все зависимости установлены и нет синтаксических ошибок.")
-    sys.exit(1)
+    core = get_core()
+    CORE_LOADED = True
+    log.info("Ядро StudioCore успешно импортировано.")
+except Exception as e:
+    log.error(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить ядро StudioCore.")
+    log.error(traceback.format_exc())
+    from studiocore import StudioCoreFallback
+    core = StudioCoreFallback()
+    CORE_LOADED = False
+    STUDIOCORE_VERSION = "FALLBACK"
 
 
 # === Установка requests (для self-check) ===
-# (Этот блок остается без изменений)
 if importlib.util.find_spec("requests") is None:
     try:
+        log.warning("Зависимость 'requests' не найдена. Попытка установить...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
     except Exception:
+        log.error("Не удалось установить 'requests'. Self-check будет отключен.")
         pass
 try:
-    import requests  # type: ignore
+    import requests
 except Exception:
     requests = None
 
-# === Инициализация ядра и FastAPI ===
-log.info("Инициализация ядра StudioCore...")
-core = get_core()
+
+# === Инициализация FastAPI ===
+log.debug("Инициализация FastAPI...")
 app = FastAPI(title="StudioCore API")
 
 # === CORS ===
@@ -58,7 +71,6 @@ app.add_middleware(
 )
 
 # === 🎧 PUBLIC API ENDPOINT ===
-# (Этот блок остается без изменений)
 
 class PredictRequest(BaseModel):
     """ Модель запроса для API """
@@ -73,7 +85,15 @@ async def api_predict(request_data: PredictRequest):
     Эндпоинт, который ищут 'test_all.py' и 'auto_core_check'.
     Он принимает JSON и возвращает JSON.
     """
-    log.debug(f"Входящий запрос /api/predict: {request_data.text[:50]}...")
+    log.debug(f"Входящий запрос /api/predict: {request_data.text[:20]}...")
+    
+    if not CORE_LOADED:
+        log.error("API /api/predict вызван, но ядро в режиме Fallback.")
+        return JSONResponse(
+            content={"error": "⚠️ StudioCoreFallback: анализ недоступен — основное ядро не загружено."}, 
+            status_code=500
+        )
+        
     try:
         # Мы сопоставляем данные из запроса с тем, что ожидает core.analyze
         result = core.analyze(
@@ -88,7 +108,7 @@ async def api_predict(request_data: PredictRequest):
              return JSONResponse(content=result, status_code=400)
         
         # Возвращаем полный результат (тесты ожидают 'bpm' и 'style')
-        log.debug(f"API /api/predict успешно вернул результат.")
+        log.debug("API /api/predict: Успешный ответ 200 OK")
         return JSONResponse(content=result, status_code=200)
 
     except Exception as e:
@@ -101,59 +121,61 @@ async def api_predict(request_data: PredictRequest):
 # === SELF-CHECK ===
 def auto_core_check():
     if os.environ.get("DISABLE_SELF_CHECK") == "1" or requests is None:
+        log.info("[Self-Check] Проверка отключена (DISABLE_SELF_CHECK=1 или 'requests' не найден).")
         return
-    time.sleep(3)
+    
+    time.sleep(3) # Даем uvicorn время на запуск
     log.debug("[Self-Check] Запуск самопроверки эндпоинта /api/predict...")
+    
+    api_url = "http://127.0.0.1:7860/api/predict"
+    payload = {"text": "self-check test"}
+    
     try:
-        # Увеличиваем таймаут до 20 секунд (на случай медленного запуска)
-        r = requests.post("http://127.0.0.1:7860/api/predict", json={"text": "test"}, timeout=20)
+        # Таймаут 20с (для "холодного старта" словарей)
+        r = requests.post(api_url, json=payload, timeout=20)
         log.info(f"[Self-Check] → Статус: {r.status_code}")
         if r.status_code != 200:
              log.warning(f"[Self-Check] → Ответ: {r.text[:100]}...")
     except Exception as e:
         log.error(f"❌ Self-Check ошибка: {e}")
 
+# Запускаем self-check в отдельном потоке
 threading.Thread(target=auto_core_check, daemon=True).start()
 
-# === АНАЛИЗ ТЕКСТА ===
+
+# === АНАЛИЗ ТЕКСТА (Gradio UI) ===
 def analyze_text(text: str, gender: str = "auto"):
-    """Основная функция анализа текста через StudioCore."""
+    """Основная функция анализа текста через StudioCore (для UI)."""
     log.debug(f"Gradio analyze_text: получено {len(text)} символов, gender={gender}")
+    
     if not text.strip():
-        log.warning("Gradio analyze_text: получен пустой текст.")
+        log.warning("Gradio analyze_text: Пустой ввод.")
         return "⚠️ Введите текст для анализа.", "", "", ""
 
     try:
-        if getattr(core, "is_fallback", False):
+        if not CORE_LOADED:
             log.error("Gradio analyze_text: Ядро в режиме Fallback!")
-            return (
-                "⚠️ StudioCore находится в безопасном режиме (fallback). "
-                "Анализ временно недоступен.", "", "", ""
-            )
+            return "❌ ОШИБКА: Ядро не загружено (см. лог).", "", "", ""
 
         # --- Проверка пользовательских описаний вокала ---
         overlay = {}
-        # (Логика voice_profile_hint остается без изменений)
-        # ...
-        if any(k in text.lower() for k in [
+        voice_hint_keywords = [
             "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
             "пескляв", "soft", "airy", "shout", "grit", "фальцет", "whisper"
-        ]):
+        ]
+        if any(k in text.lower() for k in voice_hint_keywords):
             overlay["voice_profile_hint"] = text.split("\n")[-1].strip()
             log.info(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
         else:
             overlay = None
 
         # --- Вызов ядра ---
-        log.debug("Gradio analyze_text: Вызов core.analyze...")
+        log.debug("Gradio -> core.analyze...")
         result = core.analyze(text, preferred_gender=gender, overlay=overlay)
 
         if isinstance(result, dict) and "error" in result:
-            log.error(f"Gradio analyze_text: Ядро вернуло ошибку: {result['error']}")
+            log.error(f"Gradio: Ядро вернуло ошибку: {result['error']}")
             return f"❌ Ошибка: {result['error']}", "", "", ""
-
-        # (Остальная часть функции analyze_text остается без изменений)
-        # ...
 
         style = result.get("style", {})
         vocals = result.get("vocals", [])
@@ -168,91 +190,92 @@ def analyze_text(text: str, gender: str = "auto"):
             f"🎸 {instruments} | "
             f"⏱ {result.get('bpm', '—')} BPM"
         )
-
-        annotated_text = result.get("annotated_text")
-        if not annotated_text and hasattr(core, "annotate_text"):
-            log.debug("Gradio analyze_text: Вызов core.annotate_text (fallback)...")
-            annotated_text = core.annotate_text(
-                text,
-                result.get("overlay", {}),
-                style,
-                vocals,
-                result.get("bpm") or getattr(core, "rhythm", None).bpm_from_density(text) or 120,
-                result.get("emotions", {}),
-                result.get("tlp", {}),
-            )
         
+        # prompt_suno_style (Style) и prompt_suno_lyrics (Lyrics)
         style_prompt = result.get("prompt_suno_style", "⚠️ Нет данных")
-        
-        log.debug("Gradio analyze_text: Анализ завершен, возврат в UI.")
+        suno_lyrics_prompt = result.get("prompt_suno_lyrics", "⚠️ Нет данных")
+        annotated_text = result.get("annotated_text", "⚠️ Нет данных")
+
+        log.debug("Gradio: Анализ завершен, возврат в UI.")
         return (
             summary,
-            style_prompt, # prompt_suno_style
-            result.get("prompt_suno_lyrics", "⚠️ Нет данных"), # prompt_suno_lyrics
+            style_prompt,
+            suno_lyrics_prompt, # Возвращаем вокальный промпт
             annotated_text,
         )
 
     except Exception:
-        log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА в analyze_text (UI): {traceback.format_exc()}")
-        return "❌ Внутреннее исключение при анализе.", "", "", ""
+        log.error(f"❌ КРИТИЧЕСКАЯ ОШИБКА в analyze_text (Gradio): {traceback.format_exc()}")
+        return "❌ Внутреннее исключение при анализе (см. лог).", "", "", ""
 
 # === INLINE TEST RUNNER ===
 def run_inline_tests():
     """Выполняет тесты и возвращает stdout прямо в интерфейс."""
+    
     log.info("=" * 30)
     log.info("🚀 ЗАПУСК ВСТРОЕННЫХ ТЕСТОВ...")
     log.info("=" * 30)
+    
+    # Используем StringIO для перехвата вывода от os.system
     buffer = io.StringIO()
-    # Направляем логгер также в buffer
-    test_log_handler = logging.StreamHandler(buffer)
-    test_log_handler.setFormatter(logging.Formatter(
-        "[%(name)s.%(funcName)s:%(lineno)d] - %(message)s"
-    ))
-    logging.getLogger().addHandler(test_log_handler)
-
+    
+    # Перенаправляем stdout/stderr в буфер
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+    sys.stdout = buffer
+    sys.stderr = buffer
+    
+    # Заголовки
     buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
     buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
     try:
+        # --- Запуск test_all.py ---
         buffer.write("🚀 Running: studiocore/tests/test_all.py\n\n")
-        # Мы используем os.system, но логирование уже перехватит stdout/stderr
-        # благодаря setup_logging()
-        
-        # Создаем временные файлы для вывода, чтобы точно его захватить
-        test_all_out = "tmp_test_all_out.txt"
-        
-        # Запускаем test_all.py и перенаправляем ЕГО stdout/stderr в файл
-        os.system(f"python3 studiocore/tests/test_all.py > {test_all_out} 2>&1")
-        
-        with open(test_all_out, "r", encoding="utf-8", errors="ignore") as f:
-            buffer.write(f.read() + "\n")
-        os.remove(test_all_out) # Чистим за собой
+        # Создаем процесс и ждем его завершения
+        # Используем sys.executable для гарантии использования того же python
+        process1 = subprocess.Popen(
+            [sys.executable, "studiocore/tests/test_all.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+        stdout1, _ = process1.communicate()
+        buffer.write(stdout1 + "\n\n")
 
-        # ---
-        
-        buffer.write("\n🧠 Running: studiocore/tests/test_functional_texts.py\n\n")
-        test_func_out = "tmp_test_func_out.txt"
-        
-        os.system(f"python3 studiocore/tests/test_functional_texts.py > {test_func_out} 2>&1")
-        
-        with open(test_func_out, "r", encoding="utf-8", errors="ignore") as f:
-            buffer.write(f.read() + "\n")
-        os.remove(test_func_out) # Чистим за собой
-
+        # --- Запуск test_functional_texts.py ---
+        buffer.write("🧠 Running: studiocore/tests/test_functional_texts.py\n\n")
+        process2 = subprocess.Popen(
+            [sys.executable, "studiocore/tests/test_functional_texts.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+        stdout2, _ = process2.communicate()
+        buffer.write(stdout2 + "\n\n")
 
         buffer.write("✅ Inline test session complete.\n")
 
     except Exception as e:
-        buffer.write(f"❌ Ошибка при запуске тестов: {e}\n")
-        log.error(f"❌ Ошибка при запуске тестов: {e}")
+        buffer.write(f"❌ Ошибка при запуске subprocess: {e}\n")
+        buffer.write(traceback.format_exc())
+    
+    finally:
+        # ОБЯЗАТЕЛЬНО возвращаем stdout/stderr
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
 
-    # Удаляем наш временный обработчик логов
-    logging.getLogger().removeHandler(test_log_handler)
     log.info("🏁 ...Встроенные тесты завершены.")
+    
     return buffer.getvalue()
 
+
 # === PUBLIC UI (Gradio) ===
-# (Этот блок остается без изменений, за исключением имен вывода)
+log.debug("Инициализация Gradio UI...")
 with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface") as iface_public:
     gr.Markdown(f"## 🎧 StudioCore {STUDIOCORE_VERSION}\nАдаптивный движок с тестами и логами.\n")
 
@@ -269,16 +292,15 @@ with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface
 
         with gr.Row():
             result_box = gr.Textbox(label="📊 Результат (Summary)", lines=6)
-            style_box = gr.Textbox(label="🎼 Стиль и инструменты (Style Prompt)", lines=8)
+            style_box = gr.Textbox(label="🎼 Suno [Style of Music] Prompt", lines=8, show_copy_button=True)
 
         with gr.Row():
-            suno_box = gr.Textbox(label="🎧 Suno-промт (Lyrics)", lines=8)
+            suno_box = gr.Textbox(label="🎤 Suno [Lyrics] Prompt (Vocal)", lines=8, show_copy_button=True)
             annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (inline)", lines=24)
 
         analyze_button.click(
             fn=analyze_text,
             inputs=[text_input, gender_input],
-            # Обновляем имена вывода, чтобы соответствовать analyze_text
             outputs=[result_box, style_box, suno_box, annotated_box],
         )
 
@@ -289,11 +311,11 @@ with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface
         run_btn.click(fn=run_inline_tests, inputs=None, outputs=output_box)
 
 # === MOUNT ===
+log.debug("Монтирование Gradio App в FastAPI (path='/')...")
 iface_public.queue()
 app = gr.mount_gradio_app(app, iface_public, path="/")
 
 # === RUN ===
 if __name__ == "__main__":
-    import uvicorn
     log.info(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API (Inline Logs Mode)...")
     uvicorn.run(app, host="0.0.0.0", port=7860)
