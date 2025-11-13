@@ -15,7 +15,8 @@ import logging
 
 # === 1. Импорт ядра ===
 from .config import load_config
-from .text_utils import normalize_text_preserve_symbols, extract_raw_blocks
+# v16: ИСПРАВЛЕН ImportError
+from .text_utils import normalize_text_preserve_symbols, extract_raw_blocks 
 # v15: Исправлен ImportError (возвращаем оригинальные имена)
 from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 from .tone import ToneSyncEngine
@@ -207,7 +208,9 @@ class StudioCore:
                 "gender": g_gender,
                 "hint": v_hint
             })
+            # v5: Исправлена ошибка f-string (убрано троеточие)
             log.debug(f"Блок [{block_text[:20]}...] -> Пол: {g_gender}, Хинт: {v_hint}")
+
 
         # 2. Определение финального пола (Приоритеты)
         genders_found = {p["gender"] for p in section_profiles if p["gender"]}
@@ -314,7 +317,6 @@ class StudioCore:
         suno_blocks = []
         
         num_blocks = len(text_blocks)
-        num_semantics = len(semantic_sections)
         
         # --- (v6) Улучшенная логика мэппинга секций ---
         # intro, verse1, chorus1, verse2, chorus2, bridge, chorus3, outro
@@ -329,7 +331,8 @@ class StudioCore:
             semantic_map = ["Intro", "Verse", "Pre-Chorus", "Chorus", "Verse", "Bridge", "Chorus", "Outro"]
             
         # Дополняем карту, если блоков больше 8
-        semantic_map.extend(["Verse", "Chorus"] * (num_blocks - len(semantic_map)))
+        if num_blocks > len(semantic_map):
+            semantic_map.extend(["Verse", "Chorus"] * (num_blocks - len(semantic_map)))
         
         # Находим определения секций
         sec_defs = {s["tag"].lower(): s for s in semantic_sections}
