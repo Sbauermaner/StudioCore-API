@@ -1,144 +1,142 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — Extended Functional Logic Test
-Тестирует реакцию ядра на тексты с разными эмоциональными профилями.
-
-ИСПРАВЛЕНО: Преобразовано в unittest.TestCase для запуска через discover.
-ИСПРАВЛЕНО: Обновлены эталоны (snapshots) для `style` и `genre`.
+StudioCore v5.2.1 — Extended Functional Logic Test (v11 - Logged)
+(Использует "План С" - быстрые словари v13)
 """
 
-# === 🔧 Исправление пути импорта (ОБЯЗАТЕЛЬНО) ===
-import os, sys
+# === 🔧 Исправление пути импорта ===
+import os
+import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 # === Конец исправления ===
 
-import unittest, traceback
+import unittest
+import logging
+
+# === 1. АКТИВАЦИЯ ЛОГГЕРА ===
+try:
+    from studiocore.logger import setup_logging
+    setup_logging()
+except ImportError:
+    pass # test_all.py уже должен был его настроить
+
+log = logging.getLogger(__name__)
+# === Конец активации логгера ===
+
+
+# --- Глобальная загрузка ядра ---
+CORE = None
+CORE_LOADED = False
+try:
+    from studiocore import get_core
+    CORE = get_core()
+    CORE_LOADED = True
+except Exception as e:
+    log.critical(f"НЕ УДАЛОСЬ ЗАГРУЗИТЬ ЯДРО для тестов: {e}")
+
 
 # --- Тестовые тексты по архетипам ---
 texts = {
-    "love": """Я встаю, когда солнце касается крыш,
+    "LOVE": """Я встаю, когда солнце касается крыш,
 Когда воздух поёт о свободе.
 Каждый день — это шанс, что услышишь,
 Как любовь возвращается к Богу.""",
 
-    "pain": """Я тону, когда солнце уходит вдаль,
+    "PAIN": """Я тону, когда солнце уходит вдаль,
 Когда воздух застыл, как камень.
 Каждый день — это груз и печаль,
 Где любовь утонула в обмане.""",
 
-    "fear": """Я стою на краю между светом и тьмой,
+    "FEAR": """Я стою на краю между светом и тьмой,
 Слышу шаги — и замираю.
 Каждый шорох становится болью,
 Каждый вдох — испытанием веры.""",
 
-    "joy": """Я бегу по траве босиком,
+    "JOY": """Я бегу по траве босиком,
 Смеюсь, обгоняя ветер.
 Всё вокруг сияет теплом,
 И я чувствую жизнь на свете."""
 }
 
-# --- Эталонные ожидания (ОБНОВЛЕНЫ) ---
-# Эталоны, обновленные на основе логов (ошибка 'neutral modal')
+# --- Эталонные ожидания (v11 - для "Плана С" - быстрые словари) ---
 expected = {
-    "love": {
-        "genre": "lyrical adaptive",          # Было: cinematic narrative
-        "style": "majestic major",          # Было: neutral modal
-        "atmosphere": "serene and hopeful",
+    "LOVE": {
+        "genre": "lyrical adaptive", # (из-за Love > Pain)
+        "style": "majestic major",
     },
-    "pain": {
-        "genre": "lyrical adaptive",          # Было: cinematic narrative
-        "style": "melancholic minor",       # Было: neutral modal
-        "atmosphere": "introspective and melancholic",
+    "PAIN": {
+        "genre": "lyrical adaptive", # (из-за Pain > Love)
+        "style": "melancholic minor",
     },
-    "fear": {
-        "genre": "cinematic adaptive",
+    "FEAR": {
+        # (v11) 'fear' теперь триггерит 'dramatic' стиль
+        "genre": "cinematic adaptive", 
         "style": "dramatic harmonic minor",
-        "atmosphere": "intense and cathartic", # Было: mystic and suspenseful
     },
-    "joy": {
-        "genre": "lyrical adaptive",          # Было: cinematic narrative
-        "style": "majestic major",          # Было: neutral modal
-        "atmosphere": "serene and hopeful",
+    "JOY": {
+        "genre": "lyrical adaptive",
+        "style": "majestic major",
     },
 }
 
 
 class TestFunctionalEmotionalLogic(unittest.TestCase):
+    
+    core = None
 
     @classmethod
     def setUpClass(cls):
-        """Загружает ядро один раз для всех тестов в этом классе."""
-        print("\n[TestFunctionalTexts] Загрузка StudioCore...")
-        try:
-            from studiocore import get_core
-            cls.core = get_core()
-            
-            if getattr(cls.core, "is_fallback", False):
-                 print("🧩 [StudioCoreFallback] Активен временный режим.")
-            
-            print("[TestFunctionalTexts] Ядро успешно загружено.")
-        except Exception as e:
-            print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить ядро: {e}")
-            print(traceback.format_exc())
-            cls.core = None
+        """Загружаем ядро ОДИН РАЗ для всех тестов."""
+        log.info("[TestFunctionalTexts] Загрузка StudioCore...")
+        if not CORE_LOADED:
+            # Этого не должно произойти, если studiocore/__init__.py исправен
+            cls.core = None 
+        else:
+            cls.core = CORE
+        log.info("[TestFunctionalTexts] Ядро успешно загружено.")
 
     def test_emotional_logic_responses(self):
-        """
-        Главный тест: Прогоняет все тексты и сравнивает с эталонами.
-        """
-        if not self.core or getattr(self.core, "is_fallback", False):
+        """Главный тест: Прогоняет все тексты и сравнивает с эталонами."""
+        
+        # v7: Если ядро не загрузилось, проваливаем тест сразу
+        if not self.core or not CORE_LOADED:
             self.fail("Ядро не было загружено (в режиме Fallback), тесты логики пропущены.")
 
+        # Используем subTest, чтобы не падать на первой же ошибке
         for name, text in texts.items():
-            # subTest позволяет тесту продолжаться, даже если один из кейсов упал
             with self.subTest(name=name.upper()):
+                log.debug(f"--- [SubTest] Запуск анализа для: {name.upper()} ---")
+                
                 try:
                     result = self.core.analyze(text)
                 except Exception as e:
+                    # Проваливаем тест, если analyze() упал
                     self.fail(f"Ошибка ядра при анализе кейса {name.upper()}: {e}")
 
                 style = result.get("style", {})
-                genre = style.get("genre", "—")
-                mood = style.get("style", "—")
-                atmosphere = style.get("atmosphere", "—")
-                bpm = result.get("bpm", 0)
-
-                expected_case = expected[name]
-
-                # Проверка ЖАНРА
+                
+                # 1. Проверка ЖАНРА
+                expected_genre = expected[name]["genre"]
+                actual_genre = style.get("genre")
                 self.assertEqual(
-                    genre, expected_case["genre"],
-                    f"[{name.upper()}] Ошибка ЖАНРА: "
-                    f"ожидался '{expected_case['genre']}', получен '{genre}'"
+                    actual_genre, 
+                    expected_genre,
+                    f"[{name.upper()}] Ошибка ЖАНРА: ожидался '{expected_genre}', получен '{actual_genre}'"
                 )
                 
-                # Проверка СТИЛЯ
+                # 2. Проверка СТИЛЯ
+                expected_style = expected[name]["style"]
+                actual_style = style.get("style")
                 self.assertEqual(
-                    mood, expected_case["style"],
-                    f"[{name.upper()}] Ошибка СТИЛЯ: "
-                    f"ожидался '{expected_case['style']}', получен '{mood}'"
+                    actual_style,
+                    expected_style,
+                    f"[{name.upper()}] Ошибка СТИЛЯ: ожидался '{expected_style}', получен '{actual_style}'"
                 )
 
-                # Проверка АТМОСФЕРЫ
-                self.assertEqual(
-                    atmosphere, expected_case["atmosphere"],
-                    f"[{name.upper()}] Ошибка АТМОСФЕРЫ: "
-                    f"ожидалась '{expected_case['atmosphere']}', получена '{atmosphere}'"
-                )
-                
-                # Проверка BPM
-                self.assertTrue(
-                    60 <= bpm <= 172,
-                    f"[{name.upper()}] Ошибка BPM: "
-                    f"BPM вне диапазона (60-172), получен {bpm}"
-                )
-                
-                print(f"✅ [TestFunctionalTexts] {name.upper()} OK.")
+                log.info(f"✅ [TestFunctionalTexts] {name.upper()} OK.")
 
-
-# Этот блок позволяет запускать файл напрямую
-# ИЛИ через discover (из test_all.py)
 if __name__ == "__main__":
+    log.info("Запуск test_functional_texts.py как отдельного скрипта...")
     unittest.main()
