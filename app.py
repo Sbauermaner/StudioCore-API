@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (v8 - Suno UI)
+🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (v10 - NameError ИСПРАВЛЕН)
 Gradio + FastAPI + Централизованное логирование
 """
 
@@ -10,8 +10,9 @@ import traceback
 import threading
 import time
 import io
-import uvicorn # v6: ИСПРАВЛЕН NameError
+import uvicorn 
 import logging
+import subprocess # v10: ИСПРАВЛЕН NameError: name 'subprocess' is not defined
 
 # === 1. Исправление пути импорта ===
 # (Нужно, если запускаем app.py из корня)
@@ -22,16 +23,16 @@ if ROOT not in sys.path:
 # === 2. Активация логгера ===
 # ДО импорта ядра
 try:
+    # v16: Исправлен TypeError
     from studiocore.logger import setup_logging
-    # v6: Устанавливаем уровень DEBUG, чтобы видеть все
-    # v16: Исправлен TypeError (logger.py v2)
+    # Устанавливаем уровень DEBUG, чтобы видеть все
     setup_logging(level=logging.DEBUG) 
 except ImportError:
     print("WARNING: studiocore.logger не найден. Используется стандартный print.")
     logging.basicConfig(level=logging.DEBUG) # Fallback
 
 log = logging.getLogger(__name__)
-log.info("Запуск app.py...")
+log.info(f"Запуск app.py... (PID: {os.getpid()})")
 # === Конец активации логгера ===
 
 import gradio as gr
@@ -46,7 +47,7 @@ try:
     from studiocore import get_core, STUDIOCORE_VERSION
     CORE = get_core()
     CORE_LOADED = True
-    log.info("Ядро StudioCore успешно импортировано.")
+    log.info(f"Ядро StudioCore {STUDIOCORE_VERSION} успешно импортировано.")
 except Exception as e:
     log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить ядро: {e}")
     log.critical(traceback.format_exc())
@@ -173,16 +174,12 @@ def analyze_text(text: str, gender: str = "auto"):
         
         # v8: Улучшенная логика: ищем хинт только в ПОСЛЕДНЕЙ строке, 
         # если она в скобках или начинается с "под"
-        if text.strip():
-            try:
-                last_line = text.strip().splitlines()[-1].strip().lower()
-                if (last_line.startswith("(") and last_line.endswith(")")) or \
-                   last_line.startswith("под "):
-                    if any(k in last_line for k in voice_hint_keywords):
-                        overlay["voice_profile_hint"] = last_line
-                        log.info(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
-            except IndexError:
-                pass # (Если текст пустой)
+        last_line = text.strip().splitlines()[-1].strip().lower()
+        if (last_line.startswith("(") and last_line.endswith(")")) or \
+           last_line.startswith("под "):
+            if any(k in last_line for k in voice_hint_keywords):
+                overlay["voice_profile_hint"] = last_line
+                log.info(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
         
         log.debug("Gradio -> core.analyze...")
         result = CORE.analyze(text, preferred_gender=gender, overlay=overlay or None)
