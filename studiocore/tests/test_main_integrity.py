@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — System Integrity Test (v6 - Таймаут 20с)
-Проверяет, что всё ядро работает согласованно.
+StudioCore v5.2.1 — System Integrity Test (v8 - UnboundLocal ИСПРАВЛЕН)
 """
 
 # === 🔧 Исправление пути импорта ===
@@ -17,6 +16,7 @@ import importlib
 import json
 import requests
 import traceback
+import logging
 
 # === 1. АКТИВАЦИЯ ЛОГГЕРА ===
 try:
@@ -25,7 +25,6 @@ try:
 except ImportError:
     pass # test_all.py уже должен был его настроить
 
-import logging
 log = logging.getLogger(__name__)
 # === Конец активации логгера ===
 
@@ -41,10 +40,10 @@ try:
     from studiocore.emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
     EMO_ENGINE = AutoEmotionalAnalyzer()
     TLP_ENGINE = TruthLovePainEngine()
-    CORE_LOADED = True
+    CORE_LOADED = True # v8: Устанавливаем в True
 except Exception as e:
     log.critical(f"Критическая ошибка загрузки движков: {e}")
-    CORE_LOADED = False # v7: Устанавливаем в False при ошибке
+    CORE_LOADED = False # v8: Устанавливаем в False при ошибке
 
 
 MODULES = [
@@ -63,7 +62,7 @@ class TestMainIntegrity(unittest.TestCase):
     def setUpClass(cls):
         """Запускается один раз перед всеми тестами в этом классе."""
         log.info("[TestIntegrity] Emo/TLP Analyzers pre-loaded.")
-        # v7: Исправлена ошибка UnboundLocalError
+        # v8: Исправлена ошибка UnboundLocalError
         if not CORE_LOADED:
             # Этот assert должен провалить тест, если ядро не загрузилось
             cls.fail("КРИТИЧЕСКАЯ ОШИБКА: Движки Emo/TLP не смогли загрузиться.")
@@ -109,6 +108,7 @@ class TestMainIntegrity(unittest.TestCase):
             tlp = self.tlp_engine.analyze(text)
 
             bpm = lyric_meter.bpm_from_density(text, emo)
+            # v6: Добавлен voice_hint=None
             style = style_matrix.build(emo, tlp, text, bpm, {}, None)
 
             self.assertIn("genre", style)
@@ -130,7 +130,7 @@ class TestMainIntegrity(unittest.TestCase):
         payload = {"text": "Тест API"}
         
         try:
-            # v6: Увеличен таймаут
+            # v7: Таймаут 20с (для "Плана C" - быстрые словари)
             r = requests.post(api_url, json=payload, timeout=20) 
             
             # Проверяем, что статус 200 OK
