@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — Vocal Profile Registry (v5 - 'in' syntax fixed)
+StudioCore v5 — Vocal Profile Registry (v6 - f-string ИСПРАВЛЕН)
 """
 
 import re
 from typing import Dict, Any, List, Tuple
-from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine # Используем "быстрый" движок
+from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine # v15: Исправлен ImportError
 import logging
 
 log = logging.getLogger(__name__)
@@ -168,7 +168,7 @@ class VocalProfileRegistry:
 
         if "choir" in form:
             if "женск" in t or "female choir" in t: return "choir_female"
-            # === ИСПРАВЛЕНИЕ ОШИБКИ v5 (f-string) ===
+            # === ИСПРАВЛЕНИЕ ОШИБКИ v5 (SyntaxError) ===
             # Было: if "мужск" в t or "male choir" in t: return "choir_male"
             if "мужск" in t or "male choir" in t: return "choir_male"
             # === Конец исправления ===
@@ -256,6 +256,7 @@ class VocalProfileRegistry:
             if "mf" in vocal_form:
                 vox = male_vox + female_vox
             else:
+                # v15: Убеждаемся, что emo_analyzer существует
                 emo = self.emo_analyzer.analyze(text) if self.emo_analyzer else {}
                 vox = (female_vox if (emo.get("joy",0)+emo.get("peace",0) >
                                       emo.get("anger",0)+emo.get("epic",0)) else male_vox)
