@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.1 — Extended Functional Logic Test (v11 - Logged)
+StudioCore v5.2.1 — Extended Functional Logic Test (v12 - Обновлены эталоны)
 (Использует "План С" - быстрые словари v13)
 """
 
@@ -14,6 +14,7 @@ if ROOT not in sys.path:
 
 import unittest
 import logging
+import traceback # v12: Добавлен traceback
 
 # === 1. АКТИВАЦИЯ ЛОГГЕРА ===
 try:
@@ -60,23 +61,23 @@ texts = {
 И я чувствую жизнь на свете."""
 }
 
-# --- Эталонные ожидания (v11 - для "Плана С" - быстрые словари) ---
+# --- Эталонные ожидания (v12 - для словарей v13 + style v12) ---
 expected = {
     "LOVE": {
-        "genre": "lyrical adaptive", # (из-за Love > Pain)
+        "genre": "lyrical adaptive", # (Mood=joy/peace ИЛИ Love > Pain)
         "style": "majestic major",
     },
     "PAIN": {
-        "genre": "lyrical adaptive", # (из-за Pain > Love)
+        "genre": "lyrical adaptive", # (Mood=sadness ИЛИ Pain > Love)
         "style": "melancholic minor",
     },
+    # v12: 'fear' (из emo.py) теперь ПЕРВЫМ триггерит 'dramatic' стиль
     "FEAR": {
-        # (v11) 'fear' теперь триггерит 'dramatic' стиль
         "genre": "cinematic adaptive", 
         "style": "dramatic harmonic minor",
     },
     "JOY": {
-        "genre": "lyrical adaptive",
+        "genre": "lyrical adaptive", # (Mood=joy/peace)
         "style": "majestic major",
     },
 }
@@ -90,8 +91,8 @@ class TestFunctionalEmotionalLogic(unittest.TestCase):
     def setUpClass(cls):
         """Загружаем ядро ОДИН РАЗ для всех тестов."""
         log.info("[TestFunctionalTexts] Загрузка StudioCore...")
-        if not CORE_LOADED:
-            # Этого не должно произойти, если studiocore/__init__.py исправен
+        if not CORE_LOADED or not CORE:
+            # v12: Проверяем CORE, а не CORE_LOADED
             cls.core = None 
         else:
             cls.core = CORE
@@ -100,43 +101,52 @@ class TestFunctionalEmotionalLogic(unittest.TestCase):
     def test_emotional_logic_responses(self):
         """Главный тест: Прогоняет все тексты и сравнивает с эталонами."""
         
-        # v7: Если ядро не загрузилось, проваливаем тест сразу
-        if not self.core or not CORE_LOADED:
+        # v12: Улучшенная проверка загрузки ядра
+        if not self.core:
             self.fail("Ядро не было загружено (в режиме Fallback), тесты логики пропущены.")
 
         # Используем subTest, чтобы не падать на первой же ошибке
         for name, text in texts.items():
-            with self.subTest(name=name.upper()):
-                log.debug(f"--- [SubTest] Запуск анализа для: {name.upper()} ---")
+            # v12: Приводим name к UPPERCASE для единообразия
+            name_upper = name.upper() 
+            with self.subTest(name=name_upper):
+                log.debug(f"--- [SubTest] Запуск анализа для: {name_upper} ---")
                 
                 try:
                     result = self.core.analyze(text)
                 except Exception as e:
                     # Проваливаем тест, если analyze() упал
-                    self.fail(f"Ошибка ядра при анализе кейса {name.upper()}: {e}")
+                    self.fail(f"Ошибка ядра при анализе кейса {name_upper}: {e}\n{traceback.format_exc()}")
 
                 style = result.get("style", {})
                 
                 # 1. Проверка ЖАНРА
-                expected_genre = expected[name]["genre"]
+                expected_genre = expected[name_upper]["genre"]
                 actual_genre = style.get("genre")
                 self.assertEqual(
                     actual_genre, 
                     expected_genre,
-                    f"[{name.upper()}] Ошибка ЖАНРА: ожидался '{expected_genre}', получен '{actual_genre}'"
+                    f"[{name_upper}] Ошибка ЖАНРА: ожидался '{expected_genre}', получен '{actual_genre}'"
                 )
                 
                 # 2. Проверка СТИЛЯ
-                expected_style = expected[name]["style"]
+                expected_style = expected[name_upper]["style"]
                 actual_style = style.get("style")
                 self.assertEqual(
                     actual_style,
                     expected_style,
-                    f"[{name.upper()}] Ошибка СТИЛЯ: ожидался '{expected_style}', получен '{actual_style}'"
+                    f"[{name_upper}] Ошибка СТИЛЯ: ожидался '{expected_style}', получен '{actual_style}'"
                 )
 
-                log.info(f"✅ [TestFunctionalTexts] {name.upper()} OK.")
+                log.info(f"✅ [TestFunctionalTexts] {name_upper} OK.")
 
 if __name__ == "__main__":
     log.info("Запуск test_functional_texts.py как отдельного скрипта...")
+    # v12: Добавляем активацию логгера при прямом запуске
+    try:
+        from studiocore.logger import setup_logging
+        setup_logging(level=logging.DEBUG)
+    except ImportError:
+        logging.basicConfig(level=logging.DEBUG)
+        
     unittest.main()
