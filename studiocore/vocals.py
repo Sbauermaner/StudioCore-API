@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — Vocal Profile Registry (v8 - WARNING ИСПРАВЛЕН)
-v8: Добавлены 'lyrical' и 'edm' в DEFAULT_VOCAL_MAP.
-    Исправлена логика 'duet_ff' (теперь 'duet_mf').
-    Расширены VALID_INSTRUMENTS.
+StudioCore v5 — Vocal Profile Registry (v9 - AttributeError ИСПРАВЛЕН)
+v9: Исправлена ошибка 'list' object has no attribute 'get'
 """
 
 import re
 from typing import Dict, Any, List, Tuple
-# v15: Исправлен ImportError (возвращаем оригинальные имена)
-from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine 
+from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine # v15: Исправлен ImportError
 import logging
 
 log = logging.getLogger(__name__)
@@ -63,16 +60,6 @@ DEFAULT_VOCAL_MAP = {
         "male": ["male", "soft", "processed"],
         "inst": ["synth", "synth pad", "bass", "drum machine", "FX"]
     },
-    "ambient": {
-        "female": ["female", "whispered", "ethereal"],
-        "male": ["male", "soft", "breathy"],
-        "inst": ["atmospheric pads", "piano", "strings", "synth pad"]
-    },
-    "orchestral": {
-        "female": ["female", "angelic", "soprano"],
-        "male": ["male", "deep", "bass"],
-        "inst": ["strings", "choir", "horns", "percussion", "timpani", "cello"]
-    },
     "edm": {
         "female": ["female", "processed", "ethereal"],
         "male": ["male", "processed", "melodic rap"],
@@ -94,7 +81,7 @@ DEFAULT_VOCAL_MAP = {
 
 class VocalProfileRegistry:
     """
-    (v8) Определяет вокальную форму (solo, duet и т.д.) и набор инструментов
+    (v9) Определяет вокальную форму (solo, duet и т.д.) и набор инструментов
     на основе жанра, предпочтений и анализа текста.
     """
     def __init__(self, vocal_map: Dict[str, Any] | None = None):
@@ -161,6 +148,7 @@ class VocalProfileRegistry:
             
             # v8: Если пользователь выбрал M или F, но форма - ДУЭТ (из хинта или грамматики),
             # мы ПРЕДПОЛАГАЕМ, что это M/F дуэт, чтобы он звучал интереснее.
+            # (Раньше здесь было duet_mm или duet_ff, что было ошибкой)
             if form == "duet": 
                 log.debug("Логика _mixed_code: UI-хинт (M/F) + форма (Duet) = duet_mf")
                 return "duet_mf" 
@@ -185,8 +173,8 @@ class VocalProfileRegistry:
 
         if "choir" in form:
             # v5: Исправлена ошибка 'в' на 'in'
-            if "женск" in t or "female choir" in t: return "choir_female"
             if "мужск" in t or "male choir" in t: return "choir_male"
+            if "женск" in t or "female choir" in t: return "choir_female"
             return "choir_mixed"
 
         return f"{form}_mixed"
@@ -197,7 +185,7 @@ class VocalProfileRegistry:
         preferred_gender: str,
         text: str,
         sections: List[Dict[str,Any]], # (Устарело, но оставлено для API)
-        vocal_profile_tags: Dict[str, int] # v4.3: Приходит из monolith
+        vocal_profile_tags: List[Dict[str, Any]] # v4.3: Приходит из monolith (СПИСОК)
     ) -> Tuple[List[str], List[str], str]:
         
         log.debug(f"Вызов функции: VocalProfileRegistry.get (Genre={genre_full}, PrefGender={preferred_gender})")
@@ -222,14 +210,30 @@ class VocalProfileRegistry:
         hints = self._detect_ensemble_hints(text, sections)
         form = "solo" 
         
-        log.debug(f"Теги вокала из monolith: {vocal_profile_tags}")
+        log.debug(f"Теги вокала из monolith (список): {vocal_profile_tags}")
         
-        # v4.3: Новая логика определения формы на основе анализатора секций
-        if vocal_profile_tags.get("mixed", 0) > 0:
+        # === v9: ИСПРАВЛЕНИЕ AttributeError: 'list' object has no attribute 'get' ===
+        # Мы должны сперва подсчитать теги из списка, который прислал monolith
+        summed_tags = {"male": 0, "female": 0, "mixed": 0, "auto": 0}
+        if isinstance(vocal_profile_tags, list):
+            for profile in vocal_profile_tags: 
+                gender = profile.get("gender", "auto")
+                if gender in summed_tags:
+                    summed_tags[gender] += 1
+                else:
+                    summed_tags["auto"] += 1
+        else:
+            log.warning(f"vocal_profile_tags не является списком! Получен: {type(vocal_profile_tags)}")
+            
+        log.debug(f"Подсчитанные теги (словарь): {summed_tags}")
+        # === Конец исправления v9 ===
+
+        # v4.3: Новая логика определения формы (v9: использует summed_tags)
+        if summed_tags.get("mixed", 0) > 0:
             form = "duet"
-        elif vocal_profile_tags.get("male", 0) > 0 and vocal_profile_tags.get("female", 0) > 0:
+        elif summed_tags.get("male", 0) > 0 and summed_tags.get("female", 0) > 0:
              form = "duet"
-        elif vocal_profile_tags.get("male", 0) > 2 or vocal_profile_tags.get("female", 0) > 2:
+        elif summed_tags.get("male", 0) > 2 or summed_tags.get("female", 0) > 2:
              form = "trio" # (Если один пол доминирует в 3+ секциях)
         
         # Хинты (duet, choir) из текста имеют приоритет
@@ -241,7 +245,7 @@ class VocalProfileRegistry:
 
         # Если все еще solo, используем старый метод auto_form
         if form == "solo" and \
-           not (vocal_profile_tags.get("male") or vocal_profile_tags.get("female")):
+           not (summed_tags.get("male") or summed_tags.get("female")):
             
             if self.emo_analyzer and self.tlp_analyzer:
                 emo = self.emo_analyzer.analyze(text)
@@ -252,12 +256,13 @@ class VocalProfileRegistry:
         log.debug(f"Финальная форма: {form}")
 
         # 3. Определяем состав (male/female/mixed)
+        # v9: использует summed_tags
         auto_gender = "auto"
-        if vocal_profile_tags.get("male", 0) > vocal_profile_tags.get("female", 0):
+        if summed_tags.get("male", 0) > summed_tags.get("female", 0):
             auto_gender = "male"
-        elif vocal_profile_tags.get("female", 0) > vocal_profile_tags.get("male", 0):
+        elif summed_tags.get("female", 0) > summed_tags.get("male", 0):
             auto_gender = "female"
-        elif vocal_profile_tags.get("mixed", 0) > 0:
+        elif summed_tags.get("mixed", 0) > 0:
             auto_gender = "mixed"
         log.debug(f"Грамматический пол: {auto_gender}")
 
