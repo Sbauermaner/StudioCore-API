@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — Централизованный конфигуратор логов.
+StudioCore v5 — Централизованный конфигуратор логов. (v2 - TypeError ИСПРАВЛЕН)
 Настраивает подробный вывод для отладки вызовов функций.
 """
 import logging
 import sys
+import os # v2: Добавлен os для определения уровня лога
+
+# v2: Уровень по умолчанию INFO, но можно переопределить через app.py
+LOG_LEVEL = logging.DEBUG if os.environ.get("STUDIOCORE_DEBUG") else logging.INFO
 
 # Определяем собственный формат, который включает имя функции и номер строки
 LOG_FORMAT = (
@@ -14,12 +18,13 @@ LOG_FORMAT = (
 )
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-# Устанавливаем уровень DEBUG, чтобы ловить АБСОЛЮТНО ВСЕ
-LOG_LEVEL = logging.DEBUG 
 
 _is_configured = False
 
-def setup_logging():
+# v2: Исправлена ошибка TypeError
+# Теперь функция принимает 'level' (по умолчанию INFO), 
+# но app.py может передать DEBUG
+def setup_logging(level=logging.INFO):
     """
     Применяет конфигурацию логов ко всей системе.
     Вызывается один раз из app.py или test_all.py.
@@ -30,7 +35,10 @@ def setup_logging():
 
     # Получаем корневой логгер
     root_logger = logging.getLogger()
-    root_logger.setLevel(LOG_LEVEL)
+    
+    # v2: Используем 'level', переданный из app.py
+    CURRENT_LOG_LEVEL = level 
+    root_logger.setLevel(CURRENT_LOG_LEVEL)
 
     # Удаляем все существующие обработчики (чтобы избежать дублирования в HF)
     for handler in root_logger.handlers[:]:
@@ -38,7 +46,7 @@ def setup_logging():
 
     # Создаем новый обработчик для вывода в консоль (stdout)
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(LOG_LEVEL)
+    console_handler.setLevel(CURRENT_LOG_LEVEL)
 
     # Применяем наш подробный формат
     formatter = logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT)
@@ -52,8 +60,12 @@ def setup_logging():
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("asyncio").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("gradio_client").setLevel(logging.WARNING)
+    logging.getLogger("multipart").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
-    root_logger.info("=" * 50)
-    root_logger.info("🚀 Централизованное логирование (УРОВЕНЬ DEBUG) активировано.")
-    root_logger.info("=" * 50)
+    log = logging.getLogger(__name__)
+    log.info("=" * 50)
+    log.info(f"🚀 Централизованное логирование (УРОВЕНЬ {logging.getLevelName(CURRENT_LOG_LEVEL)}) активировано.")
+    log.info("=" * 50)
     _is_configured = True
