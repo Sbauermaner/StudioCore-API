@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (v11 - Финальная балансировка)
-Логика v11: Исправлена ошибка 'sadness' vs 'sad'
+StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (v12 - NameError ИСПРАВЛЕН)
+v12: Исправлена ошибка NameError: 'energy' is not defined.
+     Логика EDM временно упрощена (только по BPM).
 """
 
 from typing import Dict, Any, Tuple, List
@@ -11,7 +12,7 @@ import logging
 log = logging.getLogger(__name__)
 
 # ==========================================================
-# 🧠 Адаптивный резолвер стиля (v11)
+# 🧠 Адаптивный резолвер стиля (v12)
 # ==========================================================
 def resolve_style_and_form(
     tlp: Dict[str, float],
@@ -23,7 +24,7 @@ def resolve_style_and_form(
     voice_hint: str | None = None,
 ) -> Dict[str, str]:
     """
-    v11: Исправлена логика 'sadness' и приоритеты TLP.
+    v12: Исправлена ошибка NameError: 'energy' is not defined.
     """
     log.debug(f"Вызов функции: resolve_style_and_form. Mood={mood}, BPM={bpm}, CF={cf:.2f}, VoiceHint={voice_hint}")
     log.debug(f"TLP: {tlp}")
@@ -51,6 +52,8 @@ def resolve_style_and_form(
             genre, style, key_mode = "rock narrative", "warm baritone", "minor"
         elif any(k in hint for k in ["rap", "рэп", "хип-хоп"]):
             genre, style, key_mode = "hip-hop", "rhythmic flow", "minor"
+        elif any(k in hint for k in ["edm", "dance", "house", "trance"]):
+             genre, style, key_mode = "edm", "uplifting electronic", "minor"
         else:
             genre, style, key_mode = "cinematic adaptive", "neutral modal", "modal"
     
@@ -60,18 +63,16 @@ def resolve_style_and_form(
     else:
         log.debug("Режим: AUTO-MODE (по TLP/Mood/BPM)")
         
-        # --- Определение СТИЛЯ (v8 - Приоритеты TLP) ---
+        # --- Определение СТИЛЯ (v11-logic) ---
         # СНАЧАЛА проверяем PAIN (v8 fix)
-        # v11: 'sadness' (из emo.py) а не 'sad'
         if (pain >= 0.01 and pain > love) or mood in ("sadness", "melancholy"): 
             style, key_mode = "melancholic minor", "minor"
             log.debug("Стиль: 'melancholic minor' (Pain > Love или Mood=sadness)")
             
-        elif (love >= 0.01 and love > pain) or mood in ("joy", "peace", "awe"):
+        elif (love >= 0.01 and love >= pain) or mood in ("joy", "peace", "awe"):
             style, key_mode = "majestic major", "major"
-            log.debug("Стиль: 'majestic major' (Love > Pain или Mood=joy/peace)")
+            log.debug("Стиль: 'majestic major' (Love >= Pain или Mood=joy/peace)")
 
-        # v11: 'fear' (из emo.py)
         elif (cf > 0.6 and truth > 0.1) or mood in ("anger", "fear", "epic"):
             style, key_mode = "dramatic harmonic minor", "minor"
             log.debug("Стиль: 'dramatic harmonic minor' (CF/Truth или Mood=anger/fear/epic)")
@@ -80,11 +81,12 @@ def resolve_style_and_form(
             style, key_mode = "neutral modal", "modal"
             log.debug("Стиль: 'neutral modal' (по умолчанию)")
 
-        # --- Определение ЖАНРА (v11) ---
-        # (Мы убрали 'energy' из v12, так как оно недоступно)
+        # --- Определение ЖАНРА (v12-logic) ---
+        
+        # v12: Исправлен NameError. Убрана 'energy'.
         if bpm > 115 and pain < 0.2 and mood not in ("sadness", "anger", "fear"):
              genre = "edm"
-             log.debug("Жанр: 'edm' (Высокий BPM + Низкий Pain)")
+             log.debug("Жанр: 'edm' (Высокий BPM + Низкий Pain/Fear)")
         
         elif style == "melancholic minor":
             genre = "lyrical adaptive"
@@ -147,7 +149,7 @@ def resolve_style_and_form(
 # 🎨 PatchedStyleMatrix (v5.2.3)
 # ==========================================================
 class PatchedStyleMatrix:
-    """Adaptive emotional-to-style mapping engine (v11 Logged)."""
+    """Adaptive emotional-to-style mapping engine (v12 Logged)."""
 
     def build(
         self,
@@ -179,11 +181,11 @@ class PatchedStyleMatrix:
         t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
         scale = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
         # (v10) Упрощенная и более предсказуемая логика ключа
+        
+        # v12: Приоритет минора, если mood/style минорный
         if resolved['key_mode'] == "minor":
-            # Приоритет 'P' (боль)
             index_shift = int(((bpm / 15) + (p * 5) + (t * 2)) % 12)
         else: # major или modal
-            # Приоритет 'L' (любовь)
             index_shift = int(((bpm / 12) + (l * 6) - (p * 2)) % 12)
             
         key = f"{scale[index_shift]} ({scale[index_shift]} {resolved['key_mode']})"
@@ -198,6 +200,7 @@ class PatchedStyleMatrix:
             "soft whisper tone": "blurred lights, feathers, close-up breathing",
             "rhythmic flow": "city night lights, graffiti, street motion",
             "neutral modal": "shifting colors, abstract transitions",
+            "uplifting electronic": "neon lights, fast motion, club atmosphere",
         }
         visual = visuals.get(resolved["style"], "shifting colors, abstract transitions")
 
@@ -229,6 +232,8 @@ class PatchedStyleMatrix:
                 techniques += ["falsetto", "bright tone"]
             if emo.get("epic", 0) > 0.3:
                 techniques += ["choral layering", "powerful projection"]
+            if resolved["genre"] == "edm":
+                techniques += ["processed vocal", "staccato", "vocal chop"]
             if not techniques:
                 techniques += ["resonant layering", "harmonic blend"]
         
@@ -239,12 +244,16 @@ class PatchedStyleMatrix:
         complexity_score = round(mean([emo[k] for k in emo]) * 10, 2) if emo else 0.5
         color_temperature = "warm" if l >= p else "cold"
         adaptive_mode = "USER-MODE" if resolved["user_mode"] else ("stable" if cf > 0.6 else "transient")
+        
+        # v12: Передаем BPM из резолвера, если он был изменен
+        bpm_final = resolved.get("bpm", bpm) 
 
         result = {
             "genre": resolved["genre"],
             "style": resolved["style"],
             "key": key,
-            "structure": "intro-verse-chorus-outro", # (Монолит теперь управляет этим через Overlay)
+            "bpm": bpm_final, # v12
+            "structure": "intro-verse-chorus-outro", 
             "visual": visual,
             "narrative": "→".join(narrative),
             "atmosphere": resolved["atmosphere"],
