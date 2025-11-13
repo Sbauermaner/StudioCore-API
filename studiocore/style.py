@@ -61,7 +61,9 @@ def resolve_style_and_form(
         log.debug("Режим: AUTO-MODE (по TLP/Mood/BPM)")
         
         # --- Определение СТИЛЯ (v8 - Приоритеты TLP) ---
-        if (pain >= 0.01 and pain > love) or mood in ("sadness", "melancholy"):
+        # СНАЧАЛА проверяем PAIN (v8 fix)
+        # v11: 'sadness' (из emo.py) а не 'sad'
+        if (pain >= 0.01 and pain > love) or mood in ("sadness", "melancholy"): 
             style, key_mode = "melancholic minor", "minor"
             log.debug("Стиль: 'melancholic minor' (Pain > Love или Mood=sadness)")
             
@@ -69,6 +71,7 @@ def resolve_style_and_form(
             style, key_mode = "majestic major", "major"
             log.debug("Стиль: 'majestic major' (Love > Pain или Mood=joy/peace)")
 
+        # v11: 'fear' (из emo.py)
         elif (cf > 0.6 and truth > 0.1) or mood in ("anger", "fear", "epic"):
             style, key_mode = "dramatic harmonic minor", "minor"
             log.debug("Стиль: 'dramatic harmonic minor' (CF/Truth или Mood=anger/fear/epic)")
@@ -77,10 +80,11 @@ def resolve_style_and_form(
             style, key_mode = "neutral modal", "modal"
             log.debug("Стиль: 'neutral modal' (по умолчанию)")
 
-        # --- Определение ЖАНРА (v11 - с EDM) ---
-        if bpm > 115 and energy > 0.3 and pain < 0.2 and mood not in ("sadness", "anger", "fear"):
+        # --- Определение ЖАНРА (v11) ---
+        # (Мы убрали 'energy' из v12, так как оно недоступно)
+        if bpm > 115 and pain < 0.2 and mood not in ("sadness", "anger", "fear"):
              genre = "edm"
-             log.debug("Жанр: 'edm' (Высокий BPM + Энергия)")
+             log.debug("Жанр: 'edm' (Высокий BPM + Низкий Pain)")
         
         elif style == "melancholic minor":
             genre = "lyrical adaptive"
@@ -176,8 +180,10 @@ class PatchedStyleMatrix:
         scale = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
         # (v10) Упрощенная и более предсказуемая логика ключа
         if resolved['key_mode'] == "minor":
+            # Приоритет 'P' (боль)
             index_shift = int(((bpm / 15) + (p * 5) + (t * 2)) % 12)
         else: # major или modal
+            # Приоритет 'L' (любовь)
             index_shift = int(((bpm / 12) + (l * 6) - (p * 2)) % 12)
             
         key = f"{scale[index_shift]} ({scale[index_shift]} {resolved['key_mode']})"
