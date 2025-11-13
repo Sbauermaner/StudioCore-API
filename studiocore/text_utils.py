@@ -42,7 +42,7 @@ def normalize_text_preserve_symbols(text: str) -> str:
     схлопывает кратные пустые строки, слегка выравнивает типографику.
     Символы пунктуации и эмодзи сохраняются.
     """
-    if not isinstance(text, str):
+    if not text:
         return ""
 
     # Переводим CRLF/CR -> LF
@@ -130,13 +130,25 @@ def flatten_sections_to_lines(sections: List[Dict[str, Any]]) -> List[str]:
         out.extend(s.get("lines", []))
     return out
 
-# === v16: ИСПРАВЛЕН ImportError ===
-# Эта функция была в monolith_v4_3_1.py, но monolith v5 ее импортирует
+# === v16: ИСПРАВЛЕНИЕ ImportError ===
+# Эта функция была в monolith_v4_3_1.py, но monolith v6 вызывает ее отсюда.
 def extract_raw_blocks(text: str) -> List[str]:
     """
-    Разбивает текст на блоки по пустой строке (один или более \n).
-    [Suno] использует это для разделения секций.
+    Разделяет текст на блоки по пустой строке, 
+    ИГНОРИРУЯ теги [Intro], (шепотом) и т.д.
     """
-    # Разделяем по одному или нескольким \n, затем фильтруем пустые строки
-    blocks = re.split(r"[\n\r]{2,}", text.strip())
-    return [block.strip() for block in blocks if block.strip()]
+    # Заменяем [Tag] и (hint) на заглушки, чтобы re.split их не видел
+    text_no_tags = re.sub(r"^\s*\[[^\]]+\]\s*$", "TAG_PLACEHOLDER", text, flags=re.MULTILINE)
+    text_no_tags = re.sub(r"^\s*\([^\)]+\)\s*$", "HINT_PLACEHOLDER", text_no_tags, flags=re.MULTILINE)
+    
+    # Разделяем по пустой строке
+    blocks = re.split(r"\n\s*\n", text_no_tags.strip())
+    
+    # Очищаем блоки от заглушек (на всякий случай) и пустых строк
+    cleaned_blocks = []
+    for block in blocks:
+        clean_block = block.replace("TAG_PLACEHOLDER", "").replace("HINT_PLACEHOLDER", "").strip()
+        if clean_block:
+            cleaned_blocks.append(clean_block)
+            
+    return cleaned_blocks
