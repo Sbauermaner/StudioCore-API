@@ -1,299 +1,335 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — Vocal Profile Registry (v9 - AttributeError ИСПРАВЛЕН)
-v9: Исправлена ошибка 'list' object has no attribute 'get'
+🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (v9 - NameError ИСПРАВЛЕН)
+Gradio + FastAPI + Централизованное логирование
 """
 
-import re
-from typing import Dict, Any, List, Tuple
-from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine # v15: Исправлен ImportError
+import os
+import sys
+import traceback
+import threading
+import time
+import io
+import uvicorn 
 import logging
+import subprocess # v9: ИСПРАВЛЕН NameError
+
+# === 1. Исправление пути импорта ===
+# (Нужно, если запускаем app.py из корня)
+ROOT = os.path.dirname(__file__)
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+# === 2. Активация логгера ===
+# ДО импорта ядра
+try:
+    # v16: Исправлен TypeError
+    from studiocore.logger import setup_logging
+    # Устанавливаем уровень DEBUG, чтобы видеть все
+    setup_logging(level=logging.DEBUG) 
+except ImportError:
+    print("WARNING: studiocore.logger не найден. Используется стандартный print.")
+    logging.basicConfig(level=logging.DEBUG) # Fallback
 
 log = logging.getLogger(__name__)
+log.info("Запуск app.py...")
+# === Конец активации логгера ===
 
-# =========================
-# 1. Расширенный список инструментов
-# =========================
-VALID_VOICES = [
-    "male","female","duet","trio","quartet","quintet","choir",
-    "tenor","soprano","alto","baritone","bass",
-    "raspy","breathy","powerful","soft","emotional","angelic","deep",
-    "whispered","warm","clear", "processed", "melodic rap", "layered harmonies",
-    "ethereal", "solo"
-]
+import gradio as gr
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
 
-VALID_INSTRUMENTS = [
-    "guitar","piano","synth","bass","drums","percussion",
-    "strings","violin","cello","trumpet","horns", "french horn", "timpani", "orchestral strings",
-    "synth lead", "808 bass", "riser", "FX", "trance pad", "house piano",
-    "synth melody", "synth pad", "drum machine", "atmospheric pads", "synth bass",
-    "organ","harp","flute","acoustic guitar", "power chords", "tagelharpa",
-    "choir","vocals","pad", 
-]
+# === 3. Импорт ядра ===
+try:
+    from studiocore import get_core, STUDIOCORE_VERSION
+    CORE = get_core()
+    CORE_LOADED = True
+    log.info("Ядро StudioCore успешно импортировано.")
+except Exception as e:
+    log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить ядро: {e}")
+    log.critical(traceback.format_exc())
+    CORE = None
+    CORE_LOADED = False
 
-# =========================
-# 2. Расширенные карты инструментов (v8: +lyrical, +edm)
-# =========================
-DEFAULT_VOCAL_MAP = {
-    "rock": {
-        "female": ["female", "emotional", "alto"],
-        "male": ["male", "raspy", "tenor"],
-        "inst": ["guitar", "drums", "bass", "piano", "power chords"]
-    },
-    "pop": {
-        "female": ["female", "clear", "soprano"],
-        "male": ["male", "soft", "tenor"],
-        "inst": ["piano", "synth", "bass", "drums", "synth melody"]
-    },
-    "folk": {
-        "female": ["female", "warm", "alto"],
-        "male": ["male", "emotional", "baritone"],
-        "inst": ["acoustic guitar", "strings", "flute", "percussion"]
-    },
-    "cinematic": {
-        "female": ["female", "angelic", "soprano"],
-        "male": ["male", "deep", "baritone"],
-        "inst": ["strings", "piano", "choir", "drums", "french horn", "timpani", "orchestral strings", "atmospheric pads"]
-    },
-    "electronic": {
-        "female": ["female", "breathy", "ethereal"],
-        "male": ["male", "soft", "processed"],
-        "inst": ["synth", "synth pad", "bass", "drum machine", "FX"]
-    },
-    "edm": {
-        "female": ["female", "processed", "ethereal"],
-        "male": ["male", "processed", "melodic rap"],
-        "inst": ["synth lead", "808 bass", "drum machine", "riser", "FX", "trance pad", "synth bass"]
-    },
-    # v8: ИСПРАВЛЕНО WARNING
-    "lyrical": {
-        "female": ["female", "emotional", "soprano"],
-        "male": ["male", "warm", "baritone"],
-        "inst": ["piano", "strings", "acoustic guitar", "cello"]
-    },
-    "default": {
-        "female": ["female", "emotional"],
-        "male": ["male", "emotional"],
-        "inst": ["piano", "guitar", "bass", "drums"]
-    }
-}
+# === 4. Инициализация FastAPI ===
+log.debug("Инициализация FastAPI...")
+app = FastAPI(title="StudioCore API")
 
+# === 5. CORS ===
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-class VocalProfileRegistry:
+# === 6. 🎧 PUBLIC API ENDPOINT ===
+# (Исправляет HTTP 404 в тестах)
+
+class PredictRequest(BaseModel):
+    """ Модель запроса для API """
+    text: str
+    gender: str = "auto"
+    tlp: Optional[dict] = None
+    overlay: Optional[dict] = None
+
+@app.post("/api/predict")
+async def api_predict(request_data: PredictRequest):
     """
-    (v9) Определяет вокальную форму (solo, duet и т.д.) и набор инструментов
-    на основе жанра, предпочтений и анализа текста.
+    Эндпоинт, который ищут 'test_all.py' и 'auto_core_check'.
+    Он принимает JSON и возвращает JSON.
     """
-    def __init__(self, vocal_map: Dict[str, Any] | None = None):
-        self.map = vocal_map or DEFAULT_VOCAL_MAP
-        try:
-            # v15: Исправлен ImportError
-            self.emo_analyzer = AutoEmotionalAnalyzer()
-            self.tlp_analyzer = TruthLovePainEngine()
-            log.debug("VocalProfileRegistry успешно инициализировал Emo/TLP движки.")
-        except Exception as e:
-            log.error(f"VocalProfileRegistry НЕ СМОГ инициализировать Emo/TLP: {e}")
-            self.emo_analyzer = None
-            self.tlp_analyzer = None
+    log.debug(f"Входящий запрос /api/predict: {request_data.text[:50]}...")
+    
+    if not CORE_LOADED or CORE is None:
+        log.error("API /api/predict: Ядро не загружено (Fallback).")
+        return JSONResponse(
+            content={"error": "⚠️ StudioCoreFallback: анализ недоступен — основное ядро не загружено."}, 
+            status_code=500
+        )
+        
+    try:
+        # Сопоставляем данные из запроса с тем, что ожидает core.analyze
+        result = CORE.analyze(
+            request_data.text,
+            preferred_gender=request_data.gender,
+            overlay=request_data.overlay
+        )
+        
+        if isinstance(result, dict) and "error" in result:
+             log.warning(f"API /api/predict: Ядро вернуло ошибку: {result['error']}")
+             return JSONResponse(content=result, status_code=400)
+        
+        # Возвращаем полный результат (тесты ожидают 'bpm' и 'style')
+        log.debug("API /api/predict: Анализ успешен.")
+        return JSONResponse(content=result, status_code=200)
+
+    except Exception as e:
+        log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА в /api/predict: {traceback.format_exc()}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+# === 7. SELF-CHECK ===
+def auto_core_check():
+    """ 
+    Фоновая проверка API-эндпоинта (v4 - таймаут 20с).
+    Дает серверу 5 секунд на запуск, затем пингует /api/predict.
+    """
+    log.debug("[Self-Check] Поток запущен, ожидание 5с...")
+    time.sleep(5) 
+    
+    if os.environ.get("DISABLE_SELF_CHECK") == "1":
+        log.info("[Self-Check] Проверка отключена (DISABLE_SELF_CHECK=1).")
+        return
+        
+    try:
+        import requests
+    except ImportError:
+        log.warning("[Self-Check] 'requests' не найден. Не могу выполнить самопроверку.")
+        return
+
+    log.debug("[Self-Check] Запуск самопроверки эндпоинта /api/predict...")
+    api_url = "http://127.0.0.1:7860/api/predict"
+    payload = {"text": "self-check test"}
+    
+    try:
+        # v7: Таймаут 20с (для "Плана C" - быстрые словари)
+        r = requests.post(api_url, json=payload, timeout=20) 
+        log.info(f"[Self-Check] → Статус: {r.status_code}")
+        if r.status_code != 200:
+             log.warning(f"[Self-Check] → Ответ: {r.text[:200]}...")
+    except Exception as e:
+        log.error(f"❌ Self-Check ошибка: {e}")
+
+# Запускаем проверку в отдельном потоке
+threading.Thread(target=auto_core_check, daemon=True).start()
 
 
-    def _detect_ensemble_hints(self, text: str, sections: List[Dict[str,Any]]) -> Dict[str,bool]:
-        """ Ищет прямые указания на ансамбль (хор, дуэт и т.д.) """
-        log.debug("Вызов функции: _detect_ensemble_hints")
-        s = (text + " " + " ".join(s.get("tag","") for s in sections)).lower()
-        hints = {
-            "wants_choir": any(k in s for k in ["choir","хор","group","chorus","anthem"]),
-            "wants_duet": any(k in s for k in ["duet","дуэт","duo","вместе", "вдвоем"]),
-            "wants_trio": any(k in s for k in ["trio","трио"]),
-            "wants_quartet": any(k in s for k in ["quartet","квартет"]),
-            "wants_quintet": any(k in s for k in ["quintet","квинтет"]),
-        }
-        log.debug(f"Результат _detect_ensemble_hints: {hints}")
-        return hints
+# === 8. АНАЛИЗ ТЕКСТА (Gradio) ===
 
-    def _auto_form(self, emo: Dict[str,float], tlp: Dict[str,float], text: str) -> str:
-        """ Автоматически определяет форму (solo/duet/...) на основе плотности и энергии """
-        log.debug("Вызов функции: _auto_form")
-        if not emo or not tlp:
-            log.warning("_auto_form не получил emo/tlp, возврат 'solo'")
-            return "solo"
+def analyze_text(text: str, gender: str = "auto"):
+    """
+    Основная функция анализа текста через StudioCore для UI Gradio.
+    v8: Возвращает 3 строки: Summary, Suno Prompt, Annotated Text
+    """
+    log.debug(f"Gradio analyze_text: получено {len(text)} символов, gender={gender}")
+    
+    if not text.strip():
+        return "⚠️ Введите текст для анализа.", "", ""
+
+    if not CORE_LOADED or CORE is None:
+        log.error("Gradio analyze_text: Ядро в режиме Fallback!")
+        return "❌ Ядро не загружено (Fallback). Анализ невозможен. Проверьте логи.", "", ""
+
+    try:
+        # --- Проверка пользовательских описаний вокала ---
+        overlay = {}
+        voice_hint_keywords = [
+            "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
+            "пескляв", "soft", "airy", "shout", "grit", "фальцет", "whisper"
+        ]
+        
+        # v8: Улучшенная логика: ищем хинт только в ПОСЛЕДНЕЙ строке, 
+        # если она в скобках или начинается с "под"
+        last_line = text.strip().splitlines()[-1].strip().lower()
+        if (last_line.startswith("(") and last_line.endswith(")")) or \
+           last_line.startswith("под "):
+            if any(k in last_line for k in voice_hint_keywords):
+                overlay["voice_profile_hint"] = last_line
+                log.info(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
+        
+        log.debug("Gradio -> core.analyze...")
+        result = CORE.analyze(text, preferred_gender=gender, overlay=overlay or None)
+
+        if isinstance(result, dict) and "error" in result:
+            log.error(f"Gradio: Ядро вернуло ошибку: {result['error']}")
+            return f"❌ Ошибка: {result['error']}", "", ""
+
+        # --- 1. Summary ---
+        style = result.get("style", {})
+        vocal_form = style.get("vocal_form", "auto")
+        
+        summary = (
+            f"✅ StudioCore {STUDIOCORE_VERSION}\n"
+            f"🎭 {style.get('genre', '—')} | "
+            f"🎵 {style.get('style', '—')} | "
+            f"🎙 {vocal_form} ({result.get('final_gender_preference', 'auto')}) | "
+            f"⏱ {result.get('bpm', '—')} BPM | "
+            f"🔑 {style.get('key', 'auto')}"
+        )
+
+        # --- 2. Suno Prompt (v8) ---
+        # (Объединяет Style и Lyrics)
+        suno_prompt = (
+            f"[STYLE PROMPT - КОПИРОВАТЬ В SUNO 'Style of Music']\n"
+            f"{result.get('prompt_suno_style', 'Ошибка: prompt_suno_style не найден')}\n\n"
+            f"[LYRICS PROMPT - КОПИРОВАТЬ В SUNO 'Lyrics']\n"
+            f"{result.get('annotated_text_suno', 'Ошибка: annotated_text_suno не найден')}"
+        )
+        
+        # --- 3. Аннотированный текст (для UI) ---
+        annotated_text_ui = result.get("annotated_text_ui", "Ошибка: annotated_text_ui не найден")
+
+        return (
+            summary,
+            suno_prompt,
+            annotated_text_ui,
+        )
+
+    except Exception as e:
+        log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА в analyze_text (Gradio): {traceback.format_exc()}")
+        return f"❌ Внутреннее исключение: {e}", "", ""
+
+# === 9. INLINE TEST RUNNER ===
+def run_inline_tests():
+    """Выполняет тесты и возвращает stdout прямо в интерфейс."""
+    log.info("=" * 30)
+    log.info("🚀 ЗАПУСК ВСТРОЕННЫХ ТЕСТОВ...")
+    log.info("=" * 30)
+    
+    buffer = io.StringIO()
+    buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
+    buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+
+    # --- Путь к скрипту test_all.py ---
+    test_script_path = os.path.join(ROOT, "studiocore", "tests", "test_all.py")
+    
+    if not os.path.exists(test_script_path):
+        log.error(f"Test runner: Файл не найден: {test_script_path}")
+        buffer.write(f"❌ ОШИБКА: Не найден скрипт test_all.py\n")
+        return buffer.getvalue()
+
+    # --- Запуск test_all.py ---
+    try:
+        log.info(f"🚀 Running: {test_script_path}")
+        buffer.write(f"🚀 Running: {test_script_path}\n\n")
+        
+        # Используем subprocess для захвата STDOUT и STDERR
+        process = subprocess.run(
+            [sys.executable, test_script_path],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=180 # 3 минуты (на случай медленной загрузки ИИ)
+        )
+        
+        # Пишем STDOUT (логи)
+        if process.stdout:
+            buffer.write(process.stdout)
             
-        wc = len(text.split())
-        cf = tlp.get("conscious_frequency", 0.5)
-        energy = (tlp.get("love",0) + tlp.get("pain",0) + tlp.get("truth",0)) / 3
+        # Пишем STDERR (ошибки)
+        if process.stderr:
+            buffer.write("\n--- STDERR ---\n")
+            buffer.write(process.stderr)
 
-        if wc < 40 and energy < 0.3: form = "solo"
-        elif 40 <= wc < 80 or cf > 0.5: form = "duet"
-        elif 80 <= wc < 150 or (energy > 0.4 and cf > 0.6): form = "trio"
-        elif 150 <= wc < 250 or energy > 0.6: form = "quartet"
-        elif wc >= 250 or cf > 0.75 or emo.get("epic", 0) > 0.3: form = "choir"
-        else: form = "solo"
-        
-        log.debug(f"Результат _auto_form: {form} (WC={wc}, CF={cf:.2f}, E={energy:.2f})")
-        return form
+    except subprocess.TimeoutExpired:
+        log.error("Test runner: ТЕСТЫ ПРЕВЫСИЛИ ТАЙМАУТ (180с)!")
+        buffer.write("\n❌ КРИТИЧЕСКАЯ ОШИБКА: Тесты заняли слишком много времени (Timeout 180s).\n")
+    except Exception as e:
+        log.error(f"Test runner: КРИТИЧЕСКАЯ ОШИБКА: {e}")
+        buffer.write(f"❌ ОШИБКА ПРИ ЗАПУСКЕ ТЕСТОВ: {e}\n{traceback.format_exc()}\n")
 
-    def _mixed_code(self, form: str, preferred_gender: str, text: str) -> str:
-        """
-        v8: Исправлена логика 'duet_ff'.
-        """
-        log.debug(f"Вызов функции: _mixed_code (Form={form}, PrefGender={preferred_gender})")
-        t = text.lower()
-        has_f = any(x in t for x in [" she ", "her ", "женщин", "девушк"])
-        has_m = any(x in t for x in [" he ", "his ", "мужчин", "парень"])
+    log.info("🏁 ...Встроенные тесты завершены.")
+    buffer.write("\n✅ Inline test session complete.\n")
+    return buffer.getvalue()
 
-        # 1. Принудительный выбор пользователя
-        if preferred_gender in ("male", "female"):
-            gender_code = "m" if preferred_gender == "male" else "f"
-            if form == "solo": return f"solo_{gender_code}"
-            
-            # v8: Если пользователь выбрал M или F, но форма - ДУЭТ (из хинта или грамматики),
-            # мы ПРЕДПОЛАГАЕМ, что это M/F дуэт, чтобы он звучал интереснее.
-            # (Раньше здесь было duet_mm или duet_ff, что было ошибкой)
-            if form == "duet": 
-                log.debug("Логика _mixed_code: UI-хинт (M/F) + форма (Duet) = duet_mf")
-                return "duet_mf" 
-            
-            if "choir" in form: 
-                # v5: Исправлена ошибка f-string
-                return f"choir_{'male' if gender_code == 'm' else 'female'}"
-            
-            return f"{form}_{gender_code}"
 
-        # 2. Автоматический выбор (preferred_gender == "auto" или "mixed")
-        if form == "solo":
-            if has_f and not has_m: return "solo_f"
-            if has_m and not has_f: return "solo_m"
-            return "solo_auto" 
+# === 10. PUBLIC UI (Gradio) ===
+log.debug("Инициализация Gradio UI...")
+with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface") as iface_public:
+    gr.Markdown(f"## 🎧 StudioCore {STUDIOCORE_VERSION}\nАдаптивный движок с тестами и логами.\n")
 
-        if form == "duet":
-            if has_m and has_f: return "duet_mf"
-            if has_f: return "duet_ff" # (Только если есть "она", но нет "он")
-            if has_m: return "duet_mm" # (Только если есть "он", но нет "она")
-            return "duet_mf" # По умолчанию (если нет грамматики)
+    with gr.Tab("🎙️ Анализ текста"):
+        with gr.Row():
+            text_input = gr.Textbox(
+                label="Введите текст песни",
+                lines=12,
+                placeholder="Вставьте лирику здесь…\n\n(Подсказка: чтобы задать вокал, напишите в ПОСЛЕДНЕЙ строке, например: (под хриплый мужской вокал) или (soft female whisper))"
+            )
+            gender_input = gr.Radio(["auto", "male", "female"], value="auto", label="Принудительный Пол (UI)")
 
-        if "choir" in form:
-            # v5: Исправлена ошибка 'в' на 'in'
-            if "мужск" in t or "male choir" in t: return "choir_male"
-            if "женск" in t or "female choir" in t: return "choir_female"
-            return "choir_mixed"
+        analyze_button = gr.Button("🔍 Анализировать")
 
-        return f"{form}_mixed"
+        # --- v8: Единый блок Suno Prompt ---
+        suno_box = gr.Textbox(
+            label="[StudioCore] Suno Prompt (Style + Lyrics)", 
+            lines=16, 
+            show_copy_button=True,
+            info="Скопируйте [STYLE PROMPT] в 'Style of Music' и [LYRICS PROMPT] в 'Lyrics' в Suno."
+        )
 
-    def get(
-        self,
-        genre_full: str,
-        preferred_gender: str,
-        text: str,
-        sections: List[Dict[str,Any]], # (Устарело, но оставлено для API)
-        vocal_profile_tags: List[Dict[str, Any]] # v4.3: Приходит из monolith (СПИСОК)
-    ) -> Tuple[List[str], List[str], str]:
-        
-        log.debug(f"Вызов функции: VocalProfileRegistry.get (Genre={genre_full}, PrefGender={preferred_gender})")
-        
-        # 1. Определяем базовый жанр для карты инструментов
-        # v8: 'lyrical' теперь приоритетнее 'default'
-        g = "edm" if "edm" in genre_full else \
-            "cinematic" if "cinematic" in genre_full else \
-            "orchestral" if "orchestral" in genre_full else \
-            "rock" if "rock" in genre_full or "metal" in genre_full else \
-            "pop" if "pop" in genre_full else \
-            "folk" if "folk" in genre_full else \
-            "ambient" if "ambient" in genre_full else \
-            "lyrical" if "lyrical" in genre_full else "default" 
+        with gr.Accordion("Показать расширенный анализ (Summary и Аннотация)", open=False):
+            # v8: Кнопки копирования возвращены
+            result_box = gr.Textbox(label="📊 Результат (Summary)", lines=6, show_copy_button=True)
+            annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (UI)", lines=24, show_copy_button=True)
 
-        if g not in self.map:
-            log.warning(f"Жанр '{g}' не найден в vocal_map, используется 'default'")
-            g = "default"
-        log.debug(f"Выбранная карта инструментов: {g}")
+        analyze_button.click(
+            fn=analyze_text,
+            inputs=[text_input, gender_input],
+            outputs=[result_box, suno_box, annotated_box],
+        )
 
-        # 2. Определяем форму (solo/duet/choir)
-        hints = self._detect_ensemble_hints(text, sections)
-        form = "solo" 
-        
-        log.debug(f"Теги вокала из monolith (список): {vocal_profile_tags}")
-        
-        # === v9: ИСПРАВЛЕНИЕ AttributeError: 'list' object has no attribute 'get' ===
-        # Мы должны сперва подсчитать теги из списка, который прислал monolith
-        summed_tags = {"male": 0, "female": 0, "mixed": 0, "auto": 0}
-        if isinstance(vocal_profile_tags, list):
-            for profile in vocal_profile_tags: 
-                gender = profile.get("gender", "auto")
-                if gender in summed_tags:
-                    summed_tags[gender] += 1
-                else:
-                    summed_tags["auto"] += 1
-        else:
-            log.warning(f"vocal_profile_tags не является списком! Получен: {type(vocal_profile_tags)}")
-            
-        log.debug(f"Подсчитанные теги (словарь): {summed_tags}")
-        # === Конец исправления v9 ===
+    with gr.Tab("🧩 Логи и тесты"):
+        gr.Markdown("### Автоматическая проверка ядра StudioCore")
+        run_btn = gr.Button("🚀 Запустить тесты")
+        output_box = gr.Textbox(
+            label="Результаты тестов (stdout/stderr)", 
+            lines=30, 
+            show_copy_button=True
+        )
+        run_btn.click(fn=run_inline_tests, inputs=None, outputs=output_box)
 
-        # v4.3: Новая логика определения формы (v9: использует summed_tags)
-        if summed_tags.get("mixed", 0) > 0:
-            form = "duet"
-        elif summed_tags.get("male", 0) > 0 and summed_tags.get("female", 0) > 0:
-             form = "duet"
-        elif summed_tags.get("male", 0) > 2 or summed_tags.get("female", 0) > 2:
-             form = "trio" # (Если один пол доминирует в 3+ секциях)
-        
-        # Хинты (duet, choir) из текста имеют приоритет
-        for name in ["choir","quintet","quartet","trio","duet"]:
-            if hints.get(f"wants_{name}"):
-                form = name
-                break 
-        log.debug(f"Форма после хинтов: {form}")
+# === 11. MOUNT ===
+log.debug("Монтирование Gradio App в FastAPI (path='/')...")
+iface_public.queue()
+app = gr.mount_gradio_app(app, iface_public, path="/")
 
-        # Если все еще solo, используем старый метод auto_form
-        if form == "solo" and \
-           not (summed_tags.get("male") or summed_tags.get("female")):
-            
-            if self.emo_analyzer and self.tlp_analyzer:
-                emo = self.emo_analyzer.analyze(text)
-                tlp = self.tlp_analyzer.analyze(text)
-                form = self._auto_form(emo, tlp, text)
-            else:
-                log.warning("Emo/TLP анализаторы не загружены, _auto_form пропущен.")
-        log.debug(f"Финальная форма: {form}")
-
-        # 3. Определяем состав (male/female/mixed)
-        # v9: использует summed_tags
-        auto_gender = "auto"
-        if summed_tags.get("male", 0) > summed_tags.get("female", 0):
-            auto_gender = "male"
-        elif summed_tags.get("female", 0) > summed_tags.get("male", 0):
-            auto_gender = "female"
-        elif summed_tags.get("mixed", 0) > 0:
-            auto_gender = "mixed"
-        log.debug(f"Грамматический пол: {auto_gender}")
-
-        # UI (preferred_gender) имеет высший приоритет
-        final_gender_preference = preferred_gender if preferred_gender != "auto" else auto_gender
-        if final_gender_preference == "mixed": final_gender_preference = "auto" 
-        log.debug(f"Финальный пол (с учетом UI): {final_gender_preference}")
-        
-        vocal_form = self._mixed_code(form, final_gender_preference, text)
-        log.debug(f"Финальный код формы: {vocal_form}")
-
-        # 4. Собираем вокал и инструменты
-        female_vox = self.map[g]["female"]
-        male_vox = self.map[g]["male"]
-        
-        if final_gender_preference == "female":
-            vox = female_vox
-        elif final_gender_preference == "male":
-            vox = male_vox
-        else: # auto
-            if "mf" in vocal_form: # duet_mf
-                vox = male_vox + female_vox
-            else:
-                emo = self.emo_analyzer.analyze(text) if self.emo_analyzer else {}
-                vox = (female_vox if (emo.get("joy",0)+emo.get("peace",0) >
-                                      emo.get("anger",0)+emo.get("epic",0)) else male_vox)
-        
-        # 5. Очистка и возврат
-        vox = [form] + vox
-        vox = sorted(list(set(v for v in vox if v in VALID_VOICES)))[:6]
-        inst = sorted(list(set(i for i in self.map[g]["inst"] if i in VALID_INSTRUMENTS)))[:6]
-        
-        log.debug(f"Возврат: Vox={vox}, Inst={inst}, Form={vocal_form}")
-        return vox, inst, vocal_form
+# === 12. RUN ===
+if __name__ == "__main__":
+    log.info(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API (Inline Logs Mode)...")
+    uvicorn.run(app, host="0.0.0.0", port=7860)
