@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 StudioCore v5.2.1 — COMPLETE SYSTEM VALIDATION (v8 - Включено логирование)
+v8: Восстановлены check_directories, check_syntax и т.д.
 """
 
 # === 🔧 Исправление пути импорта ===
@@ -20,6 +21,7 @@ import requests
 import traceback
 import unittest
 import time
+import logging # v8: Добавлен импорт
 
 # === 1. АКТИВАЦИЯ ЛОГГЕРА ===
 try:
@@ -38,6 +40,7 @@ log = logging.getLogger("test_all")
 # Папки для сканирования (только наши)
 ROOT_DIR = ROOT 
 PROJECT_FOLDERS_TO_SCAN = ["studiocore"]
+# v8: Добавляем app.py в список сканирования
 PROJECT_FILES_TO_SCAN = ["app.py"] 
 
 log.info(f"ROOT проекта: {ROOT_DIR}")
@@ -54,7 +57,7 @@ MODULES = [
 ]
 
 # ==========================================================
-#  HELPER: Функции сканирования (v2 - Ограниченные)
+#  HELPER: Функции сканирования (v8 - ВОССТАНОВЛЕНЫ)
 # ==========================================================
 
 # Пути, которые нужно *полностью* игнорировать
@@ -67,6 +70,19 @@ def _is_ignored(path):
             return True
     return False
 
+# v8: ВОССТАНОВЛЕНО
+def check_directories():
+    log.info("📂 Проверка структуры...")
+    # Проверяем только 'studiocore', а не весь ROOT
+    required = [f"{ROOT_DIR}/studiocore", f"{ROOT_DIR}/studiocore/tests"]
+    missing = [d for d in required if not os.path.isdir(d)]
+    if missing:
+        log.error(f"❌ Отсутствуют директории: {missing}")
+        return False
+    log.info("✅ Структура в порядке.")
+    return True
+
+# v8: ВОССТАНОВЛЕНО
 def check_python_syntax():
     log.info("🐍 Проверка синтаксиса Python (проект)...")
     all_ok = True
@@ -107,7 +123,7 @@ def check_python_syntax():
                 
     return all_ok
 
-
+# v8: ВОССТАНОВЛЕНО
 def check_json_yaml():
     log.info("🧩 Проверка JSON / YAML (проект)...")
     ok = True
@@ -203,9 +219,8 @@ def check_internal_dependencies():
             
             path = os.path.join(root, f)
             # v7: Улучшенная нормализация имени модуля
-            module_name = os.path.splitext(os.path.relpath(path, scan_dir))[0]
-            # v8: Заменяем os.path.sep на точку
-            module_name = module_name.replace(os.path.sep, ".")
+            rel_path = os.path.relpath(path, scan_dir)
+            module_name = os.path.splitext(rel_path)[0].replace(os.path.sep, ".")
             
             # v8: Убираем __init__
             if module_name.endswith(".__init__"):
@@ -213,6 +228,10 @@ def check_internal_dependencies():
             
             # v8: Пропускаем сам logger
             if module_name == "logger":
+                continue
+            
+            # v16: Пропускаем app.py (он не в .studiocore)
+            if "app.py" in path:
                 continue
 
             dependencies[module_name] = []
@@ -231,6 +250,7 @@ def check_internal_dependencies():
                         if node.module == "__future__":
                             continue
                             
+                        # v16: Добавляем проверку, что node.module не None
                         if node.module and (node.module.startswith("studiocore.") or node.module.startswith(".")):
                             # Убираем . из '.emotion'
                             dependencies[module_name].append(node.module.lstrip('.'))
@@ -294,13 +314,11 @@ def run_all_unit_tests():
 # ==========================================================
 def test_prediction_pipeline():
     """
-    Этот тест проверяет, что Monolith, TLP, Emo, Rhythm и Style 
-    могут быть загружены ВМЕСТЕ и выдать результат.
-    (Это тест ИНТЕГРАЦИИ, а не логики)
+    (v7) Интеграционный тест ядра (без API).
     """
     log.info("\n🎧 Проверка (интеграционная) ядра StudioCore...")
     try:
-        # v6: Исправлен ImportError. 
+        # v16: Исправлен ImportError. 
         from studiocore.monolith_v4_3_1 import PatchedLyricMeter
         from studiocore.style import PatchedStyleMatrix
         # v15: Исправлен ImportError
@@ -417,7 +435,7 @@ if __name__ == "__main__":
 
     if percent == 100:
         log.info("🚀 Система полностью функциональна.")
-    elif percent >= 75: # 6/8
+    elif percent >= 75: # (6/8)
         log.warning("⚠️ Система работает, но требует проверки некоторых модулей.")
     else:
         log.error("❌ Обнаружены критические ошибки, требуется ревизия.")
