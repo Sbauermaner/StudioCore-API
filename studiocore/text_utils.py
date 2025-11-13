@@ -42,7 +42,7 @@ def normalize_text_preserve_symbols(text: str) -> str:
     схлопывает кратные пустые строки, слегка выравнивает типографику.
     Символы пунктуации и эмодзи сохраняются.
     """
-    if not text:
+    if not isinstance(text, str):
         return ""
 
     # Переводим CRLF/CR -> LF
@@ -129,3 +129,14 @@ def flatten_sections_to_lines(sections: List[Dict[str, Any]]) -> List[str]:
     for s in sections:
         out.extend(s.get("lines", []))
     return out
+
+# === v16: ИСПРАВЛЕН ImportError ===
+# Эта функция была в monolith_v4_3_1.py, но monolith v5 ее импортирует
+def extract_raw_blocks(text: str) -> List[str]:
+    """
+    Разбивает текст на блоки по пустой строке (один или более \n).
+    [Suno] использует это для разделения секций.
+    """
+    # Разделяем по одному или нескольким \n, затем фильтруем пустые строки
+    blocks = re.split(r"[\n\r]{2,}", text.strip())
+    return [block.strip() for block in blocks if block.strip()]
