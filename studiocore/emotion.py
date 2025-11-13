@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore Emotion Engines (v13 - "Умные" Словари)
-Быстрый эвристический анализ (не ИИ).
+StudioCore Emotion Engines (v15 - Имена ИСПРАВЛЕНЫ)
+Быстрый эвристический анализ (не ИИ) + Расширенные словари v3.
 """
 
 import re
@@ -10,7 +10,6 @@ from typing import Dict, Any
 import logging
 
 # Получаем логгер для этого модуля
-# (Он будет настроен app.py или test_all.py)
 log = logging.getLogger(__name__)
 
 # === Весовые карты ===
@@ -21,7 +20,7 @@ EMOJI_WEIGHTS = {ch: 0.5 for ch in "❤💔💖🔥😭😢✨🌌🌅🌙🌈�
 # =====================================================
 # 💠 Truth × Love × Pain Engine (v3 Словари)
 # =====================================================
-class TruthLovePainEngine: # <-- Оригинальное имя
+class TruthLovePainEngine: # <-- v15: Оригинальное имя
     """Balances TLP axes using expanded v3 dictionaries."""
 
     # v3 - Расширенные словари с "корнями"
@@ -54,7 +53,7 @@ class TruthLovePainEngine: # <-- Оригинальное имя
         self.TRUTH = re.compile(r"(" + "|".join(self.TRUTH_WORDS) + r")", re.I)
         self.LOVE = re.compile(r"(" + "|".join(self.LOVE_WORDS) + r")", re.I)
         self.PAIN = re.compile(r"(" + "|".join(self.PAIN_WORDS) + r")", re.I)
-        log.debug("TLP Engine (v13) инициализирован с расширенными словарями.")
+        log.debug(f"TLP Engine (v15) инициализирован с {len(self.TRUTH_WORDS)}+{len(self.LOVE_WORDS)}+{len(self.PAIN_WORDS)} словами.")
 
     def analyze(self, text: str) -> Dict[str, float]:
         log.debug(f"Вызов функции: TruthLovePainEngine.analyze")
@@ -70,7 +69,6 @@ class TruthLovePainEngine: # <-- Оригинальное имя
 
         if total == 0:
             # Если нет TLP слов, вычисляем "частоту" (CF)
-            # на основе длины. Короткие тексты = высокая CF (мир)
             word_count = len(re.findall(r"[a-zа-яё]+", s))
             cf = 1.0 - min(1.0, word_count / 100.0) * 0.5 
             truth, love, pain = 0.0, 0.0, 0.0
@@ -85,7 +83,6 @@ class TruthLovePainEngine: # <-- Оригинальное имя
             dissonance = pain
             
             # CF = (Гармония - Диссонанс) + 0.5 (базовая линия)
-            # Смягчаем диссонанс, чтобы CF не уходила в 0
             cf = max(0.0, min(1.0, (harmony - dissonance * 0.5 + 0.5))) 
 
         result = {
@@ -101,8 +98,8 @@ class TruthLovePainEngine: # <-- Оригинальное имя
 # =====================================================
 # 💫 AutoEmotionalAnalyzer (v3 Словари)
 # =====================================================
-class AutoEmotionalAnalyzer: # <-- Оригинальное имя
-    """Heuristic emotion-field classifier (v13, +Logging)."""
+class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
+    """Heuristic emotion-field classifier (v15, +Logging)."""
 
     EMO_FIELDS = {
         "joy": ["joy", "happy", "laugh", "смех", "рад", "улыб", "счаст", "весел", "hope", "bright", "солнц"],
@@ -121,17 +118,15 @@ class AutoEmotionalAnalyzer: # <-- Оригинальное имя
             if tokens:
                 # v13: Компилируем регекспы для *корней* слов (быстрее и точнее)
                 self.LEXICON[field] = re.compile(r"(" + "|".join(tokens) + r")", re.I)
-        log.debug("AutoEmotionalAnalyzer (v13) инициализирован.")
+        log.debug(f"AutoEmotionalAnalyzer (v15) инициализирован.")
 
     def _softmax(self, scores: Dict[str, float]) -> Dict[str, float]:
         if not scores: return {}
-        # Защита от переполнения (OverflowError)
         max_score = max(scores.values()) if scores else 0
         try:
             exps = {k: math.exp(v - max_score) for k, v in scores.items()}
         except OverflowError:
             log.warning("Softmax Overflow. Используется линейная нормализация.")
-            # Fallback на простую линейную нормализацию, если exp() падает
             total = sum(v for v in scores.values() if v > 0) or 1.0
             return {k: max(0, v) / total for k, v in scores.items()}
             
@@ -159,7 +154,6 @@ class AutoEmotionalAnalyzer: # <-- Оригинальное имя
         log.debug(f"Хиты по эмоциям (raw): {scores}")
 
         # 3️⃣ Усиление (Amplification)
-        # Умножаем на 1 + (0..1), чтобы усилить, но не обнулить, если energy=0
         if energy > 0.1 and total_hits > 0:
             for field in scores:
                 scores[field] *= (1 + energy ** 2)
