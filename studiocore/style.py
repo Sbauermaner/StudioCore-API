@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (v12 - NameError ИСПРАВЛЕН)
+StudioCore v6.0 — Adaptive StyleMatrix Hybrid (v12 - NameError ИСПРАВЛЕН)
 v12: Исправлена ошибка NameError: 'energy' is not defined.
      Логика EDM временно упрощена (только по BPM).
 """
@@ -146,7 +146,7 @@ def resolve_style_and_form(
 
 
 # ==========================================================
-# 🎨 PatchedStyleMatrix (v5.2.3)
+# 🎨 PatchedStyleMatrix (v6.0.0)
 # ==========================================================
 class PatchedStyleMatrix:
     """Adaptive emotional-to-style mapping engine (v12 Logged)."""
@@ -267,7 +267,7 @@ class PatchedStyleMatrix:
 
 
 # ==========================================================
-STYLE_VERSION = "v5.2.3 adaptive hybrid (USER-MODE + AutoDetect)"
+STYLE_VERSION = "v6.0.0 maxi hybrid (USER-MODE + AutoDetect)"
 log.info(f"🎨 [PatchedStyleMatrix {STYLE_VERSION}] loaded successfully.")
 
 # ==========================================================

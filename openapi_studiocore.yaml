@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
   title: StudioCore API
-  version: "v5.0"
+  version: "v6.0.0"
   description: |
-    🎧 **StudioCore v5 — Expressive Adaptive Engine**
+    🎧 **StudioCore v6 — Maxi Adaptive Engine**
     Автор: Bauer Synesthetic Studio
 
     Формула: **Truth × Love × Pain = Conscious Frequency**
@@ -34,7 +34,7 @@ paths:
                     example: ok
                   engine:
                     type: string
-                    example: StudioCore v5
+                    example: StudioCore v6
                   ready:
                     type: boolean
                     example: true
@@ -60,7 +60,7 @@ paths:
                     example: StudioCore
                   version:
                     type: string
-                    example: v5.0
+                    example: v6.0.0
                   signature:
                     type: string
                     example: StudioCore
@@ -107,4 +107,4 @@ paths:
                     example: "🎙️ Core Annotation + Vocal Layer ..."
                   engine_version:
                     type: string
-                    example: v5.0
+                    example: v6.0.0

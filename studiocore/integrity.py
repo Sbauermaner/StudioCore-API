@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — Integrity Scan Engine
+StudioCore v6 — Integrity Scan Engine
 Проверяет структурную и эмоциональную целостность текста.
 """
 

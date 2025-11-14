@@ -1,5 +1,5 @@
 {
-  "version": "v5.2.1",
+  "version": "v6.0.0",
   "description": "StudioCore Adaptive StyleMatrix testset — verifies correct genre/style detection for Love/Pain/CF variance.",
   "tests": [
     {

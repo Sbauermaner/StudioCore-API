@@ -11,7 +11,7 @@ from pathlib import Path
 import os
 
 # === CONFIG ===
-STUDIO_VERSION = "v5.0"
+STUDIO_VERSION = "v6.0.0"
 README_PATH = Path("README.md")
 SERVER_URL = "https://sbauer8-studiocore-api.hf.space"
 

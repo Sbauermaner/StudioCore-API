@@ -2,8 +2,8 @@
   "openapi": "3.0.1",
   "info": {
     "title": "StudioCore API",
-    "version": "v5.2",
-    "description": "🎧 StudioCore — Expressive Adaptive Engine by Bauer Synesthetic Studio.\n\nAI ядро для анализа текста, эмоций и структуры. Возвращает жанр, BPM, философию, промты и аннотированный текст.\n\nFormula: Truth × Love × Pain = Conscious Frequency."
+    "version": "v6.0.0",
+    "description": "🎧 StudioCore — Maxi Adaptive Engine by Bauer Synesthetic Studio.\n\nAI ядро для анализа текста, эмоций и структуры. Возвращает жанр, BPM, философию, промты и аннотированный текст.\n\nFormula: Truth × Love × Pain = Conscious Frequency."
   },
   "servers": [
     {
@@ -31,7 +31,7 @@
                 },
                 "example": {
                   "status": "ok",
-                  "engine": "StudioCore v5.2",
+                  "engine": "StudioCore v6.0.0-maxi",
                   "ready": true
                 }
               }
@@ -62,7 +62,7 @@
                 "example": {
                   "status": "ok",
                   "engine": "StudioCore",
-                  "version": "v5.2",
+                  "version": "v6.0.0",
                   "signature": "StudioCore"
                 }
               }
@@ -126,7 +126,7 @@
                   "prompt_full": "Genre: lyrical adaptive | Style: melancholic minor | ...",
                   "prompt_suno": "lyrical minor emotional soft tone ...",
                   "annotated_text": "🎙️ Core Annotation + Vocal Layer ...",
-                  "engine_version": "v5.2",
+                  "engine_version": "v6.0.0",
                   "gender": "auto"
                 }
               }

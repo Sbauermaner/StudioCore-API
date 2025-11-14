@@ -9,7 +9,7 @@ from typing import Any, Dict
 from compat_base import load_openapi, normalize_openapi, dict_diff, save_report
 
 # Пути к файлам OpenAPI (замени на свои при необходимости)
-OPENAPI_LEFT = os.environ.get("OPENAPI_LEFT", "openapi_main.yaml")
+OPENAPI_LEFT = os.environ.get("OPENAPI_LEFT", "openapi.json")
 OPENAPI_RIGHT = os.environ.get("OPENAPI_RIGHT", "openapi_studiocore.yaml")
 
 

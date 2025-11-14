@@ -3,7 +3,7 @@ info:
   title: StudioCore Adaptive API
   version: "{{VERSION}}"
   description: |
-    🎧 **StudioCore v5 — Expressive Adaptive Engine**
+    🎧 **StudioCore v6 — Maxi Adaptive Engine**
     Формула: **Truth × Love × Pain = Conscious Frequency**
     Анализ текста, эмоций, структуры и философии.
     Возвращает жанр, BPM, философию, промты и аннотированный текст.

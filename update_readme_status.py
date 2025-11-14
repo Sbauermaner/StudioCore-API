@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-📘 Auto-Update README for StudioCore v5.x
+📘 Auto-Update README for StudioCore v6.x
 -----------------------------------------
 Обновляет README.md при запуске Space:
 — Обновляет статус API (online/offline)
 — Фиксирует дату последней синхронизации
 — Вставляет актуальные ссылки на OpenAPI схемы (YAML + JSON)
-— Автоматически корректирует заголовок версии (v4.x → v5.x и т.д.)
+— Автоматически корректирует заголовок версии (v5.x → v6.x и т.д.)
 """
 
 import requests
@@ -30,7 +30,7 @@ def get_api_info():
             data = r.json()
             return {
                 "status": "🟢 **API online**" if data.get("ready") else "🟡 **API partial**",
-                "version": data.get("version", "v5.0"),
+                "version": data.get("version", "v6.0.0"),
             }
     except Exception:
         pass

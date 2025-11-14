@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (v10 - NameError ИСПРАВЛЕН)
+🎧 StudioCore v6.0.0 — Adaptive Annotation Engine (maxi release)
 Gradio + FastAPI + Централизованное логирование
 """
 

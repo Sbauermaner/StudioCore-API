@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — Vocal Profile Registry (v9 - AttributeError ИСПРАВЛЕН)
+StudioCore v6 — Vocal Profile Registry (v9 - AttributeError ИСПРАВЛЕН)
 v9: Исправлена ошибка 'list' object has no attribute 'get'
 """
 

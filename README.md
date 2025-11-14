@@ -1,5 +1,5 @@
 ---
-title: StudioCore v5 — Expressive Adaptive Engine
+title: StudioCore v6 — Maxi Adaptive Engine
 emoji: 🎧
 colorFrom: blue
 colorTo: pink
@@ -11,10 +11,10 @@ license: mit
 author: Bauer Synesthetic Studio
 ---
 
-# 🎧 StudioCore API by Bauer  
-### *Expressive Adaptive Engine — Truth × Love × Pain = Conscious Frequency*
+# 🎧 StudioCore API by Bauer
+### *Maxi Adaptive Engine — Truth × Love × Pain = Conscious Frequency*
 
-> Версия ядра: **v5.0-adaptive**  
+> Версия ядра: **v6.0.0-maxi**
 > Обновлено: *{{ auto_update_date }}*  
 > OpenAPI: [`openapi_main.json`](./openapi_main.json) • [`openapi_gpt.yaml`](./openapi_gpt.yaml)
 

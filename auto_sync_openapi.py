@@ -12,7 +12,7 @@ try:
     from studiocore import STUDIOCORE_VERSION
     VERSION = STUDIOCORE_VERSION
 except Exception:
-    VERSION = os.environ.get("STUDIOCORE_VERSION", "v5.2")
+    VERSION = os.environ.get("STUDIOCORE_VERSION", "v6.0.0")
 
 # === URL Space ===
 SPACE_URL = os.environ.get("SPACE_URL", "http://0.0.0.0:7860")

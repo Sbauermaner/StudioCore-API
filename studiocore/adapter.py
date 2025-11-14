@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5.2 — Suno/Studio Adaptive Adapter (v5 - NameError ИСПРАВЛЕН)
+StudioCore v6.0 — Suno/Studio Adaptive Adapter (v5 - NameError ИСПРАВЛЕН)
 Semantic compression · RNS safety · Dynamic prompt formatting
 """
 
@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 # === ИСПРАВЛЕНИЕ (NameError) ===
 # Эта константа была потеряна при рефакторинге
-VERSION_LIMITS: Dict[str, int] = {"v3": 200, "v3.5": 200, "v4": 500, "v5": 1000}
+VERSION_LIMITS: Dict[str, int] = {"v3": 200, "v3.5": 200, "v4": 500, "v5": 1000, "v6": 1200}
 # === Конец исправления ===
 
 # -----------------------------------------------------------

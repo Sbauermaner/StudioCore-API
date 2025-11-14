@@ -1,23 +1,24 @@
 # -*- coding: utf-8 -*-
 """
 StudioCore Configuration Loader
-Совместим с ядром v4.3.1-adaptive и выше.
+Совместим с ядром v6.0.0-maxi и выше.
 """
 
 import os
 import json
 
-STUDIOCORE_VERSION = "v4.3.1-adaptive"
+STUDIOCORE_VERSION = "v6.0.0-maxi"
 
 VERSION_LIMITS = {
     "v3": 200,
     "v3.5": 200,
     "v4": 500,
-    "v5": 1000
+    "v5": 1000,
+    "v6": 1200,
 }
 
 DEFAULT_CONFIG = {
-    "suno_version": "v5",
+    "suno_version": "v6",
     "safety": {
         "max_peak_db": -1.0,        # ограничение на пиковый уровень
         "max_rms_db": -14.0,        # средний RMS-уровень

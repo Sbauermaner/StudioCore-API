@@ -131,7 +131,7 @@ def flatten_sections_to_lines(sections: List[Dict[str, Any]]) -> List[str]:
     return out
 
 # === v16: ИСПРАВЛЕНИЕ ImportError ===
-# Эта функция была в monolith_v4_3_1.py, но monolith v6 вызывает ее отсюда.
+# Эта функция была в monolith_v4_3_1.py, но монолит v6.0.0 вызывает ее отсюда.
 def extract_raw_blocks(text: str) -> List[str]:
     """
     Разделяет текст на блоки по пустой строке, 

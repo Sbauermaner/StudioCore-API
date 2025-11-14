@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-🎧 StudioCore v5.2.1 — Unified Adaptive Engine (Safe Loader)
+🎧 StudioCore v6.0.0 — Unified Adaptive Engine (Maxi Loader)
 Truth × Love × Pain = Conscious Frequency
 
 🧩 Особенности:
-- Автоматический поиск последнего monolith_*.py
+- Автоматический поиск последнего monolith_*.py (v6 maxi)
 - Устойчивый импорт: fallback при отсутствии StyleMatrix
 - Безопасный вызов get_core() даже при ошибках импорта
 """
@@ -17,7 +17,7 @@ from typing import Any
 # ============================================================
 # 🔹 Версия ядра
 # ============================================================
-STUDIOCORE_VERSION = "v5.2.1"
+STUDIOCORE_VERSION = "v6.0.0-maxi"
 
 # ============================================================
 # 🔹 Автоматическое определение Monolith
@@ -27,7 +27,7 @@ def _detect_latest_monolith() -> str:
     base = os.path.dirname(__file__)
     candidates = glob.glob(os.path.join(base, "monolith_*.py"))
     if not candidates:
-        return "monolith_v4_3_1"
+        return "monolith_v6_0_0"
     def _ver(x: str) -> tuple:
         match = re.search(r"(\d+)_(\d+)_(\d+)", x)
         return tuple(map(int, match.groups())) if match else (0, 0, 0)

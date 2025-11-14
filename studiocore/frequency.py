@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — Frequency & RNS Safety
+StudioCore v6 — Frequency & RNS Safety
 Resonance–Nervous–Safety adaptive harmonics
 """
 

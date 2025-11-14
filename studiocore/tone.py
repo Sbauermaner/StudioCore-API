@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-StudioCore v5 — ToneSyncEngine
+StudioCore v6 — ToneSyncEngine
 Unified color–resonance engine for emotional frequency visualization.
 """
 

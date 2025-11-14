@@ -4,8 +4,12 @@
 Author: Bauer Synesthetic Studio
 """
 from __future__ import annotations
-import os, json
+
+import os
+from typing import Any, Dict
+
 import requests
+
 from compat_base import save_report
 
 API_URL = os.environ.get("STUDIOCORE_API_URL", "https://sbauer8-studiocore-api.hf.space/api/predict")
@@ -16,26 +20,28 @@ TEST_TEXT = """Вся моя жизнь — как быль или небыль,
 Я так хочу твоей женщиной быть…"""
 
 
-def run_check():
+def _report(payload: Dict[str, Any]) -> Dict[str, Any]:
+    save_report("remote_compatibility_full_report.json", payload)
+    return payload
+
+
+def run_check() -> Dict[str, Any]:
     print("🧩 Remote API:", API_URL)
     try:
         r = requests.post(API_URL, json={"text": TEST_TEXT}, timeout=60)
     except Exception as e:
         print("❌ Connect error:", e)
-        save_report("remote_compatibility_full_report.json", {"status": "connect_error", "error": str(e)})
-        return
+        return _report({"ok": False, "status": "connect_error", "error": str(e)})
 
     if r.status_code != 200:
         print(f"❌ API {r.status_code}: {r.text}")
-        save_report("remote_compatibility_full_report.json", {"status": "http_error", "code": r.status_code, "body": r.text})
-        return
+        return _report({"ok": False, "status": "http_error", "code": r.status_code, "body": r.text})
 
     try:
         data = r.json()
     except Exception:
         print("⚠️ JSON decode error")
-        save_report("remote_compatibility_full_report.json", {"status": "json_error", "body": r.text})
-        return
+        return _report({"ok": False, "status": "json_error", "body": r.text})
 
     summary = data.get("summary", "")
     annotated = data.get("annotated_text", "")
@@ -60,7 +66,8 @@ def run_check():
     print("ToneSync:", has_tonesync)
     print("→", "✅ StudioCore runtime OK" if all_ok else "⚠️ Runtime mismatches")
 
-    save_report("remote_compatibility_full_report.json", {
+    return _report({
+        "ok": all_ok,
         "status": "ok" if all_ok else "mismatch",
         "checks": {
             "summary_ok": ok_summary,
