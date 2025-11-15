@@ -157,7 +157,7 @@ class AdaptiveVocalAllocator:
 # 🚀 StudioCore Monolith (v4.3.11)
 # ==========================================================
 class StudioCore:
-    
+
     def __init__(self, config_path: str | None = None):
         log.debug("Инициализация StudioCore...")
         self.cfg = load_config(config_path or "studio_config.json")
@@ -255,9 +255,9 @@ class StudioCore:
     # -------------------------------------------------------
     # 🎼 (v6) Генератор семантических секций
     # -------------------------------------------------------
-    def _build_semantic_sections(self, emo: Dict[str,float], tlp: Dict[str,float], bpm: int, style_key: str) -> Dict[str, Any]:
+    def _build_semantic_layers(self, emo: Dict[str,float], tlp: Dict[str,float], bpm: int, style_key: str) -> Dict[str, Any]:
         """ v6: Генерирует 'energy', 'arrangement' и использует 'key' """
-        log.debug("Вызов функции: _build_semantic_sections")
+        log.debug("Вызов функции: _build_semantic_layers")
         
         love, pain, truth = tlp.get("love",0), tlp.get("pain",0), tlp.get("truth",0)
         cf = tlp.get("conscious_frequency",0)
@@ -305,12 +305,12 @@ class StudioCore:
 
         return {
             "bpm_suggested": bpm_adj,
-            "overlay": {
-                "depth": round((truth+pain)/2,2),
-                "warmth": round(love,2),
-                "clarity": round(cf,2),
-                "sections": [intro, verse, bridge, chorus, outro]
-            }
+            "layers": {
+                "depth": round((truth + pain) / 2, 2),
+                "warmth": round(love, 2),
+                "clarity": round(cf, 2),
+                "sections": [intro, verse, bridge, chorus, outro],
+            },
         }
 
     # -------------------------------------------------------
@@ -413,12 +413,13 @@ class StudioCore:
     # -------------------------------------------------------
     # 🚀 Главный Пайплайн
     # -------------------------------------------------------
-    def analyze(self, 
-                text: str, 
-                preferred_gender: str = "auto",
-                version: Optional[str] = None,
-                overlay: Optional[Dict[str, Any]] = None
-                ) -> Dict[str, Any]:
+    def analyze(
+        self,
+        text: str,
+        preferred_gender: str = "auto",
+        version: Optional[str] = None,
+        semantic_hints: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         
         log.debug(f"--- ЗАПУСК АНАЛИЗА (v{STUDIOCORE_VERSION}) ---")
         log.debug(f"Preferred Gender: {preferred_gender}, Text: {text[:40]}...")
@@ -463,20 +464,20 @@ class StudioCore:
         final_gender_preference = vocal_analysis["final_gender_preference"]
         user_voice_hint = vocal_analysis["user_voice_hint"]
         
-        log.debug(f"Режим вокала: {'USER-MODE' if user_voice_hint else 'AUTO-DETECT'}")
+        log.debug(f"Статус вокального выбора: {'USER-DEFINED' if user_voice_hint else 'AUTO-DETECT'}")
 
         # 3. Стиль (Style)
         log.debug("Вызов: self.style.build")
         # Передаем хинт в style.build
-        style = self.style.build(emo, tlp, raw, bpm_base, overlay, user_voice_hint)
+        style = self.style.build(emo, tlp, raw, bpm_base, semantic_hints, user_voice_hint)
         log.debug(f"Результат Style: Genre={style['genre']}, Style={style['style']}")
 
         # 4. Семантические секции (Suno)
         # (Используем BPM из style.build и ключ из style.build)
-        log.debug("Вызов: self._build_semantic_sections")
-        semantic_overlay = self._build_semantic_sections(emo, tlp, style.get('bpm', bpm_base), style.get('key'))
-        bpm_adj = semantic_overlay["bpm_suggested"]
-        semantic_sections = semantic_overlay["overlay"]["sections"]
+        log.debug("Вызов: self._build_semantic_layers")
+        semantic_layers = self._build_semantic_layers(emo, tlp, style.get('bpm', bpm_base), style.get('key'))
+        bpm_adj = semantic_layers["bpm_suggested"]
+        semantic_sections = semantic_layers["layers"]["sections"]
         
         # 5. Вокал и Инструменты
         log.debug("Вызов: self.vocals.get")
@@ -516,10 +517,10 @@ class StudioCore:
 
         # 8. Финальные Промпты
         log.debug("Вызов: build_suno_prompt (STYLE)")
-        prompt_suno_style = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="suno_style")
-        
+        prompt_suno_style = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, prompt_variant="suno_style")
+
         log.debug("Вызов: build_suno_prompt (LYRICS)")
-        prompt_suno_lyrics = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, mode="suno_lyrics")
+        prompt_suno_lyrics = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, prompt_variant="suno_lyrics")
 
         log.debug("--- АНАЛИЗ УСПЕШНО ЗАВЕРШЕН ---")
 
@@ -529,15 +530,65 @@ class StudioCore:
             "vocal_form": vocal_form, "final_gender_preference": final_gender_preference,
             "integrity": integ, "tone_sync": tone,
             "rhythm": rhythm_analysis,
-            
+
             "annotated_text_ui": annotated_text_ui,     # v6: Для Gradio UI
             "annotated_text_suno": annotated_text_suno, # v6: Для Suno Lyrics
             "prompt_suno_style": prompt_suno_style,   # v6: Для Suno Style
             "prompt_suno_lyrics": prompt_suno_lyrics, # v6: (Legacy)
-            
-            "semantic_overlay": semantic_overlay,
-            "version": version, "mode": "AUTO-DETECT" if not user_voice_hint else "USER-MODE"
+
+            "semantic_layers": semantic_layers,
+            "version": version,
+            "vocal_detection_state": "AUTO-DETECT" if not user_voice_hint else "USER-DEFINED",
         }
+
+
+class StudioCoreV5:
+    """Compatibility wrapper exposing the v5 API expected by legacy tools."""
+
+    def __init__(self, *args, **kwargs):
+        self._core = StudioCore(*args, **kwargs)
+
+    def analyze(self, *args, **kwargs):
+        return self._core.analyze(*args, **kwargs)
+
+    def emotion(self, text: str):
+        return self._core.emotion.analyze(text)
+
+    def style(
+        self,
+        emo: Dict[str, float],
+        tlp: Dict[str, float],
+        text: str,
+        bpm: int,
+        semantic_hints: Dict[str, Any] | None = None,
+        voice_hint: str | None = None,
+    ) -> Dict[str, Any]:
+        if not self._core.style:
+            raise RuntimeError("Style subsystem is unavailable.")
+        return self._core.style.build(emo, tlp, text, bpm, semantic_hints, voice_hint)
+
+    def tone(self, emo: Dict[str, float], tlp: Dict[str, float], key_hint: str | None = None):
+        return self._core.tone.colors_for_primary(emo, tlp, key_hint or "auto")
+
+    def rhythm(
+        self,
+        text: str,
+        *,
+        emotions: Dict[str, float] | None = None,
+        tlp: Dict[str, float] | None = None,
+        cf: float | None = None,
+        header_bpm: float | None = None,
+    ):
+        return self._core.rhythm.analyze(
+            text,
+            emotions=emotions,
+            tlp=tlp,
+            cf=cf,
+            header_bpm=header_bpm,
+        )
+
+    def __getattr__(self, item: str):
+        return getattr(self._core, item)
 
 
 # ==========================================================

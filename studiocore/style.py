@@ -157,7 +157,7 @@ class PatchedStyleMatrix:
         tlp: Dict[str, float],
         text: str,
         bpm: int,
-        overlay: Dict[str, Any] | None = None,
+        semantic_hints: Dict[str, Any] | None = None,
         voice_hint: str | None = None, # v4.3: Принимает хинт от monolith
     ) -> Dict[str, Any]:
         

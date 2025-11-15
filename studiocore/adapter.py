@@ -97,12 +97,12 @@ def build_suno_prompt(
     bpm: int,
     philosophy: str,
     version: str,
-    mode: str = "suno_style",
+    prompt_variant: str = "suno_style",
 ) -> str:
     """
     v5: Генерирует промпты в формате [TAG: value], как просил пользователь.
     """
-    log.debug(f"Вызов функции: build_suno_prompt (Mode: {mode})")
+    log.debug(f"Вызов функции: build_suno_prompt (Variant: {prompt_variant})")
 
     genre = style_data.get("genre", "adaptive emotional")
     style = style_data.get("style", "free-form tonal flow")
@@ -130,7 +130,7 @@ def build_suno_prompt(
         vocal_desc = f"mixed vocals ({', '.join(clean_vocals)})"
 
     # === [Style of Music] Prompt ===
-    if mode == "suno_style":
+    if prompt_variant == "suno_style":
         prompt_parts = [
             f"[GENRE: {genre}]",
             f"[MOOD: {atmosphere}]",
@@ -147,7 +147,7 @@ def build_suno_prompt(
 
     # === [Lyrics] Prompt (Vocal Hints) ===
     # (Этот режим больше не используется app.py v8, но мы его оставим)
-    elif mode == "suno_lyrics":
+    elif prompt_variant == "suno_lyrics":
         techniques = style_data.get("techniques", [])
         prompt_parts = [
             vocal_form,
@@ -173,5 +173,5 @@ def build_suno_prompt(
             f"Safety: {safety_tag} | Emotion Balance: {emotion_balance} | Engine: StudioCore {version}\n"
             f"Prompt ID: {prompt_id}"
         )
-        max_len = 5000 if mode == "full" else 1200
+        max_len = 5000 if prompt_variant == "full" else 1200
         return semantic_compress(base_prompt, max_len, preserve_last_line=True)

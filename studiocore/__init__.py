@@ -14,6 +14,9 @@ import os
 import importlib
 from typing import Any
 
+from .fallback import StudioCoreFallback
+from .core_v6 import StudioCoreV6
+
 # ============================================================
 # 🔹 Версия ядра
 # ============================================================
@@ -40,11 +43,13 @@ monolith_name = os.getenv("STUDIOCORE_MONOLITH", _detect_latest_monolith())
 # 🔹 Попытка импорта ядра
 # ============================================================
 StudioCore = None
+StudioCoreV5 = None
 MONOLITH_VERSION = "unknown"
 
 try:
     core_mod = importlib.import_module(f".{monolith_name}", package=__name__)
     StudioCore = getattr(core_mod, "StudioCore", None)
+    StudioCoreV5 = getattr(core_mod, "StudioCoreV5", None)
     MONOLITH_VERSION = getattr(core_mod, "STUDIOCORE_VERSION", "unknown")
     print(f"🎧 [StudioCore Loader] Loaded {monolith_name} (version={MONOLITH_VERSION})")
 except ImportError as e:
@@ -57,17 +62,6 @@ except Exception as e:
 # ============================================================
 if not StudioCore:
     print("⚠️ [StudioCore Loader] Основное ядро не найдено — создаётся fallback-заглушка.")
-
-    class StudioCoreFallback:
-        """Fallback ядро: позволяет системе работать, пока StudioCore не готов."""
-        def __init__(self, *args, **kwargs):
-            print("🧩 [StudioCoreFallback] Активен временный режим.")
-            self.is_fallback = True
-            self.status = "safe-mode"
-            self.subsystems = []
-        def analyze(self, *_, **__):
-            raise RuntimeError("⚠️ StudioCoreFallback: анализ недоступен — основное ядро не загружено.")
-
     StudioCore = StudioCoreFallback
     MONOLITH_VERSION = "fallback"
 
@@ -81,6 +75,17 @@ def get_core() -> Any:
     except Exception as e:
         print(f"⚠️ [StudioCore] Ошибка инициализации: {e}")
         return StudioCoreFallback()
+
+
+__all__ = [
+    "StudioCore",
+    "StudioCoreV5",
+    "StudioCoreV6",
+    "StudioCoreFallback",
+    "get_core",
+    "STUDIOCORE_VERSION",
+    "MONOLITH_VERSION",
+]
 
 # ============================================================
 # 🔹 Тестовый запуск
