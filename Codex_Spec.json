@@ -1,7 +1,13 @@
 {
   "StudioCore_Spec": {
-    "version": "6.1",
-    "description": "Unified specification for StudioCore v6.x engines, diagnostics, overrides, and Codex-driven code synchronization.",
+    "version": "6.3",
+    "description": "Unified specification for StudioCore v6.x engines, diagnostics, overrides, dynamic user parameters and Codex-driven code synchronization + skeleton-based project repair.",
+
+    "modes": {
+      "analysis_mode": "auto",
+      "override_mode": "user_first",
+      "update_mode": "skeleton_mode"
+    },
 
     "required_modules": [
       "__init__.py",
@@ -90,7 +96,6 @@
         "detect_meta_pause",
         "detect_zero_pulse"
       ],
-
       "EmotionEngine": [
         "emotion_detection",
         "emotion_intensity_curve",
@@ -98,13 +103,11 @@
         "secondary_emotion_detection",
         "emotion_conflict_map"
       ],
-
       "ColorEmotionEngine": [
         "assign_color_by_emotion",
         "generate_color_wave",
         "color_transition_map"
       ],
-
       "VocalEngine": [
         "detect_voice_gender",
         "detect_voice_type",
@@ -113,7 +116,6 @@
         "vocal_dynamics_map",
         "vocal_intensity_curve"
       ],
-
       "BreathingEngine": [
         "detect_inhale_points",
         "detect_short_breath",
@@ -122,7 +124,6 @@
         "detect_emotional_breathing",
         "breath_to_emotion_sync"
       ],
-
       "BPMEngine": [
         "text_bpm_estimation",
         "emotion_bpm_mapping",
@@ -130,14 +131,12 @@
         "breathing_bpm_integration",
         "poly_rhythm_detection"
       ],
-
       "MeaningVelocityEngine": [
         "semantic_shift_detection",
         "meaning_acceleration",
         "meaning_fracture_detection",
         "meaning_curve_generation"
       ],
-
       "TonalityEngine": [
         "mode_detection",
         "major_minor_classifier",
@@ -145,7 +144,6 @@
         "modal_shift_detection",
         "key_transition_curve"
       ],
-
       "InstrumentationEngine": [
         "instrument_selection",
         "instrument_based_on_emotion",
@@ -153,21 +151,18 @@
         "instrument_color_sync",
         "instrument_rhythm_sync"
       ],
-
       "REM_Synchronizer": [
         "detect_layer_conflicts",
         "resolve_layer_conflicts",
         "assign_dominant_layer",
         "align_layers_for_final_output"
       ],
-
       "ZeroPulseEngine": [
         "detect_zero_pulse",
         "vacuum_beat_state",
         "silence_as_emotion",
         "silence_as_transition"
       ],
-
       "CommandInterpreter": [
         "detect_commands_in_text",
         "execute_bpm_commands",
@@ -175,7 +170,6 @@
         "execute_rhythm_commands",
         "execute_emotion_commands"
       ],
-
       "StyleEngine": [
         "genre_selection",
         "mood_selection",
@@ -185,7 +179,6 @@
         "tone_style",
         "final_style_prompt_build"
       ],
-
       "LyricsAnnotationEngine": [
         "add_vocal_annotations",
         "add_breath_annotations",
@@ -193,7 +186,6 @@
         "add_emotional_annotations",
         "add_rhythm_annotations"
       ],
-
       "FinalCompiler": [
         "merge_all_layers",
         "generate_final_structure",
@@ -201,7 +193,6 @@
         "generate_final_annotations",
         "consistency_check"
       ],
-
       "UserOverrideEngine": [
         "resolve_bpm",
         "apply_to_rhythm",
@@ -209,6 +200,207 @@
         "apply_to_vocals"
       ]
     },
+
+    "engines": {
+      "ColorEmotionEngine": {
+        "functions": [
+          "assign_color_by_emotion",
+          "generate_color_wave",
+          "color_transition_map"
+        ],
+        "expanded": {
+          "purpose": "Color defines the energetic field of the song. It influences atmosphere, rhythm, vocal, tone, transitions and style without appearing in the final Suno prompt.",
+          "components": {
+            "emotion_to_color": {
+              "sadness": "blue/cold violet",
+              "anger": "red/hot",
+              "hope": "gold/turquoise",
+              "drama": "deep violet/burgundy",
+              "light": "pastel",
+              "dark": "deep saturated"
+            },
+            "tonal_color": {
+              "Am": "dark blue",
+              "F# minor": "blue-violet",
+              "G major": "yellow-green",
+              "D minor": "crimson"
+            },
+            "tlp_color_shift": {
+              "truth": "white/blue",
+              "love": "warm red/pink",
+              "pain": "black-red/purple"
+            }
+          },
+          "influences": {
+            "vocal_selection": [
+              "soft vs aggressive timbre based on color temperature",
+              "whisper/airy vs rasp/drive",
+              "gender preference depending on atmosphere"
+            ],
+            "instrument_selection": [
+              "dark colors → low synths, cello, sub-bass",
+              "light colors → pads, piano, bright guitars",
+              "blue → reverb heavy ambient textures",
+              "red → percussion, distortion"
+            ],
+            "rhythm_bpm": [
+              "dark → slower, heavier rhythm feel",
+              "light → faster, airy tempo feel"
+            ],
+            "section_transitions": [
+              "tone shifts",
+              "dynamic curves",
+              "emotional breaks",
+              "smooth vs sharp transitions"
+            ],
+            "style_matrix": [
+              "blue → cinematic ambient, indie, sad pop",
+              "red → trap, dnb, rap",
+              "gold → orchestral, epic"
+            ]
+          },
+          "engine_behavior": {
+            "color_is_hidden_from_prompt": true,
+            "color_updates_tone_sync": true,
+            "color_influences_all_engines": true,
+            "color_does_not_override_user_commands": true
+          },
+          "internal_outputs": {
+            "color_wave": "dynamic color progression across the song",
+            "color_state": "current emotional climate",
+            "color_transitions": "section-to-section color shifts",
+            "tone_sync": "final combined emotional-tonal color field"
+          },
+          "symbiosis_protocol": {
+            "role": "supportive_correction_layer",
+            "priority": "below_user_overrides_below_core_engines",
+            "interactions": {
+              "EmotionEngine": "refines emotional colors without changing detected emotions",
+              "TonalityEngine": "adjusts tonal palette without altering key or mode",
+              "BPMEngine": "modulates BPM-feel without altering numeric BPM",
+              "VocalEngine": "adjusts vocal color (soft/bright/dark) without changing detected voice type",
+              "StyleEngine": "adds hidden atmosphere layer without altering final genre/style text"
+            },
+            "rules": {
+              "never_override_other_engine_output": true,
+              "always_operate_additively": true,
+              "follow_final_compiler_merging": true,
+              "provide_hidden_weights_for_final_blending": true
+            },
+            "output_flow": {
+              "color_wave": "feeds into emotion/tone/bpm layers as reference only",
+              "color_state": "feeds into vocal and style engines",
+              "color_transitions": "helps smooth section transitions",
+              "tone_sync": "feeds into FinalCompiler for final balancing"
+            }
+          }
+        }
+      },
+
+      "VocalEngine": {
+        "type": "logical_engine",
+        "description": "Vocal profile, voice type, multi-gender combinations and dynamics mapping.",
+        "extended_vocal_parameters": {
+          "gender": ["male", "female", "mixed", "choir_mixed"],
+          "role": ["lead", "backing", "double", "choir", "response"],
+          "timbre": ["soft", "raspy", "warm", "airy", "gritty", "bright", "dark", "clean", "broken"],
+          "range": ["low", "mid", "high", "full"],
+          "dynamics": ["calm", "emotional", "intense", "explosive", "whisper_to_scream"],
+          "techniques": [
+            "falsetto",
+            "whisper",
+            "shout",
+            "growl",
+            "spoken",
+            "belt",
+            "head_voice",
+            "mixed_voice",
+            "fry",
+            "scream"
+          ],
+          "multi_voice": [
+            "male_female_duet",
+            "male_male_duet",
+            "female_female_duet",
+            "male_lead_female_back",
+            "female_lead_male_back",
+            "layered_choir"
+          ]
+        },
+        "auto_behavior": {
+          "auto_detect_gender_from_text": true,
+          "auto_detect_anger_pain_for_scream": true,
+          "auto_detect_tenderness_for_soft": true,
+          "auto_assign_duet_if_dialogue_present": true,
+          "respect_user_gender_mix": true
+        },
+        "user_override_behavior": {
+          "accepts_user_vocal_sets": true,
+          "accepts_multiple_voices_in_one_song": true,
+          "merge_user_vocals_with_auto": true,
+          "user_priority": "high"
+        }
+      },
+
+      "InstrumentationEngine": {
+        "type": "logical_engine",
+        "description": "Instrument selection and sync with emotion, vocals, rhythm and color.",
+        "instrument_matrix": {
+          "strings": ["violin", "viola", "cello", "contrabass", "string_ensemble"],
+          "guitars": ["acoustic_guitar", "clean_electric", "crunch_electric", "hi_gain_rhythm", "lead_guitar", "12_string"],
+          "bass": ["electric_bass", "synth_bass", "sub_bass", "distorted_bass"],
+          "keys": ["piano", "felt_piano", "epiano", "organ", "synth_pad", "plucks"],
+          "drums": ["acoustic_drums", "metal_drums", "trap_kit", "dnb_kit", "industrial_kit"],
+          "fx": ["risers", "impacts", "noise_fx", "reverse_fx"],
+          "vocals_fx": ["reverb_tail", "delay_echo", "telephone_fx", "distortion_bus"],
+          "orchestral": ["brass_section", "horns", "woodwinds", "percussion_orch"]
+        },
+        "emotion_binding": {
+          "high_pain": ["distorted_bass", "hi_gain_rhythm", "metal_drums"],
+          "soft_love": ["acoustic_guitar", "felt_piano", "pads"],
+          "epic_truth": ["brass_section", "string_ensemble", "sub_bass", "big_drums"]
+        },
+        "user_override_behavior": {
+          "accepts_explicit_instrument_list": true,
+          "merge_user_instruments_with_auto": true,
+          "never_remove_user_instrument": true
+        }
+      }
+    },
+
+    "user_parameters": {
+      "description": "All core parameters of the engine may be provided by the user explicitly. The engine must adapt all auto-analysis to user constraints when present.",
+      "accepted_fields": {
+        "bpm": "Numeric tempo. If provided, all engines must adapt to it. Auto BPM only when missing.",
+        "key": "Musical key (e.g. D minor, G major). TonalityEngine respects it as base.",
+        "scale_or_mode": "Optional mode (dorian, phrygian, etc.).",
+        "genre": "Target genre (rock, metal, rap, trap, jazz, dnb, cinematic, etc.).",
+        "style_mood": "High-level mood words (dark, tense, hopeful, tragic, epic...).",
+        "vocal_gender": "male, female, mixed, duet, choir_mixed.",
+        "vocal_timbre": "soft, raspy, warm, airy, gritty, etc.",
+        "vocal_range": "low, mid, high, full.",
+        "vocal_dynamics": "calm, emotional, intense, explosive, whisper_to_scream.",
+        "vocal_techniques": "list of techniques: scream, whisper, growl, belt, etc.",
+        "vocal_roles": "lead/backing/response/choir.",
+        "instrument_list": "explicit instruments that must be used.",
+        "structure_template": "optional: list of sections [Intro, Verse, Chorus, Bridge, Outro, Hook, Break].",
+        "language": "language of lyrics (ru, en, de, etc.).",
+        "color_request": "optional color hint (blue, red, gold, etc., for diagnostics only)."
+      },
+      "combination_rules": {
+        "single_param_allowed": true,
+        "partial_param_sets_allowed": true,
+        "full_param_sets_allowed": true,
+        "user_params_can_be_mixed_with_auto": true,
+        "if_conflict_between_user_and_auto": "user_wins"
+      }
+    },
+
+    "override_priority": [
+      "user_overrides",
+      "meta_directives",
+      "auto_analysis"
+    ],
 
     "color_engine_rules": {
       "visibility": {
@@ -245,24 +437,150 @@
       }
     },
 
-    "override_priority": [
-      "user_overrides",
-      "meta_directives",
-      "auto_analysis"
-    ],
-
-    "reserved_keywords": {
-      "deprecated": ["mode", "overlay"],
-      "forbidden": ["overlay"]
+    "relationships": {
+      "logical_to_physical": {
+        "TextStructureEngine": [
+          "core_v6.py",
+          "text_utils.py"
+        ],
+        "EmotionEngine": [
+          "core_v6.py",
+          "emotion.py"
+        ],
+        "ColorEmotionEngine": [
+          "emotion.py",
+          "tone.py",
+          "rhythm.py",
+          "style.py"
+        ],
+        "VocalEngine": [
+          "core_v6.py",
+          "vocals.py"
+        ],
+        "BPMEngine": [
+          "core_v6.py",
+          "rhythm.py"
+        ],
+        "TonalityEngine": [
+          "core_v6.py",
+          "tone.py"
+        ],
+        "MeaningVelocityEngine": [
+          "core_v6.py"
+        ],
+        "InstrumentationEngine": [
+          "core_v6.py",
+          "instrument.py"
+        ],
+        "StyleEngine": [
+          "core_v6.py",
+          "style.py"
+        ],
+        "LyricsAnnotationEngine": [
+          "core_v6.py",
+          "adapter.py"
+        ],
+        "FinalCompiler": [
+          "core_v6.py",
+          "adapter.py"
+        ],
+        "UserOverrideEngine": [
+          "core_v6.py",
+          "user_override_manager.py"
+        ]
+      },
+      "fallback_chain": [
+        "core_v6.py (StudioCoreV6)",
+        "monolith_v4_3_1.py (V5 Monolith)",
+        "fallback.py (StudioCoreFallback)"
+      ]
     },
 
-    "file_generation_rules": {
+    "auto_file_generation_policy": {
       "enabled": true,
-      "create_missing_files": true,
-      "create_missing_classes": true,
-      "create_missing_functions": true,
-      "add_missing_imports": true,
-      "confirm_before_writing": true
+      "conditions": [
+        "module listed in StudioCore_Spec.required_modules does not have a corresponding file in the repository",
+        "class described in orchestrator or engine spec is missing",
+        "required_methods or engine_functions from this spec are missing in code",
+        "critical dependencies between modules are missing (missing imports or adapters)",
+        "a new helper file is required to synchronize layers or resolve conflicts"
+      ],
+      "actions": [
+        "create missing module file with minimal valid code skeleton",
+        "create missing class with documented TODO body",
+        "create missing functions with stubs that log 'NOT_IMPLEMENTED' and expected signature",
+        "add required import statements between modules",
+        "register new files in the loader (__init__.py, core_v6.py) when needed"
+      ],
+      "safety": [
+        "every auto-generated file or function must be confirmed by the user before being committed",
+        "without user confirmation, changes are kept as draft-only (e.g. separate folder or suffix)",
+        "auto-generation must never overwrite an existing file without explicit user confirmation"
+      ],
+      "integration": [
+        "all newly created files must be added to StudioCore_Spec.required_modules or dependencies",
+        "new relationships must be added to StudioCore_Spec.relationships",
+        "after generation, a validation pass must be executed against this spec"
+      ]
+    },
+
+    "project_update": {
+      "project_update_mode": "skeleton_mode",
+      "scan_directories": {
+        "target": ["./main", "./studiocore"],
+        "exclude": [
+          ".github",
+          ".git",
+          "__pycache__",
+          ".env",
+          ".DS_Store",
+          "node_modules"
+        ],
+        "include_all_files": true,
+        "rebuild_missing_files": true
+      },
+      "skeleton_rules": {
+        "rebuild_mode": "non_destructive",
+        "keep_existing_logic": true,
+        "regenerate_structure": true,
+        "fill_missing_classes": true,
+        "fill_missing_methods": true,
+        "add_missing_imports": true,
+        "patch_incomplete_files": true,
+        "skeleton_format": {
+          "class": "class {NAME}:\n    \"\"\"AUTO-GENERATED SKELETON CLASS — TODO IMPLEMENTATION\"\"\"\n    pass\n",
+          "function": "def {NAME}(*args, **kwargs):\n    \"\"\"AUTO-GENERATED SKELETON FUNCTION — TODO IMPLEMENTATION\"\"\"\n    pass\n",
+          "file": "# AUTO-GENERATED SKELETON FILE — DO NOT REMOVE\n\n"
+        }
+      }
+    },
+
+    "embedded_files": {
+      "README.md": {
+        "mode": "replace",
+        "content": "# StudioCore V6.3 — Adaptive Multilayer Analysis Engine\n\nStudioCore V6.3 is a dynamic, multi-layer AI engine capable of interpreting lyrics, tone, rhythm, emotional structures, breathing, vocal parameters and generating adaptive prompts for Suno and other generators.\n\n## Core Features\n- Automatic text segmentation (Intro / Verse / Chorus / Bridge / Outro / Hook / Meta-Pause)\n- Dynamic vocal engine (timbre, range, techniques, multi-voice, gender mixing)\n- Full instrument matrix with emotional and color binding\n- Color-emotion hidden layer (energetic field of the song)\n- Zero Pulse detection and structural silence handling\n- Multi-engine symbiosis (emotion ↔ tone ↔ rhythm ↔ style ↔ color)\n- User command interpreter (full parameter override: BPM, Key, Genre, Vocals, Instruments, Structure)\n- Auto-annotation layer (breath, dynamics, vocal shifts, section headers, meta markers)\n\n## User Parameters\nThe engine accepts partial or full user parameter sets. Even if the user provides only one parameter (for example, key or genre), the engine adapts all other engines to respect this constraint. When multiple parameters are provided (BPM + Key + Genre + Vocal Type + Instruments), the system builds a full style and annotation profile around them.\n\n## Cooperation\nFor business cooperation, licensing, integration or research collaboration please contact:\n\n**Email:** ssv8240@gmail.com\n\nStudioCore Engine will continue to expand emotionally and structurally, adding new adaptive layers, extended style logic, multi-voice dynamic models and improved user override protocols.\n"
+      },
+      "LICENSE": {
+        "mode": "replace",
+        "content": "StudioCore Engine — Custom License v1.0 (2025)\n\nCopyright (c) 2025, StudioCore Engine (SBauer & Contributors).\nAll rights reserved.\n\nPermission is hereby granted to use this specification and engine for\npersonal, educational and research purposes, including integration with\nnon-commercial tools and experiments.\n\nAny commercial use, resale, sublicensing, hosted SaaS offering or\nintegration into paid products or platforms requires explicit written\npermission from the author.\n\nFor licensing or cooperation contact: ssv8240@gmail.com\n\nThis engine and its emotional core will continue to expand, including\n(but not limited to):\n- extended emotion and color models,\n- advanced multi-voice adaptive logic,\n- new genre and style matrices,\n- enhanced safety and diagnostic layers.\n\nBy using this specification, you agree not to remove the author credit\nor falsify the origin of the engine.\n"
+      }
+    },
+
+    "diagnostics": {
+      "validation_requirements": [
+        "all modules listed in this spec must exist in the codebase",
+        "all classes referenced by orchestrator and engines must exist",
+        "all required methods must exist with correct signatures",
+        "no deprecated parameters (mode, overlay) are used",
+        "no missing imports between modules",
+        "V6 must run without TypeError in normal execution"
+      ],
+      "diagnostic_outputs": [
+        "Diagnostics",
+        "CommandDiagnostics",
+        "LayerSyncMap",
+        "ZeroPulseMap"
+      ]
     },
 
     "validation_rules": {
