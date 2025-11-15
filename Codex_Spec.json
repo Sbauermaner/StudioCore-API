@@ -1,0 +1,237 @@
+{
+  "Codex_Spec": {
+    "version": "6.x",
+    "description": "Compact, AI-friendly specification for StudioCore v6.x required modules, functions, classes, and dependencies.",
+
+    "required_modules": [
+      "core_v6.py",
+      "__init__.py",
+      "emotion.py",
+      "tone.py",
+      "rhythm.py",
+      "vocals.py",
+      "instrument.py",
+      "style.py",
+      "adapter.py",
+      "text_utils.py",
+      "monolith_v4_3_1.py",
+      "fallback.py"
+    ],
+
+    "required_classes": {
+      "core_v6.py": [
+        "StudioCoreV6"
+      ],
+      "monolith_v4_3_1.py": [
+        "StudioCoreV5"
+      ],
+      "fallback.py": [
+        "StudioCoreFallback"
+      ]
+    },
+
+    "required_methods": {
+      "StudioCoreV6": [
+        "analyze",
+        "_backend_analyze",
+        "_merge_user_params",
+        "_auto_generate_missing_params",
+        "_finalize_result"
+      ],
+      "StudioCoreV5": [
+        "analyze",
+        "emotion",
+        "style",
+        "tone",
+        "rhythm"
+      ],
+      "StudioCoreFallback": [
+        "analyze"
+      ]
+    },
+
+    "logical_engines": [
+      "TextStructureEngine",
+      "EmotionEngine",
+      "ColorEngine",
+      "VocalEngine",
+      "BreathingEngine",
+      "BPMEngine",
+      "MeaningVelocityEngine",
+      "TonalityEngine",
+      "InstrumentationEngine",
+      "REM_Synchronizer",
+      "ZeroPulseEngine",
+      "CommandInterpreter",
+      "StyleEngine",
+      "LyricsAnnotationEngine",
+      "FinalCompiler"
+    ],
+
+    "engine_functions": {
+      "TextStructureEngine": [
+        "auto_section_split",
+        "detect_intro",
+        "detect_verse",
+        "detect_prechorus",
+        "detect_chorus",
+        "detect_bridge",
+        "detect_outro",
+        "detect_meta_pause",
+        "detect_zero_pulse"
+      ],
+      "EmotionEngine": [
+        "emotion_detection",
+        "emotion_intensity_curve",
+        "emotion_pivot_points",
+        "secondary_emotion_detection",
+        "emotion_conflict_map"
+      ],
+      "ColorEngine": [
+        "assign_color_by_emotion",
+        "generate_color_wave",
+        "color_transition_map"
+      ],
+      "VocalEngine": [
+        "detect_voice_gender",
+        "detect_voice_type",
+        "detect_voice_tone",
+        "detect_vocal_style",
+        "vocal_dynamics_map",
+        "vocal_intensity_curve"
+      ],
+      "BreathingEngine": [
+        "detect_inhale_points",
+        "detect_short_breath",
+        "detect_broken_breath",
+        "detect_spasms",
+        "detect_emotional_breathing",
+        "breath_to_emotion_sync"
+      ],
+      "BPMEngine": [
+        "text_bpm_estimation",
+        "emotion_bpm_mapping",
+        "meaning_bpm_curve",
+        "breathing_bpm_integration",
+        "poly_rhythm_detection"
+      ],
+      "MeaningVelocityEngine": [
+        "semantic_shift_detection",
+        "meaning_acceleration",
+        "meaning_fracture_detection",
+        "meaning_curve_generation"
+      ],
+      "TonalityEngine": [
+        "mode_detection",
+        "major_minor_classifier",
+        "section_key_selection",
+        "modal_shift_detection",
+        "key_transition_curve"
+      ],
+      "InstrumentationEngine": [
+        "instrument_selection",
+        "instrument_based_on_emotion",
+        "instrument_based_on_voice",
+        "instrument_color_sync",
+        "instrument_rhythm_sync"
+      ],
+      "REM_Synchronizer": [
+        "detect_layer_conflicts",
+        "resolve_layer_conflicts",
+        "assign_dominant_layer",
+        "align_layers_for_final_output"
+      ],
+      "ZeroPulseEngine": [
+        "detect_zero_pulse",
+        "vacuum_beat_state",
+        "silence_as_emotion",
+        "silence_as_transition"
+      ],
+      "CommandInterpreter": [
+        "detect_commands_in_text",
+        "execute_bpm_commands",
+        "execute_key_commands",
+        "execute_rhythm_commands",
+        "execute_emotion_commands"
+      ],
+      "StyleEngine": [
+        "genre_selection",
+        "mood_selection",
+        "instrumentation_style",
+        "vocal_style",
+        "visual_style",
+        "tone_style",
+        "final_style_prompt_build"
+      ],
+      "LyricsAnnotationEngine": [
+        "add_vocal_annotations",
+        "add_breath_annotations",
+        "add_tonal_annotations",
+        "add_emotional_annotations",
+        "add_rhythm_annotations"
+      ],
+      "FinalCompiler": [
+        "merge_all_layers",
+        "generate_final_structure",
+        "generate_final_prompt",
+        "generate_final_annotations",
+        "consistency_check"
+      ]
+    },
+
+    "critical_dependencies": {
+      "ColorEngine": [
+        "emotion.py",
+        "tone.py",
+        "rhythm.py",
+        "style.py"
+      ],
+      "VocalEngine": [
+        "vocals.py",
+        "emotion.py"
+      ],
+      "BPMEngine": [
+        "rhythm.py",
+        "text_utils.py"
+      ],
+      "TonalityEngine": [
+        "tone.py",
+        "text_utils.py"
+      ],
+      "FinalCompiler": [
+        "core_v6.py",
+        "adapter.py"
+      ]
+    },
+
+    "reserved_keywords": {
+      "deprecated_parameters": [
+        "mode",
+        "overlay"
+      ],
+      "must_not_use_in_code": [
+        "overlay",
+        "legacy_mode_param"
+      ]
+    },
+
+    "file_generation_rules": {
+      "enabled": true,
+      "create_missing_files": true,
+      "create_missing_classes": true,
+      "create_missing_functions": true,
+      "add_missing_imports": true,
+      "confirm_before_writing": true
+    },
+
+    "validation_rules": {
+      "must_have_all_modules": true,
+      "must_have_all_classes": true,
+      "must_have_all_required_methods": true,
+      "must_have_all_required_engine_functions": true,
+      "no_missing_imports": true,
+      "no_signature_mismatches": true,
+      "no_type_errors_on_runtime": true
+    }
+  }
+}
