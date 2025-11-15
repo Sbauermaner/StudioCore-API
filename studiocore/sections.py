@@ -19,7 +19,7 @@ EMO_MAP = {
 }
 
 class SectionTagAnalyzer:
-    """Dynamic section parser that overlays emotional hints over analyzed text."""
+    """Dynamic section parser that applies emotional hints to analyzed text."""
 
     def parse(self, text: str) -> List[Dict[str, Any]]:
         matches = ANNOTATION_PATTERN.finditer(text)
