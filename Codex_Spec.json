@@ -1,33 +1,29 @@
 {
-  "Codex_Spec": {
-    "version": "6.x",
-    "description": "Compact, AI-friendly specification for StudioCore v6.x required modules, functions, classes, and dependencies.",
+  "StudioCore_Spec": {
+    "version": "6.1",
+    "description": "Unified specification for StudioCore v6.x engines, diagnostics, overrides, and Codex-driven code synchronization.",
 
     "required_modules": [
-      "core_v6.py",
       "__init__.py",
+      "core_v6.py",
       "emotion.py",
       "tone.py",
       "rhythm.py",
       "vocals.py",
-      "instrument.py",
       "style.py",
+      "instrument.py",
       "adapter.py",
       "text_utils.py",
       "monolith_v4_3_1.py",
-      "fallback.py"
+      "fallback.py",
+      "user_override_manager.py"
     ],
 
     "required_classes": {
-      "core_v6.py": [
-        "StudioCoreV6"
-      ],
-      "monolith_v4_3_1.py": [
-        "StudioCoreV5"
-      ],
-      "fallback.py": [
-        "StudioCoreFallback"
-      ]
+      "core_v6.py": ["StudioCoreV6"],
+      "monolith_v4_3_1.py": ["StudioCoreV5"],
+      "fallback.py": ["StudioCoreFallback"],
+      "user_override_manager.py": ["UserOverrides", "UserOverrideManager"]
     },
 
     "required_methods": {
@@ -47,13 +43,26 @@
       ],
       "StudioCoreFallback": [
         "analyze"
+      ],
+      "UserOverrides": [
+        "__init__",
+        "from_dict"
+      ],
+      "UserOverrideManager": [
+        "__init__",
+        "resolve_bpm",
+        "_get_meta_bpm",
+        "apply_to_rhythm",
+        "apply_to_style",
+        "apply_to_vocals",
+        "debug_summary"
       ]
     },
 
     "logical_engines": [
       "TextStructureEngine",
       "EmotionEngine",
-      "ColorEngine",
+      "ColorEmotionEngine",
       "VocalEngine",
       "BreathingEngine",
       "BPMEngine",
@@ -65,7 +74,8 @@
       "CommandInterpreter",
       "StyleEngine",
       "LyricsAnnotationEngine",
-      "FinalCompiler"
+      "FinalCompiler",
+      "UserOverrideEngine"
     ],
 
     "engine_functions": {
@@ -80,6 +90,7 @@
         "detect_meta_pause",
         "detect_zero_pulse"
       ],
+
       "EmotionEngine": [
         "emotion_detection",
         "emotion_intensity_curve",
@@ -87,11 +98,13 @@
         "secondary_emotion_detection",
         "emotion_conflict_map"
       ],
-      "ColorEngine": [
+
+      "ColorEmotionEngine": [
         "assign_color_by_emotion",
         "generate_color_wave",
         "color_transition_map"
       ],
+
       "VocalEngine": [
         "detect_voice_gender",
         "detect_voice_type",
@@ -100,6 +113,7 @@
         "vocal_dynamics_map",
         "vocal_intensity_curve"
       ],
+
       "BreathingEngine": [
         "detect_inhale_points",
         "detect_short_breath",
@@ -108,6 +122,7 @@
         "detect_emotional_breathing",
         "breath_to_emotion_sync"
       ],
+
       "BPMEngine": [
         "text_bpm_estimation",
         "emotion_bpm_mapping",
@@ -115,12 +130,14 @@
         "breathing_bpm_integration",
         "poly_rhythm_detection"
       ],
+
       "MeaningVelocityEngine": [
         "semantic_shift_detection",
         "meaning_acceleration",
         "meaning_fracture_detection",
         "meaning_curve_generation"
       ],
+
       "TonalityEngine": [
         "mode_detection",
         "major_minor_classifier",
@@ -128,6 +145,7 @@
         "modal_shift_detection",
         "key_transition_curve"
       ],
+
       "InstrumentationEngine": [
         "instrument_selection",
         "instrument_based_on_emotion",
@@ -135,18 +153,21 @@
         "instrument_color_sync",
         "instrument_rhythm_sync"
       ],
+
       "REM_Synchronizer": [
         "detect_layer_conflicts",
         "resolve_layer_conflicts",
         "assign_dominant_layer",
         "align_layers_for_final_output"
       ],
+
       "ZeroPulseEngine": [
         "detect_zero_pulse",
         "vacuum_beat_state",
         "silence_as_emotion",
         "silence_as_transition"
       ],
+
       "CommandInterpreter": [
         "detect_commands_in_text",
         "execute_bpm_commands",
@@ -154,6 +175,7 @@
         "execute_rhythm_commands",
         "execute_emotion_commands"
       ],
+
       "StyleEngine": [
         "genre_selection",
         "mood_selection",
@@ -163,6 +185,7 @@
         "tone_style",
         "final_style_prompt_build"
       ],
+
       "LyricsAnnotationEngine": [
         "add_vocal_annotations",
         "add_breath_annotations",
@@ -170,49 +193,67 @@
         "add_emotional_annotations",
         "add_rhythm_annotations"
       ],
+
       "FinalCompiler": [
         "merge_all_layers",
         "generate_final_structure",
         "generate_final_prompt",
         "generate_final_annotations",
         "consistency_check"
+      ],
+
+      "UserOverrideEngine": [
+        "resolve_bpm",
+        "apply_to_rhythm",
+        "apply_to_style",
+        "apply_to_vocals"
       ]
     },
 
-    "critical_dependencies": {
-      "ColorEngine": [
+    "color_engine_rules": {
+      "visibility": {
+        "exposed_in_style_prompt": false,
+        "exposed_only_if_user_explicitly_requests_color": true
+      },
+      "internal_usage": [
+        "emotion → color map",
+        "tone → color harmonic match",
+        "pain/truth/love → color shift",
+        "BPM → color intensity",
+        "structure → color transitions"
+      ],
+      "dependencies": [
         "emotion.py",
         "tone.py",
+        "tlp_engine",
         "rhythm.py",
         "style.py"
       ],
-      "VocalEngine": [
-        "vocals.py",
-        "emotion.py"
+      "purpose": [
+        "energy glow",
+        "vocal profile correction",
+        "instrument selection",
+        "section transitions",
+        "emotional field stabilization"
       ],
-      "BPMEngine": [
-        "rhythm.py",
-        "text_utils.py"
-      ],
-      "TonalityEngine": [
-        "tone.py",
-        "text_utils.py"
-      ],
-      "FinalCompiler": [
-        "core_v6.py",
-        "adapter.py"
-      ]
+      "output_rules": {
+        "write_to_result_json": true,
+        "write_to_prompt_suno_style": false,
+        "write_to_prompt_suno_lyrics": false,
+        "write_to_annotations": false,
+        "write_to_internal_diagnostics": true
+      }
     },
 
+    "override_priority": [
+      "user_overrides",
+      "meta_directives",
+      "auto_analysis"
+    ],
+
     "reserved_keywords": {
-      "deprecated_parameters": [
-        "mode",
-        "overlay"
-      ],
-      "must_not_use_in_code": [
-        "overlay",
-        "legacy_mode_param"
-      ]
+      "deprecated": ["mode", "overlay"],
+      "forbidden": ["overlay"]
     },
 
     "file_generation_rules": {
