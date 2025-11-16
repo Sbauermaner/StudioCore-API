@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import glob
 import importlib
+import io
 import json
 import os
 import re
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
@@ -51,6 +55,47 @@ def _deep_merge_dict(first: Dict[str, Any], second: Dict[str, Any]) -> Dict[str,
         else:
             merged[key] = value
     return merged
+
+
+def _run_git(args: Sequence[str], check: bool = True) -> subprocess.CompletedProcess:
+    """Execute a git command and optionally raise on failure."""
+
+    proc = subprocess.run(
+        ["git", *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if check and proc.returncode != 0:
+        details = proc.stderr.strip() or proc.stdout.strip() or "unknown error"
+        raise RuntimeError(
+            f"git {' '.join(args)} failed with exit code {proc.returncode}: {details}"
+        )
+    return proc
+
+
+def _git_has_remote() -> bool:
+    remotes = _run_git(["remote"], check=False)
+    return bool(remotes.stdout.strip())
+
+
+def _ensure_branch(branch: str) -> None:
+    probe = _run_git(["rev-parse", "--verify", branch], check=False)
+    if probe.returncode != 0:
+        raise RuntimeError(f"Branch '{branch}' was not found in this repository")
+
+
+def _ensure_clean_worktree() -> None:
+    status = _run_git(["status", "--porcelain"], check=True)
+    if status.stdout.strip():
+        raise RuntimeError(
+            "The working tree contains uncommitted changes. Commit or stash them before running Codex PR automation."
+        )
+
+
+def _format_git_output(proc: subprocess.CompletedProcess) -> str:
+    message = proc.stdout.strip() or proc.stderr.strip()
+    return message or "Already up to date."
 
 
 class LoaderFile:
@@ -317,6 +362,111 @@ def diagnose(args: argparse.Namespace) -> int:
     return 0 if success else 1
 
 
+def runtime_checks(args: argparse.Namespace) -> int:
+    """Run the full diagnostic suite and optionally store the output."""
+
+    diag_args = argparse.Namespace(
+        full=True,
+        runtime=True,
+        check_init=True,
+        check_subsystems=True,
+        check_env=True,
+        check_loader=True,
+        check_monolith=True,
+        check_v6=True,
+        check_versions=True,
+        verify_fallback_chain=True,
+        fix_loader_order=True,
+        fix_version_duplicates=True,
+        ensure_v6_priority=True,
+        deep_merge=True,
+        target=args.target,
+        commit=args.commit,
+        func=diagnose,
+    )
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        exit_code = diagnose(diag_args)
+
+    output = buffer.getvalue()
+    print(output, end="")
+
+    if args.output and args.output != "-":
+        log_path = Path(args.output)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).isoformat()
+        header = f"=== Runtime Check @ {timestamp} ===\n"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(header)
+            handle.write(output)
+            if not output.endswith("\n"):
+                handle.write("\n")
+
+    return exit_code
+
+
+def merge_pull_request(args: argparse.Namespace) -> int:
+    """Synchronize a feature branch with the target branch and merge it."""
+
+    source = args.source
+    target = args.target
+    summary: List[str] = []
+
+    try:
+        if not args.allow_dirty:
+            _ensure_clean_worktree()
+
+        _ensure_branch(source)
+        _ensure_branch(target)
+
+        previous_branch = (
+            _run_git(["rev-parse", "--abbrev-ref", "HEAD"], check=True).stdout.strip()
+        )
+
+        if not args.skip_fetch:
+            if _git_has_remote():
+                fetch_proc = _run_git(["fetch", "--all"], check=True)
+                summary.append(
+                    f"Fetched remote refs: {_format_git_output(fetch_proc)}"
+                )
+            else:
+                summary.append("Skipped fetch — no git remotes are configured.")
+
+        _run_git(["checkout", source], check=True)
+        sync_proc = _run_git(["merge", target], check=True)
+        summary.append(
+            f"Synced {source} with {target}: {_format_git_output(sync_proc)}"
+        )
+
+        _run_git(["checkout", target], check=True)
+        merge_cmd = ["merge"]
+        if args.strategy == "ff-only":
+            merge_cmd.append("--ff-only")
+        elif args.strategy == "no-ff":
+            merge_cmd.append("--no-ff")
+        merge_cmd.append(source)
+
+        merge_proc = _run_git(merge_cmd, check=True)
+        summary.append(
+            f"Merged {source} into {target}: {_format_git_output(merge_proc)}"
+        )
+
+        if args.restore_branch and previous_branch not in {source, target}:
+            _run_git(["checkout", previous_branch], check=True)
+            summary.append(f"Restored working branch: {previous_branch}")
+
+    except RuntimeError as exc:
+        print(f"❌ {exc}")
+        return 1
+
+    print("Codex PR automation summary:")
+    for line in summary:
+        print(f" - {line}")
+    print(f"✅ Pull request workflow complete: {source} merged into {target}.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codex", description="StudioCore Codex utility")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -339,6 +489,63 @@ def build_parser() -> argparse.ArgumentParser:
     diagnose_parser.add_argument("--target", default="studiocore/*", help="Glob pattern for modules to scan")
     diagnose_parser.add_argument("--commit", default=None, help="Optional commit tag for reporting")
     diagnose_parser.set_defaults(func=diagnose)
+
+    runtime_parser = subparsers.add_parser(
+        "runtime-checks",
+        help="Execute the full diagnostic stack and persist a log",
+    )
+    runtime_parser.add_argument(
+        "--target",
+        default="studiocore/*",
+        help="Glob pattern passed to the diagnose command",
+    )
+    runtime_parser.add_argument(
+        "--commit",
+        default=None,
+        help="Optional commit tag recorded inside the log header",
+    )
+    runtime_parser.add_argument(
+        "--output",
+        default="test_log.txt",
+        help="Destination file for the captured diagnostic output (use '-' to skip writing)",
+    )
+    runtime_parser.set_defaults(func=runtime_checks)
+
+    pr_parser = subparsers.add_parser(
+        "merge-pr",
+        help="Sync a feature branch with the latest target branch commits and merge it",
+    )
+    pr_parser.add_argument(
+        "source",
+        help="Branch to merge into the target (e.g., codex/check-studiocore-runtime)",
+    )
+    pr_parser.add_argument(
+        "--target",
+        default="main",
+        help="Target branch to receive the changes (default: main)",
+    )
+    pr_parser.add_argument(
+        "--skip-fetch",
+        action="store_true",
+        help="Skip fetching remotes before syncing",
+    )
+    pr_parser.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="Allow running even if the working tree has uncommitted changes",
+    )
+    pr_parser.add_argument(
+        "--strategy",
+        choices=["merge", "ff-only", "no-ff"],
+        default="merge",
+        help="Merge strategy used when integrating the source into the target",
+    )
+    pr_parser.add_argument(
+        "--restore-branch",
+        action="store_true",
+        help="Checkout the original working branch after the automation completes",
+    )
+    pr_parser.set_defaults(func=merge_pull_request)
 
     return parser
 

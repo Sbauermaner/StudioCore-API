@@ -64,6 +64,11 @@ try:
     core_mod = importlib.import_module(f".{monolith_name}", package=__name__)
     StudioCore = getattr(core_mod, "StudioCore", None)
     StudioCoreV5 = getattr(core_mod, "StudioCoreV5", None)
+    MONOLITH_VERSION = getattr(
+        core_mod,
+        "MONOLITH_VERSION",
+        getattr(core_mod, "STUDIOCORE_VERSION", MONOLITH_VERSION),
+    )
     print(f"🎧 [StudioCore Loader] Loaded {monolith_name} (version={MONOLITH_VERSION})")
 except ImportError as e:
     print(f"⚠️ [StudioCore Loader] ImportError: {e}")
