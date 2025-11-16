@@ -8,7 +8,7 @@
 """
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 class EmotionLexiconExtended:
@@ -34,14 +34,58 @@ class EmotionLexiconExtended:
             "high": ["критично", "взрывно", "катастрофично"],
         }
 
-    def get_emotion(self, text: str) -> Dict[str, bool | str]:
+        # Речевые регистры для усиления стилистических выводов
+        self.speech_registers: Dict[str, List[str]] = {
+            "formal": ["уважаемый", "прошение", "обращаюсь", "господин"],
+            "colloquial": ["эй", "чувак", "ладно", "ну да", "ага"],
+            "poetic": ["о мой", "очи", "сердцу", "внемли", "владыка"],
+        }
+
+        self.tone_markers: Dict[str, List[str]] = {
+            "solemn": ["торжественно", "величие", "венец", "сияние"],
+            "rebellious": ["бунт", "революция", "сопротивление", "не покорюсь"],
+            "meditative": ["тишина", "дыхание", "покой", "медленно"],
+        }
+
+        self.intensity_markers: Dict[str, List[str]] = {
+            "high": ["буря", "огонь", "кровь", "кричу", "шторм"],
+            "medium": ["искры", "дрожь", "пульс", "порыв"],
+            "low": ["шёпот", "тихо", "лёгкий", "мягкий"],
+        }
+
+    def get_emotion(self, text: str) -> Dict[str, Any]:
         lowered = text.lower()
-        result = {emotion: any(word in lowered for word in words) for emotion, words in self.emotion_words.items()}
-        result["drama_level"] = self._detect_drama_level(lowered)
-        return result
+        buckets = {emotion: any(word in lowered for word in words) for emotion, words in self.emotion_words.items()}
+        return {
+            "emotions": buckets,
+            "register": self._detect_register(lowered),
+            "tone": self._detect_tone(lowered),
+            "drama_level": self._detect_drama_level(lowered),
+            "intensity": self._estimate_intensity(lowered),
+        }
 
     def _detect_drama_level(self, text: str) -> str:
         for level, keywords in self.drama_levels.items():
             if any(word in text for word in keywords):
                 return level
         return "neutral"
+
+    def _detect_register(self, text: str) -> str:
+        for register, keywords in self.speech_registers.items():
+            if any(word in text for word in keywords):
+                return register
+        return "neutral"
+
+    def _detect_tone(self, text: str) -> str:
+        for tone, keywords in self.tone_markers.items():
+            if any(word in text for word in keywords):
+                return tone
+        return "neutral"
+
+    def _estimate_intensity(self, text: str) -> float:
+        high_hits = sum(text.count(word) for word in self.intensity_markers["high"])
+        medium_hits = sum(text.count(word) for word in self.intensity_markers["medium"])
+        low_hits = sum(text.count(word) for word in self.intensity_markers["low"])
+        punctuation_bonus = min(text.count("!") / 5, 1.0) * 0.2
+        base = high_hits * 0.3 + medium_hits * 0.15 + low_hits * 0.05
+        return round(min(1.0, base + punctuation_bonus), 3)
