@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable
 
 from .emotion import TruthLovePainEngine
+from .emotion_dictionary_extended import EmotionLexiconExtended
 from .logical_engines import (
     BPMEngine,
     BreathingEngine,
@@ -29,6 +30,7 @@ from .logical_engines import (
     VocalEngine,
     ZeroPulseEngine,
 )
+from .genre_matrix_extended import GenreMatrixEngine
 from .instrument_dynamics import InstrumentalDynamicsEngine
 from .section_intelligence import SectionIntelligenceEngine
 from .suno_annotations import SunoAnnotationEngine
@@ -60,6 +62,8 @@ class StudioCoreV6:
         self.override_engine = UserOverrideEngine()
         self.symbiosis_engine = UserAdaptiveSymbiosisEngine()
         self.tlp_engine = TruthLovePainEngine()
+        self.genre_matrix = GenreMatrixEngine()
+        self.emotion_dictionary_extended = EmotionLexiconExtended()
 
         # Late import to avoid circular dependencies during module import time.
         from .monolith_v4_3_1 import StudioCore as LegacyCore  # pylint: disable=import-outside-toplevel
@@ -199,6 +203,8 @@ class StudioCoreV6:
         )
         emotion_curve = auto_context.get("emotion_curve", [])
         commands = auto_context.get("commands", [])
+        extended_genre = self.genre_matrix.detect(text)
+        extended_emotions = self.emotion_dictionary_extended.get_emotion(text)
 
         # 1. Call the legacy core for full analysis.
         try:
@@ -481,6 +487,8 @@ class StudioCoreV6:
             "instrument_dynamics": instrument_dynamics_payload,
             "suno_annotations": suno_annotations,
             "override_debug": override_manager.debug_summary(),
+            "extended_genre": extended_genre,
+            "extended_emotions": extended_emotions,
         }
         result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(override_manager, result)
         return result
@@ -500,6 +508,8 @@ class StudioCoreV6:
         merged["suno_annotations"] = payload.get("suno_annotations", [])
         merged["symbiosis"] = payload.get("symbiosis", {})
         merged["override_debug"] = payload.get("override_debug", {})
+        merged["extended_genre"] = payload.get("extended_genre", {})
+        merged["extended_emotions"] = payload.get("extended_emotions", {})
         return merged
 
     @staticmethod
