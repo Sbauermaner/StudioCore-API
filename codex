@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import glob
 import importlib
+import io
 import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
@@ -317,6 +320,50 @@ def diagnose(args: argparse.Namespace) -> int:
     return 0 if success else 1
 
 
+def runtime_checks(args: argparse.Namespace) -> int:
+    """Run the full diagnostic suite and optionally store the output."""
+
+    diag_args = argparse.Namespace(
+        full=True,
+        runtime=True,
+        check_init=True,
+        check_subsystems=True,
+        check_env=True,
+        check_loader=True,
+        check_monolith=True,
+        check_v6=True,
+        check_versions=True,
+        verify_fallback_chain=True,
+        fix_loader_order=True,
+        fix_version_duplicates=True,
+        ensure_v6_priority=True,
+        deep_merge=True,
+        target=args.target,
+        commit=args.commit,
+        func=diagnose,
+    )
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        exit_code = diagnose(diag_args)
+
+    output = buffer.getvalue()
+    print(output, end="")
+
+    if args.output and args.output != "-":
+        log_path = Path(args.output)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).isoformat()
+        header = f"=== Runtime Check @ {timestamp} ===\n"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(header)
+            handle.write(output)
+            if not output.endswith("\n"):
+                handle.write("\n")
+
+    return exit_code
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codex", description="StudioCore Codex utility")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -339,6 +386,27 @@ def build_parser() -> argparse.ArgumentParser:
     diagnose_parser.add_argument("--target", default="studiocore/*", help="Glob pattern for modules to scan")
     diagnose_parser.add_argument("--commit", default=None, help="Optional commit tag for reporting")
     diagnose_parser.set_defaults(func=diagnose)
+
+    runtime_parser = subparsers.add_parser(
+        "runtime-checks",
+        help="Execute the full diagnostic stack and persist a log",
+    )
+    runtime_parser.add_argument(
+        "--target",
+        default="studiocore/*",
+        help="Glob pattern passed to the diagnose command",
+    )
+    runtime_parser.add_argument(
+        "--commit",
+        default=None,
+        help="Optional commit tag recorded inside the log header",
+    )
+    runtime_parser.add_argument(
+        "--output",
+        default="test_log.txt",
+        help="Destination file for the captured diagnostic output (use '-' to skip writing)",
+    )
+    runtime_parser.set_defaults(func=runtime_checks)
 
     return parser
 
