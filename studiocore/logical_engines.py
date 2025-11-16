@@ -701,11 +701,29 @@ class StyleEngine:
     def tone_style(self, tonality: Dict[str, Any]) -> str:
         return f"{tonality.get('mode', 'major')} mood, keys {', '.join(tonality.get('section_keys', []))}"
 
-    def final_style_prompt_build(self, *, genre: str, mood: str, instrumentation: str, vocal: str, visual: str, tone: str) -> str:
-        return (
-            f"Genre: {genre}; Mood: {mood}; Vocals: {vocal}; Instruments: {instrumentation}; "
-            f"Visuals: {visual}; Tonality: {tone}."
-        )
+    def final_style_prompt_build(
+        self,
+        *,
+        genre: str,
+        mood: str,
+        instrumentation: str,
+        vocal: str,
+        visual: str | None,
+        tone: str,
+    ) -> str:
+        """Build a StudioCore style prompt that follows the annotation spec."""
+
+        annotations = [
+            ("GENRE", genre),
+            ("MOOD", mood),
+            ("VOCALS", vocal),
+            ("INSTRUMENTS", instrumentation),
+            ("TONE", tone),
+        ]
+        if visual:
+            annotations.append(("VISUALS", visual))
+        content = "".join(f"({label}: {value})" for label, value in annotations)
+        return f"[{content}] [END]"
 
 
 class UserOverrideEngine:
