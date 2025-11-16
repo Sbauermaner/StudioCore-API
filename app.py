@@ -75,7 +75,7 @@ class PredictRequest(BaseModel):
     text: str
     gender: str = "auto"
     tlp: Optional[dict] = None
-    overlay: Optional[dict] = None
+    semantic_hints: Optional[dict] = None
 
 @app.post("/api/predict")
 async def api_predict(request_data: PredictRequest):
@@ -97,7 +97,7 @@ async def api_predict(request_data: PredictRequest):
         result = CORE.analyze(
             request_data.text,
             preferred_gender=request_data.gender,
-            overlay=request_data.overlay
+            semantic_hints=request_data.semantic_hints
         )
         
         if isinstance(result, dict) and "error" in result:
@@ -166,7 +166,7 @@ def analyze_text(text: str, gender: str = "auto"):
 
     try:
         # --- Проверка пользовательских описаний вокала ---
-        overlay = {}
+        semantic_hints = {}
         voice_hint_keywords = [
             "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
             "пескляв", "soft", "airy", "shout", "grit", "фальцет", "whisper"
@@ -178,11 +178,11 @@ def analyze_text(text: str, gender: str = "auto"):
         if (last_line.startswith("(") and last_line.endswith(")")) or \
            last_line.startswith("под "):
             if any(k in last_line for k in voice_hint_keywords):
-                overlay["voice_profile_hint"] = last_line
-                log.info(f"🎙️ [UI] Обнаружено описание вокала: {overlay['voice_profile_hint']}")
+                semantic_hints["voice_profile_hint"] = last_line
+                log.info(f"🎙️ [UI] Обнаружено описание вокала: {semantic_hints['voice_profile_hint']}")
         
         log.debug("Gradio -> core.analyze...")
-        result = CORE.analyze(text, preferred_gender=gender, overlay=overlay or None)
+        result = CORE.analyze(text, preferred_gender=gender, semantic_hints=semantic_hints or None)
 
         if isinstance(result, dict) and "error" in result:
             log.error(f"Gradio: Ядро вернуло ошибку: {result['error']}")

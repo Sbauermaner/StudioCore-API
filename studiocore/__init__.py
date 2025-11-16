@@ -1,86 +1,132 @@
 # -*- coding: utf-8 -*-
-"""
-🎧 StudioCore v5.2.1 — Unified Adaptive Engine (Safe Loader)
-Truth × Love × Pain = Conscious Frequency
+"""StudioCore loader that follows the Codex fallback chain.
 
-🧩 Особенности:
-- Автоматический поиск последнего monolith_*.py
-- Устойчивый импорт: fallback при отсутствии StyleMatrix
-- Безопасный вызов get_core() даже при ошибках импорта
+Features required by the specification:
+* Diagnostic logger for loader decisions
+* Env overrides (STUDIOCORE_FORCE_V5 / STUDIOCORE_MONOLITH)
+* Primary selection of StudioCoreV6, fallback to V5 monolith, then StudioCoreFallback
 """
 
 from __future__ import annotations
-import os
+
 import importlib
-from typing import Any
+import logging
+import os
+from typing import Any, Tuple, Type
 
-# ============================================================
-# 🔹 Версия ядра
-# ============================================================
-STUDIOCORE_VERSION = "v5.2.1"
+from .core_v6 import StudioCoreV6
+from .fallback import StudioCoreFallback
 
-# ============================================================
-# 🔹 Автоматическое определение Monolith
-# ============================================================
+STUDIOCORE_VERSION = "v6.3"
+
+
+def _setup_loader_logging() -> logging.Logger:
+    logger = logging.getLogger("studiocore.loader")
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter("[StudioCore Loader] %(levelname)s: %(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+    return logger
+
+
 def _detect_latest_monolith() -> str:
-    import glob, re
-    base = os.path.dirname(__file__)
-    candidates = glob.glob(os.path.join(base, "monolith_*.py"))
+    import glob
+    import os as _os
+    import re
+
+    base = _os.path.dirname(__file__)
+    candidates = glob.glob(_os.path.join(base, "monolith_*.py"))
     if not candidates:
         return "monolith_v4_3_1"
-    def _ver(x: str) -> tuple:
-        match = re.search(r"(\d+)_(\d+)_(\d+)", x)
+
+    def _ver(name: str) -> Tuple[int, int, int]:
+        match = re.search(r"(\d+)_(\d+)_(\d+)", name)
         return tuple(map(int, match.groups())) if match else (0, 0, 0)
+
     latest = sorted(candidates, key=_ver)[-1]
     return os.path.splitext(os.path.basename(latest))[0]
 
-monolith_name = os.getenv("STUDIOCORE_MONOLITH", _detect_latest_monolith())
 
-# ============================================================
-# 🔹 Попытка импорта ядра
-# ============================================================
-StudioCore = None
-MONOLITH_VERSION = "unknown"
+def _try_load_v6(logger: logging.Logger) -> Type[Any] | None:
+    try:
+        logger.info("StudioCoreV6 ready.")
+        return StudioCoreV6
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.warning("StudioCoreV6 unavailable: %s", exc)
+        return None
 
-try:
-    core_mod = importlib.import_module(f".{monolith_name}", package=__name__)
-    StudioCore = getattr(core_mod, "StudioCore", None)
-    MONOLITH_VERSION = getattr(core_mod, "STUDIOCORE_VERSION", "unknown")
-    print(f"🎧 [StudioCore Loader] Loaded {monolith_name} (version={MONOLITH_VERSION})")
-except ImportError as e:
-    print(f"⚠️ [StudioCore Loader] ImportError: {e}")
-except Exception as e:
-    print(f"❌ [StudioCore Loader] Failed to load {monolith_name}: {e}")
 
-# ============================================================
-# 🔹 Fallback: если Monolith не загрузился
-# ============================================================
-if not StudioCore:
-    print("⚠️ [StudioCore Loader] Основное ядро не найдено — создаётся fallback-заглушка.")
+def _try_load_v5_monolith(logger: logging.Logger, monolith_name: str | None = None):
+    resolved_name = monolith_name or _detect_latest_monolith()
+    try:
+        module = importlib.import_module(f".{resolved_name}", package=__name__)
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.warning("Monolith import failed (%s): %s", resolved_name, exc)
+        return None, None, resolved_name, "unknown"
 
-    class StudioCoreFallback:
-        """Fallback ядро: позволяет системе работать, пока StudioCore не готов."""
-        def __init__(self, *args, **kwargs):
-            print("🧩 [StudioCoreFallback] Активен временный режим.")
-            self.is_fallback = True
-            self.status = "safe-mode"
-            self.subsystems = []
-        def analyze(self, *_, **__):
-            raise RuntimeError("⚠️ StudioCoreFallback: анализ недоступен — основное ядро не загружено.")
+    core_cls = getattr(module, "StudioCore", None)
+    v5_cls = getattr(module, "StudioCoreV5", None) or core_cls
+    version = getattr(module, "STUDIOCORE_VERSION", "unknown")
+    if core_cls:
+        logger.info("Loaded monolith %s (version=%s)", resolved_name, version)
+    else:
+        logger.warning("Monolith %s loaded but StudioCore class missing", resolved_name)
+    return core_cls, v5_cls, resolved_name, version
 
-    StudioCore = StudioCoreFallback
-    MONOLITH_VERSION = "fallback"
 
-# ============================================================
-# 🔹 Обёртка безопасного вызова
-# ============================================================
+def _select_core_class(
+    logger: logging.Logger,
+    *,
+    force_v5: bool = False,
+    monolith_name: str | None = None,
+):
+    v6_cls = None if force_v5 else _try_load_v6(logger)
+    monolith_core, monolith_v5, resolved_name, version = _try_load_v5_monolith(logger, monolith_name)
+
+    if v6_cls:
+        logger.info("StudioCoreV6 selected as primary core")
+        return v6_cls, monolith_v5, "core_v6", STUDIOCORE_VERSION
+
+    if monolith_core:
+        logger.info("StudioCore monolith selected (%s)", resolved_name)
+        return monolith_core, monolith_v5 or monolith_core, resolved_name, version
+
+    logger.error("Falling back to StudioCoreFallback")
+    return StudioCoreFallback, StudioCoreFallback, "fallback", "fallback"
+
+
+_LOGGER = _setup_loader_logging()
+_FORCE_V5 = os.getenv("STUDIOCORE_FORCE_V5", "").strip().lower() in {"1", "true", "yes"}
+_MONOLITH_OVERRIDE = os.getenv("STUDIOCORE_MONOLITH")
+
+StudioCore, StudioCoreV5, MONOLITH_NAME, MONOLITH_VERSION = _select_core_class(
+    _LOGGER,
+    force_v5=_FORCE_V5,
+    monolith_name=_MONOLITH_OVERRIDE,
+)
+
+
 def get_core() -> Any:
-    """Возвращает экземпляр ядра с безопасным fallback."""
+    """Return an instantiated core following the fallback chain."""
+
     try:
         return StudioCore()
-    except Exception as e:
-        print(f"⚠️ [StudioCore] Ошибка инициализации: {e}")
+    except Exception as exc:  # pragma: no cover - defensive guard
+        _LOGGER.error("Core init failed (%s). Falling back to StudioCoreFallback.", exc)
         return StudioCoreFallback()
+
+
+__all__ = [
+    "StudioCore",
+    "StudioCoreV5",
+    "StudioCoreV6",
+    "StudioCoreFallback",
+    "get_core",
+    "STUDIOCORE_VERSION",
+    "MONOLITH_VERSION",
+]
 
 # ============================================================
 # 🔹 Тестовый запуск

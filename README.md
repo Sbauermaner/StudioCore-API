@@ -1,97 +1,23 @@
----
-title: StudioCore v5 — Expressive Adaptive Engine
-emoji: 🎧
-colorFrom: blue
-colorTo: pink
-sdk: docker
-sdk_version: 5.49.1
-app_file: app.py
-pinned: true
-license: mit
-author: Bauer Synesthetic Studio
----
+# StudioCore V6.3 — Adaptive Multilayer Analysis Engine
 
-# 🎧 StudioCore API by Bauer  
-### *Expressive Adaptive Engine — Truth × Love × Pain = Conscious Frequency*
+StudioCore V6.3 is a dynamic, multi-layer AI engine capable of interpreting lyrics, tone, rhythm, emotional structures, breathing, vocal parameters and generating adaptive prompts for Suno and other generators.
 
-> Версия ядра: **v5.0-adaptive**  
-> Обновлено: *{{ auto_update_date }}*  
-> OpenAPI: [`openapi_main.json`](./openapi_main.json) • [`openapi_gpt.yaml`](./openapi_gpt.yaml)
+## Core Features
+- Automatic text segmentation (Intro / Verse / Chorus / Bridge / Outro / Hook / Meta-Pause)
+- Dynamic vocal engine (timbre, range, techniques, multi-voice, gender mixing)
+- Full instrument matrix with emotional and color binding
+- Color-emotion hidden layer (energetic field of the song)
+- Zero Pulse detection and structural silence handling
+- Multi-engine symbiosis (emotion ↔ tone ↔ rhythm ↔ style ↔ color)
+- User command interpreter (full parameter override: BPM, Key, Genre, Vocals, Instruments, Structure)
+- Auto-annotation layer (breath, dynamics, vocal shifts, section headers, meta markers)
 
----
+## User Parameters
+The engine accepts partial or full user parameter sets. Even if the user provides only one parameter (for example, key or genre), the engine adapts all other engines to respect this constraint. When multiple parameters are provided (BPM + Key + Genre + Vocal Type + Instruments), the system builds a full style and annotation profile around them.
 
-## 💡 Описание
+## Cooperation
+For business cooperation, licensing, integration or research collaboration please contact:
 
-**StudioCore** — это интеллектуальное ядро для анализа текста, эмоций и структуры,  
-способное создавать **адаптивные музыкальные промты** под Suno, Sora и другие ИИ-системы.  
+**Email:** ssv8240@gmail.com
 
-Модуль строит эмоционально-философский профиль текста и возвращает четыре результата:
-
-1. 📊 **Краткий результат анализа** — жанр, BPM, философия, версия.  
-2. 🎼 **Полный промт (Full Prompt)** — структура, вокал, инструменты.  
-3. 🎧 **Suno-промт (до 1000 символов)** — компактная версия для генерации музыки.  
-4. 📜 **Аннотированный текст** — автоматическая структура *(Intro, Verse, Bridge, Chorus, Outro)*.
-
----
-
-## 🚀 Как использовать
-
-1. Введите текст песни, стихотворения или манифеста.  
-2. (Опционально) укажите стиль или тип вокала.  
-3. Нажмите **Run** — StudioCore выполнит анализ и сформирует промт.
-
----
-
-## 🧠 Основные компоненты ядра
-
-| Компонент | Назначение |
-|------------|-------------|
-| **Emotion Analyzer** | Распознаёт эмоциональные слои (радость, грусть, гнев, покой). |
-| **Truth × Love × Pain Engine** | Философская матрица оценки смысла. |
-| **Rhythm Engine** | Рассчитывает темп (BPM) и метрику текста. |
-| **Frequency Engine (RNS-Safe)** | Формирует безопасный частотный профиль. |
-| **ToneSync Engine** | Определяет визуальные цвета и частотные соответствия. |
-| **Style Matrix** | Определяет жанр, тональность и вокальные техники. |
-| **Vocal Registry** | Подбирает ансамбль (solo, duet, trio, choir). |
-| **Annotation Layer** | Строит секции и эмоциональную динамику. |
-
----
-
-## ⚙️ API Endpoints
-
-**POST** `https://sbauer8-studiocore-api.hf.space/api/predict`  
-**GET** `https://sbauer8-studiocore-api.hf.space/status` – проверка состояния  
-**GET** `https://sbauer8-studiocore-api.hf.space/version` – версия ядра  
-**GET** `https://sbauer8-studiocore-api.hf.space/compat-check` – диагностика совместимости  
-
----
-
-### 🔹 Пример вызова (Python)
-
-```python
-from gradio_client import Client
-
-client = Client("https://sbauer8-studiocore-api.hf.space/")
-result = client.predict(
-    text="""
-    Я стою на краю между прошлым и светом,
-    где земля дрожит под шагами молчания.
-    Мир разделён — половина в огне, половина спит,
-    и только дыхание правды ещё не угасло.
-    """,
-    api_name="/predict"
-)
-print(result)
-
-
-🧑‍💻 Автор и проект
-
-Bauer Synesthetic Studio
-🧬 Разработка: Serhiy Bauer
-🌐 GitHub: Sbauermaner
-
-🪶 Лицензия
-
-MIT License © 2025
-Разрешается использование в исследовательских и креативных целях
-при указании авторства: Bauer Synesthetic Studio / StudioCore Engine
+StudioCore Engine will continue to expand emotionally and structurally, adding new adaptive layers, extended style logic, multi-voice dynamic models and improved user override protocols.

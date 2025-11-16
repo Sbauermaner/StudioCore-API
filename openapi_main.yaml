@@ -1,0 +1,11 @@
+openapi: 3.0.0
+info:
+  title: StudioCore API (stub)
+  version: 0.0.0
+paths:
+  /api/predict:
+    post:
+      summary: Stub specification to satisfy compatibility checks.
+      responses:
+        '200':
+          description: OK
