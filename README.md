@@ -62,7 +62,19 @@ author: Bauer Synesthetic Studio
 **POST** `https://sbauer8-studiocore-api.hf.space/api/predict`  
 **GET** `https://sbauer8-studiocore-api.hf.space/status` – проверка состояния  
 **GET** `https://sbauer8-studiocore-api.hf.space/version` – версия ядра  
-**GET** `https://sbauer8-studiocore-api.hf.space/compat-check` – диагностика совместимости  
+**GET** `https://sbauer8-studiocore-api.hf.space/compat-check` – диагностика совместимости
+
+---
+
+## 🧪 Runtime Diagnostics
+
+Для полной проверки ядра используйте CLI-утилиту `codex`:
+
+```bash
+./codex runtime-checks --output test_log.txt
+```
+
+Команда запускает полный набор диагностик (`codex diagnose --full`), выводит отчёт в терминал и сохраняет его в `test_log.txt`, что удобно для автоматизированных проверок и CI.
 
 ---
 

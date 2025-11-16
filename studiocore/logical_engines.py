@@ -844,6 +844,8 @@ class FinalCompiler:
             "zero_pulse": payload.get("zero_pulse"),
             "style": payload.get("style"),
             "commands": payload.get("commands"),
+            "extended_genre": payload.get("extended_genre"),
+            "extended_emotions": payload.get("extended_emotions"),
         }
         return merged
 

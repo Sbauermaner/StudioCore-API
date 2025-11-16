@@ -1,0 +1,167 @@
+# -*- coding: utf-8 -*-
+"""GenreWeightsEngine v1.1 — весовая классификация жанров."""
+from __future__ import annotations
+
+from typing import Dict, List
+
+from .emotion_dictionary_extended import EmotionLexiconExtended
+
+
+class GenreWeightsEngine:
+    """Approximate poetic/dramatic genre classifier based on structural cues."""
+
+    def __init__(self) -> None:
+        self.genre_profiles: Dict[str, Dict[str, float]] = {
+            "лирика": {
+                "structure_weight": 0.40,
+                "emotion_weight": 0.35,
+                "lexicon_weight": 0.15,
+                "narrative_weight": 0.10,
+            },
+            "элегия": {
+                "structure_weight": 0.30,
+                "emotion_weight": 0.50,
+                "lexicon_weight": 0.10,
+                "narrative_weight": 0.10,
+            },
+            "романс": {
+                "structure_weight": 0.35,
+                "emotion_weight": 0.45,
+                "lexicon_weight": 0.10,
+                "narrative_weight": 0.10,
+            },
+            "ода": {
+                "structure_weight": 0.30,
+                "emotion_weight": 0.30,
+                "lexicon_weight": 0.25,
+                "narrative_weight": 0.15,
+            },
+            "поэма": {
+                "structure_weight": 0.25,
+                "emotion_weight": 0.20,
+                "lexicon_weight": 0.15,
+                "narrative_weight": 0.40,
+            },
+            "притча": {
+                "structure_weight": 0.20,
+                "emotion_weight": 0.20,
+                "lexicon_weight": 0.20,
+                "narrative_weight": 0.40,
+            },
+            "басня": {
+                "structure_weight": 0.20,
+                "emotion_weight": 0.15,
+                "lexicon_weight": 0.35,
+                "narrative_weight": 0.30,
+            },
+            "драма": {
+                "structure_weight": 0.10,
+                "emotion_weight": 0.40,
+                "lexicon_weight": 0.20,
+                "narrative_weight": 0.30,
+            },
+            "трагедия": {
+                "structure_weight": 0.15,
+                "emotion_weight": 0.45,
+                "lexicon_weight": 0.15,
+                "narrative_weight": 0.25,
+            },
+            "комедия": {
+                "structure_weight": 0.15,
+                "emotion_weight": 0.30,
+                "lexicon_weight": 0.35,
+                "narrative_weight": 0.20,
+            },
+        }
+
+        # Лексические паттерны для каждого жанра. Небольшие словари, которые
+        # помогают отличить художественные маркеры от драматургии.
+        self.genre_keywords: Dict[str, List[str]] = {
+            "лирика": ["сердце", "луна", "ночь", "тихий", "шёпот"],
+            "элегия": ["скорбь", "прах", "минувшее", "тень", "вечность"],
+            "романс": ["поцелуй", "огонь", "любимый", "струны", "танго"],
+            "ода": ["слава", "триумф", "бог", "герой", "глас"],
+            "поэма": ["странник", "дорога", "битва", "меч", "кровь"],
+            "притча": ["учитель", "ученик", "мудрец", "урок", "истина"],
+            "басня": ["мораль", "зверь", "лиса", "ворона", "поученье"],
+            "драма": ["сцена", "акт", "герой", "диалог", "пауза"],
+            "трагедия": ["рок", "гибель", "фатальный", "плач", "жертва"],
+            "комедия": ["смех", "шут", "курьёз", "ирония", "фарс"],
+        }
+
+        self.narrative_markers = {
+            "dialogue": ("—", " - ", ":"),
+            "conflict": ("конфликт", "спор", "битва", "война", "столкновение"),
+            "moral": ("мораль", "урок", "вывод"),
+        }
+
+        self.emotion_lexicon = EmotionLexiconExtended()
+
+    def _rhyme_score(self, text: str) -> float:
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
+        if len(lines) < 2:
+            return 0.0
+        rhymes = 0
+        for current, following in zip(lines, lines[1:]):
+            if len(current) > 3 and len(following) > 3 and current[-2:] == following[-2:]:
+                rhymes += 1
+        return rhymes / len(lines)
+
+    def _structure_score(self, text: str) -> float:
+        lengths = [len(line) for line in text.split("\n") if line.strip()]
+        if not lengths:
+            return 0.0
+        avg_length = sum(lengths) / len(lengths)
+        variance = sum(abs(length - avg_length) for length in lengths)
+        return 1.0 - min(1.0, variance / 300)
+
+    def _emotion_score(self, text: str) -> float:
+        tags = self.emotion_lexicon.get_emotion(text)
+        hit_count = sum(1 for key, value in tags.items() if key != "drama_level" and value)
+        drama_bonus = {
+            "high": 0.4,
+            "medium": 0.25,
+            "low": 0.1,
+        }.get(tags.get("drama_level"), 0.0)
+        if hit_count == 0 and drama_bonus == 0.0:
+            return 0.0
+        normalized_hits = hit_count / max(len(self.emotion_lexicon.emotion_words), 1)
+        return min(1.0, normalized_hits * 3 + drama_bonus)
+
+    def _lexicon_score(self, text: str, genre: str) -> float:
+        keywords = self.genre_keywords.get(genre, [])
+        if not keywords:
+            return 0.0
+        lowered = text.lower()
+        hits = sum(lowered.count(keyword) for keyword in keywords)
+        unique_hits = sum(1 for keyword in keywords if keyword in lowered)
+        score = (hits * 0.6 + unique_hits * 0.4) / max(len(keywords), 1)
+        return min(1.0, score)
+
+    def _narrative_score(self, text: str) -> float:
+        lowered = text.lower()
+        dialogue_hits = sum(lowered.count(marker) for marker in self.narrative_markers["dialogue"])
+        conflict_hits = sum(lowered.count(marker) for marker in self.narrative_markers["conflict"])
+        moral_hits = sum(lowered.count(marker) for marker in self.narrative_markers["moral"])
+        raw_score = dialogue_hits * 0.2 + conflict_hits * 0.3 + moral_hits * 0.5
+        return min(1.0, raw_score)
+
+    def predict(self, text: str) -> Dict[str, float]:
+        rhyme = self._rhyme_score(text)
+        structure = self._structure_score(text)
+        structure_combo = (rhyme + structure) / 2
+        emotion = self._emotion_score(text)
+        narrative = self._narrative_score(text)
+
+        predictions: Dict[str, float] = {}
+        for genre, weights in self.genre_profiles.items():
+            lexicon = self._lexicon_score(text, genre)
+            score = (
+                structure_combo * weights["structure_weight"]
+                + emotion * weights["emotion_weight"]
+                + lexicon * weights["lexicon_weight"]
+                + narrative * weights["narrative_weight"]
+            )
+            predictions[genre] = round(score, 4)
+
+        return dict(sorted(predictions.items(), key=lambda item: item[1], reverse=True))
