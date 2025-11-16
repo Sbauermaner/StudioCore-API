@@ -402,6 +402,9 @@ class StudioCoreV6:
         )
 
         # 14. Style synthesis
+        style_signature = semantic_hints.get("style", {}).get("style") or self.style_engine.style_signature(
+            emotion_profile, tlp_profile
+        )
         style_genre = semantic_hints.get("style", {}).get("genre") or self.style_engine.genre_selection(
             emotion_profile, tlp_profile
         )
@@ -414,6 +417,7 @@ class StudioCoreV6:
         style_tone = self.style_engine.tone_style(tonality_payload)
         style_prompt = self.style_engine.final_style_prompt_build(
             genre=style_genre,
+            style=style_signature,
             mood=style_mood,
             instrumentation=style_instrumentation,
             vocal=style_vocal,
@@ -422,6 +426,7 @@ class StudioCoreV6:
         )
         style_payload = {
             "genre": style_genre,
+            "style": style_signature,
             "mood": style_mood,
             "instrumentation": style_instrumentation,
             "vocal": style_vocal,
