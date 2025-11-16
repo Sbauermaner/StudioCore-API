@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+"""Codex helper CLI for StudioCore loader diagnostics."""
+from __future__ import annotations
+
+import argparse
+import glob
+import importlib
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Sequence
+
+DEFAULT_SUBSYSTEMS = [
+    "emotion",
+    "tlp",
+    "rhythm",
+    "freq",
+    "safety",
+    "integrity",
+    "vocals",
+    "style",
+    "tone",
+]
+
+EXPECTED_LOADER_ORDER = ("v6", "monolith", "fallback")
+
+
+def _resolve_target(pattern: str) -> List[str]:
+    matches = sorted(glob.glob(pattern, recursive=True))
+    return [str(Path(m)) for m in matches if os.path.exists(m)]
+
+
+def _load_module(name: str):
+    return importlib.import_module(name)
+
+
+def _instantiate_core(module: Any):
+    get_core = getattr(module, "get_core", None)
+    if not callable(get_core):
+        raise RuntimeError("studiocore.get_core() is not callable")
+    return get_core()
+
+
+def _deep_merge_dict(first: Dict[str, Any], second: Dict[str, Any]) -> Dict[str, Any]:
+    merged = dict(first)
+    for key, value in second.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = _deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+class LoaderFile:
+    """Utility helpers for manipulating the StudioCore loader file."""
+
+    ORDER_PATTERN = re.compile(r"DEFAULT_LOADER_ORDER\s*=\s*\((?P<body>.*?)\)", re.S)
+
+    def __init__(self, path: str):
+        self.path = Path(path)
+        self.source = self.path.read_text(encoding="utf-8")
+
+    def detect_order(self) -> List[str]:
+        match = self.ORDER_PATTERN.search(self.source)
+        if not match:
+            return []
+        body = match.group("body")
+        return re.findall(r"['\"]([^'\"]+)['\"]", body)
+
+    def ensure_order(self, expected: Sequence[str]) -> bool:
+        block = "DEFAULT_LOADER_ORDER = (\n" + "\n".join(f'    "{item}",' for item in expected) + "\n)"
+        if self.ORDER_PATTERN.search(self.source):
+            new_source = self.ORDER_PATTERN.sub(block, self.source, count=1)
+        else:
+            insert_at = self.source.find("STUDIOCORE_VERSION")
+            if insert_at == -1:
+                insert_at = 0
+            else:
+                insert_at = self.source.find("\n", insert_at)
+                insert_at = self.source.find("\n", insert_at + 1) if insert_at != -1 else len(self.source)
+            new_source = self.source[:insert_at] + "\n" + block + "\n" + self.source[insert_at:]
+        if new_source != self.source:
+            self.source = new_source
+            return True
+        return False
+
+    def fix_duplicates(self, names: Sequence[str]) -> bool:
+        seen = {name: 0 for name in names}
+        changed = False
+        lines = self.source.splitlines()
+        new_lines: List[str] = []
+        for line in lines:
+            stripped = line.strip()
+            drop_line = False
+            for name in names:
+                if stripped.startswith(f"{name} ="):
+                    seen[name] += 1
+                    if seen[name] > 1:
+                        changed = True
+                        drop_line = True
+                    break
+            if not drop_line:
+                new_lines.append(line)
+        if changed:
+            trailing = "\n" if self.source.endswith("\n") else ""
+            self.source = "\n".join(new_lines) + trailing
+        return changed
+
+    def save(self) -> None:
+        self.path.write_text(self.source, encoding="utf-8")
+
+
+def diagnose(args: argparse.Namespace) -> int:
+    if args.full:
+        for flag in [
+            "runtime",
+            "check_init",
+            "check_subsystems",
+            "check_env",
+            "check_loader",
+            "check_monolith",
+            "check_v6",
+            "check_versions",
+            "verify_fallback_chain",
+            "fix_loader_order",
+            "fix_version_duplicates",
+            "ensure_v6_priority",
+            "deep_merge",
+        ]:
+            setattr(args, flag, True)
+
+    report: Dict[str, Any] = {
+        "command": "diagnose",
+        "targets": _resolve_target(args.target),
+        "commit": args.commit,
+        "runtime": {},
+        "init": {},
+        "subsystems": {},
+        "env": {},
+        "loader": {},
+        "versions": {},
+        "repairs": [],
+    }
+    failures: List[str] = []
+
+    module = None
+    core = None
+
+    if args.runtime or args.check_init or args.check_subsystems or args.check_versions or args.check_loader:
+        try:
+            module = _load_module("studiocore")
+            report["runtime"] = {
+                "module": getattr(module, "__file__", "unknown"),
+                "STUDIOCORE_VERSION": getattr(module, "STUDIOCORE_VERSION", "unknown"),
+                "MONOLITH_VERSION": getattr(module, "MONOLITH_VERSION", "unknown"),
+            }
+        except Exception as exc:  # pragma: no cover - defensive logging
+            failures.append(f"Runtime import failed: {exc}")
+            report["runtime"] = {"error": str(exc)}
+
+    if module and args.check_versions:
+        versions = {
+            "STUDIOCORE_VERSION": getattr(module, "STUDIOCORE_VERSION", "unknown"),
+            "MONOLITH_VERSION": getattr(module, "MONOLITH_VERSION", "unknown"),
+        }
+        report["versions"] = versions
+        for key, value in versions.items():
+            if value in {None, "unknown"}:
+                failures.append(f"{key} is not set")
+
+    if module and (
+        args.check_init
+        or args.check_subsystems
+        or args.check_loader
+        or args.verify_fallback_chain
+        or args.check_v6
+        or args.check_monolith
+    ):
+        try:
+            core = _instantiate_core(module)
+            report["init"] = {
+                "core_type": type(core).__name__,
+                "is_fallback": bool(getattr(core, "is_fallback", False)),
+            }
+        except Exception as exc:
+            failures.append(f"Core initialization failed: {exc}")
+            report["init"] = {"error": str(exc)}
+
+    if core and args.check_subsystems:
+        active = [name for name in DEFAULT_SUBSYSTEMS if hasattr(core, name)]
+        missing = sorted(set(DEFAULT_SUBSYSTEMS) - set(active))
+        report["subsystems"] = {
+            "expected": DEFAULT_SUBSYSTEMS,
+            "active": active,
+            "missing": missing,
+        }
+        if missing:
+            failures.append(f"Missing subsystems: {', '.join(missing)}")
+
+    loader_file_reports: List[Dict[str, Any]] = []
+    for path in report["targets"]:
+        if not path.endswith(".py") or not os.path.exists(path):
+            continue
+        loader_file = LoaderFile(path)
+        file_report = {
+            "path": path,
+            "order": loader_file.detect_order(),
+        }
+        loader_file_reports.append(file_report)
+        changed = False
+        actions: List[str] = []
+        if args.fix_loader_order:
+            if loader_file.ensure_order(EXPECTED_LOADER_ORDER):
+                changed = True
+                actions.append("fix_loader_order")
+        if args.ensure_v6_priority:
+            if loader_file.ensure_order(EXPECTED_LOADER_ORDER):
+                changed = True
+                actions.append("ensure_v6_priority")
+        if args.fix_version_duplicates:
+            if loader_file.fix_duplicates(["STUDIOCORE_VERSION", "MONOLITH_VERSION"]):
+                changed = True
+                actions.append("fix_version_duplicates")
+        if changed:
+            loader_file.save()
+        if actions:
+            report.setdefault("repairs", []).append({"path": path, "actions": actions})
+
+    if loader_file_reports:
+        report["loader"]["files"] = loader_file_reports
+
+    if args.check_env:
+        report["env"] = {
+            "STUDIOCORE_MONOLITH": os.getenv("STUDIOCORE_MONOLITH"),
+            "STUDIOCORE_LOADER_ORDER": os.getenv("STUDIOCORE_LOADER_ORDER"),
+        }
+
+    runtime_loader_report: Dict[str, Any] = {}
+    if module and (args.check_loader or args.verify_fallback_chain or args.check_v6 or args.check_monolith):
+        loader_graph = getattr(module, "LOADER_GRAPH", {})
+        default_order = list(getattr(module, "DEFAULT_LOADER_ORDER", []))
+        loader_status = getattr(module, "LOADER_STATUS", {})
+        runtime_loader_report = {
+            "default_order": default_order,
+            "graph": {},
+            "status": loader_status,
+        }
+        for key, meta in loader_graph.items():
+            runtime_loader_report["graph"][key] = {
+                "available": bool(meta.get("loader")),
+                "name": meta.get("name"),
+                "version": meta.get("version"),
+            }
+        report["loader"]["runtime"] = runtime_loader_report
+
+        if args.check_loader and default_order:
+            normalized = [key.lower() for key in default_order]
+            if normalized[: len(EXPECTED_LOADER_ORDER)] != list(EXPECTED_LOADER_ORDER):
+                failures.append("Loader order does not prioritize v6 -> monolith -> fallback")
+
+        if args.check_v6:
+            v6_meta = loader_graph.get("v6")
+            if not (v6_meta and v6_meta.get("loader")):
+                failures.append("StudioCoreV6 loader unavailable")
+
+        if args.check_monolith:
+            mono_meta = loader_graph.get("monolith")
+            if not (mono_meta and mono_meta.get("loader")):
+                failures.append("Monolith loader unavailable")
+
+        if args.verify_fallback_chain:
+            fallback_meta = loader_graph.get("fallback")
+            if not (fallback_meta and fallback_meta.get("loader")):
+                failures.append("Fallback loader missing")
+            else:
+                try:
+                    fallback_meta["loader"]()
+                except Exception as exc:  # pragma: no cover - defensive
+                    failures.append(f"Fallback loader failed to instantiate: {exc}")
+
+    if args.deep_merge and runtime_loader_report:
+        file_summary = loader_file_reports[0] if loader_file_reports else {}
+        report["loader"]["summary"] = _deep_merge_dict(file_summary, runtime_loader_report)
+
+    success = not failures
+
+    print("=== Codex Diagnostics ===")
+    print("Command: diagnose")
+    print(f"Targets resolved: {len(report['targets'])}")
+    if args.commit:
+        print(f"Requested commit tag: {args.commit}")
+    if report["runtime"]:
+        print("Runtime:", json.dumps(report["runtime"], ensure_ascii=False))
+    if report["versions"]:
+        print("Versions:", json.dumps(report["versions"], ensure_ascii=False))
+    if report["env"]:
+        print("Env:", json.dumps(report["env"], ensure_ascii=False))
+    if report["init"]:
+        print("Init:", json.dumps(report["init"], ensure_ascii=False))
+    if report["subsystems"]:
+        print("Subsystems:", json.dumps(report["subsystems"], ensure_ascii=False))
+    if report["loader"]:
+        print("Loader:", json.dumps(report["loader"], ensure_ascii=False))
+    if report["repairs"]:
+        print("Repairs:", json.dumps(report["repairs"], ensure_ascii=False))
+    if failures:
+        print("Status: FAIL")
+        for item in failures:
+            print(" -", item)
+    else:
+        print("Status: OK")
+    print("==========================")
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+
+    return 0 if success else 1
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="codex", description="StudioCore Codex utility")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    diagnose_parser = subparsers.add_parser("diagnose", help="Run StudioCore diagnostics")
+    diagnose_parser.add_argument("--full", action="store_true", help="Enable every diagnostic and repair routine")
+    diagnose_parser.add_argument("--runtime", action="store_true", help="Check runtime availability")
+    diagnose_parser.add_argument("--check-init", action="store_true", help="Instantiate StudioCore")
+    diagnose_parser.add_argument("--check-subsystems", action="store_true", help="Validate core subsystems")
+    diagnose_parser.add_argument("--check-env", action="store_true", help="Capture relevant environment variables")
+    diagnose_parser.add_argument("--check-loader", action="store_true", help="Validate loader metadata")
+    diagnose_parser.add_argument("--check-monolith", action="store_true", help="Validate monolith availability")
+    diagnose_parser.add_argument("--check-v6", action="store_true", help="Ensure v6 loader is available")
+    diagnose_parser.add_argument("--check-versions", action="store_true", help="Ensure version constants are present")
+    diagnose_parser.add_argument("--verify-fallback-chain", action="store_true", help="Verify fallback chain is usable")
+    diagnose_parser.add_argument("--fix-loader-order", action="store_true", help="Rewrite loader order to the canonical sequence")
+    diagnose_parser.add_argument("--fix-version-duplicates", action="store_true", help="Remove duplicate version assignments")
+    diagnose_parser.add_argument("--ensure-v6-priority", action="store_true", help="Guarantee that v6 stays the primary loader")
+    diagnose_parser.add_argument("--deep-merge", action="store_true", help="Deep merge file + runtime loader data")
+    diagnose_parser.add_argument("--target", default="studiocore/*", help="Glob pattern for modules to scan")
+    diagnose_parser.add_argument("--commit", default=None, help="Optional commit tag for reporting")
+    diagnose_parser.set_defaults(func=diagnose)
+
+    return parser
+
+
+def main(argv: List[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(main())

@@ -66,6 +66,17 @@ class StudioCoreV6:
 
         self._legacy_core_cls = LegacyCore
 
+        # Compatibility shims to satisfy legacy subsystem checks.
+        self.emotion = self.emotion_engine
+        self.tlp = self.tlp_engine
+        self.rhythm = self.bpm_engine
+        self.freq = self.zero_pulse_engine
+        self.safety = self.override_engine
+        self.integrity = self.section_intelligence
+        self.vocals = self.vocal_engine
+        self.style = self.style_engine
+        self.tone = self.tonality_engine
+
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         params = self._merge_user_params(dict(kwargs))
         overrides: UserOverrides = params.get("user_overrides")
