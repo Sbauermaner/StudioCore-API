@@ -31,6 +31,7 @@ from .logical_engines import (
     ZeroPulseEngine,
 )
 from .genre_matrix_extended import GenreMatrixEngine
+from .genre_weights import GenreWeightsEngine
 from .instrument_dynamics import InstrumentalDynamicsEngine
 from .section_intelligence import SectionIntelligenceEngine
 from .suno_annotations import SunoAnnotationEngine
@@ -64,6 +65,7 @@ class StudioCoreV6:
         self.tlp_engine = TruthLovePainEngine()
         self.genre_matrix = GenreMatrixEngine()
         self.emotion_dictionary_extended = EmotionLexiconExtended()
+        self.genre_weights_engine = GenreWeightsEngine()
 
         # Late import to avoid circular dependencies during module import time.
         from .monolith_v4_3_1 import StudioCore as LegacyCore  # pylint: disable=import-outside-toplevel
@@ -80,6 +82,10 @@ class StudioCoreV6:
         self.vocals = self.vocal_engine
         self.style = self.style_engine
         self.tone = self.tonality_engine
+
+    def analyze_genre(self, text: str) -> Dict[str, float]:
+        """Expose GenreWeightsEngine predictions for reuse across analyzers."""
+        return self.genre_weights_engine.predict(text)
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         params = self._merge_user_params(dict(kwargs))
@@ -205,6 +211,7 @@ class StudioCoreV6:
         commands = auto_context.get("commands", [])
         extended_genre = self.genre_matrix.detect(text)
         extended_emotions = self.emotion_dictionary_extended.get_emotion(text)
+        genre_probabilities = self.analyze_genre(text)
 
         # 1. Call the legacy core for full analysis.
         try:
@@ -489,6 +496,7 @@ class StudioCoreV6:
             "override_debug": override_manager.debug_summary(),
             "extended_genre": extended_genre,
             "extended_emotions": extended_emotions,
+            "genre_probabilities": genre_probabilities,
         }
         result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(override_manager, result)
         return result
@@ -510,6 +518,7 @@ class StudioCoreV6:
         merged["override_debug"] = payload.get("override_debug", {})
         merged["extended_genre"] = payload.get("extended_genre", {})
         merged["extended_emotions"] = payload.get("extended_emotions", {})
+        merged["genre_probabilities"] = payload.get("genre_probabilities", {})
         return merged
 
     @staticmethod
