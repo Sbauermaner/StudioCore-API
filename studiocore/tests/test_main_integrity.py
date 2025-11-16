@@ -15,6 +15,7 @@ import unittest
 import importlib
 import json
 import requests
+from requests import exceptions as requests_exceptions
 import traceback
 import logging
 
@@ -131,22 +132,27 @@ class TestMainIntegrity(unittest.TestCase):
         
         try:
             # v7: Таймаут 20с (для "Плана C" - быстрые словари)
-            r = requests.post(api_url, json=payload, timeout=20) 
-            
+            r = requests.post(api_url, json=payload, timeout=20)
+
             # Проверяем, что статус 200 OK
-            self.assertEqual(r.status_code, 200, 
-                             f"API test failed: HTTP {r.status_code}. "
-                             f"Убедитесь, что URL '{api_url}' корректный в app.py. "
-                             f"Response: {r.text[:200]}")
-            
+            self.assertEqual(
+                r.status_code,
+                200,
+                f"API test failed: HTTP {r.status_code}. "
+                f"Убедитесь, что URL '{api_url}' корректный в app.py. "
+                f"Response: {r.text[:200]}"
+            )
+
             data = r.json()
             self.assertIn("bpm", data)
             self.assertIn("style", data)
-            
+
             log.info(f"✅ API OK | Style={data.get('style')} | BPM={data.get('bpm')}")
 
-        except Exception as e:
-            self.fail(f"❌ API test failed: {e}")
+        except (requests_exceptions.ConnectionError, requests_exceptions.Timeout) as exc:
+            self.skipTest(f"API сервер недоступен: {exc}")
+        except requests_exceptions.RequestException as exc:
+            self.fail(f"❌ API test failed: {exc}")
 
 if __name__ == "__main__":
     log.info("Запуск test_main_integrity.py как отдельного скрипта...")

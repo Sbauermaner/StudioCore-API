@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable
 
-from .emotion import TruthLovePainEngine
+from .config import load_config
+from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
+from .frequency import RNSSafety, UniversalFrequencyEngine
+from .integrity import IntegrityScanEngine
 from .logical_engines import (
     BPMEngine,
     BreathingEngine,
@@ -30,9 +33,13 @@ from .logical_engines import (
     ZeroPulseEngine,
 )
 from .instrument_dynamics import InstrumentalDynamicsEngine
+from .rhythm import LyricMeter
 from .section_intelligence import SectionIntelligenceEngine
+from .style import PatchedStyleMatrix
 from .suno_annotations import SunoAnnotationEngine
+from .tone import ToneSyncEngine
 from .user_override_manager import UserOverrideManager, UserOverrides
+from .vocals import VocalProfileRegistry
 
 
 class StudioCoreV6:
@@ -60,6 +67,20 @@ class StudioCoreV6:
         self.override_engine = UserOverrideEngine()
         self.symbiosis_engine = UserAdaptiveSymbiosisEngine()
         self.tlp_engine = TruthLovePainEngine()
+
+        # --------------------------------------------------
+        # Legacy compatibility surfaces (v5 naming)
+        # --------------------------------------------------
+        cfg = load_config()
+        self.emotion = AutoEmotionalAnalyzer()
+        self.tlp = TruthLovePainEngine()
+        self.rhythm = LyricMeter()
+        self.freq = UniversalFrequencyEngine()
+        self.safety = RNSSafety(cfg)
+        self.integrity = IntegrityScanEngine()
+        self.vocals = VocalProfileRegistry()
+        self.style = PatchedStyleMatrix()
+        self.tone = ToneSyncEngine()
 
         # Late import to avoid circular dependencies during module import time.
         from .monolith_v4_3_1 import StudioCore as LegacyCore  # pylint: disable=import-outside-toplevel
@@ -400,15 +421,18 @@ class StudioCoreV6:
         style_instrumentation = self.style_engine.instrumentation_style(instrumentation_payload.get("selection", {}))
         style_vocal = self.style_engine.vocal_style(vocal_payload)
         style_visual = self.style_engine.visual_style(color_profile)
+        expose_visual = self._should_expose_color_visuals(semantic_hints, override_manager)
+        visual_for_prompt = style_visual if expose_visual else None
         style_tone = self.style_engine.tone_style(tonality_payload)
         style_prompt = self.style_engine.final_style_prompt_build(
             genre=style_genre,
             mood=style_mood,
             instrumentation=style_instrumentation,
             vocal=style_vocal,
-            visual=style_visual,
+            visual=visual_for_prompt,
             tone=style_tone,
         )
+        legacy_style = legacy_result.get("style", {}) if isinstance(legacy_result, dict) else {}
         style_payload = {
             "genre": style_genre,
             "mood": style_mood,
@@ -418,6 +442,7 @@ class StudioCoreV6:
             "tone": style_tone,
             "prompt": style_prompt,
         }
+        style_payload = self._merge_semantic_hints(style_payload, legacy_style)
         style_payload = self._merge_semantic_hints(style_payload, semantic_hints.get("style", {}))
         style_payload = self.override_engine.apply_to_style(style_payload, override_manager)
 
@@ -490,6 +515,24 @@ class StudioCoreV6:
         merged["symbiosis"] = payload.get("symbiosis", {})
         merged["override_debug"] = payload.get("override_debug", {})
         return merged
+
+    def _should_expose_color_visuals(
+        self,
+        semantic_hints: Dict[str, Any],
+        override_manager: UserOverrideManager,
+    ) -> bool:
+        """Determine if color-driven visuals are allowed in the style prompt."""
+
+        override_color = getattr(override_manager.overrides, "color_state", None)
+        if override_color:
+            return True
+        color_hints = semantic_hints.get("color")
+        if isinstance(color_hints, dict) and color_hints.get("expose_in_prompt"):
+            return True
+        style_hints = semantic_hints.get("style")
+        if isinstance(style_hints, dict) and style_hints.get("visual_prompt"):
+            return True
+        return False
 
     @staticmethod
     def _merge_semantic_hints(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:

@@ -22,6 +22,7 @@ def resolve_style_and_form(
     narrative: Tuple[str, str, str] | None = None,
     key_hint: str | None = None,
     voice_hint: str | None = None,
+    emotion_profile: Dict[str, float] | None = None,
 ) -> Dict[str, str]:
     """
     v12: Исправлена ошибка NameError: 'energy' is not defined.
@@ -32,6 +33,7 @@ def resolve_style_and_form(
     love = tlp.get("love", 0.0)
     pain = tlp.get("pain", 0.0)
     truth = tlp.get("truth", 0.0)
+    emotion_profile = dict(emotion_profile or {})
 
     user_mode = bool(voice_hint)
     
@@ -64,19 +66,44 @@ def resolve_style_and_form(
         log.debug("Режим: AUTO-MODE (по TLP/Mood/BPM)")
         
         # --- Определение СТИЛЯ (v11-logic) ---
-        # СНАЧАЛА проверяем PAIN (v8 fix)
-        if (pain >= 0.01 and pain > love) or mood in ("sadness", "melancholy"): 
-            style, key_mode = "melancholic minor", "minor"
-            log.debug("Стиль: 'melancholic minor' (Pain > Love или Mood=sadness)")
-            
-        elif (love >= 0.01 and love >= pain) or mood in ("joy", "peace", "awe"):
-            style, key_mode = "majestic major", "major"
-            log.debug("Стиль: 'majestic major' (Love >= Pain или Mood=joy/peace)")
+        positive_moods = ("joy", "peace", "awe")
+        positive_values = [emotion_profile.get(m, 0.0) for m in positive_moods]
+        positive_signal = max(positive_values) if positive_values else 0.0
+        sadness_signal = emotion_profile.get("sadness", 0.0)
+        dramatic_core_signal = max(
+            emotion_profile.get("fear", 0.0),
+            emotion_profile.get("anger", 0.0),
+        )
+        epic_signal = emotion_profile.get("epic", 0.0)
+        dramatic_signal = max(dramatic_core_signal, epic_signal)
+        pain_advantage = pain - love
+        positive_override = (
+            mood in positive_moods
+            and pain_advantage < 0.25
+            and positive_signal >= sadness_signal + 0.01
+            and dramatic_core_signal < 0.09
+        )
 
-        elif (cf > 0.6 and truth > 0.1) or mood in ("anger", "fear", "epic"):
+        dramatic_forced = (
+            (cf > 0.6 and truth > 0.1)
+            or mood in ("anger", "fear")
+            or dramatic_core_signal >= 0.09
+            or (mood == "epic" and epic_signal >= 0.09)
+        )
+
+        # СНАЧАЛА учитываем драматический сигнал, затем позитив и меланхолию.
+        if dramatic_forced:
             style, key_mode = "dramatic harmonic minor", "minor"
-            log.debug("Стиль: 'dramatic harmonic minor' (CF/Truth или Mood=anger/fear/epic)")
-            
+            log.debug("Стиль: 'dramatic harmonic minor' (CF/Truth или высокий страх/гнев)")
+
+        elif positive_override or (love >= 0.01 and love >= pain):
+            style, key_mode = "majestic major", "major"
+            log.debug("Стиль: 'majestic major' (Mood позитивный или Love >= Pain)")
+
+        elif mood in ("sadness", "melancholy") or (pain >= 0.01 and pain > love):
+            style, key_mode = "melancholic minor", "minor"
+            log.debug("Стиль: 'melancholic minor' (Mood=sadness/melancholy или Pain > Love)")
+
         else:
             style, key_mode = "neutral modal", "modal"
             log.debug("Стиль: 'neutral modal' (по умолчанию)")
@@ -173,8 +200,14 @@ class PatchedStyleMatrix:
         # 1. 🧠 Вызов Резолвера
         narrative = ("search", "struggle", "transformation")
         resolved = resolve_style_and_form(
-            tlp, cf, dominant_mood, bpm, narrative, 
-            key_hint=None, voice_hint=voice_hint
+            tlp,
+            cf,
+            dominant_mood,
+            bpm,
+            narrative,
+            key_hint=None,
+            voice_hint=voice_hint,
+            emotion_profile=emo,
         )
 
         # 2. 🎼 Определение Ключа (Тональности)

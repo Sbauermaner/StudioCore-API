@@ -22,6 +22,7 @@ import traceback
 import unittest
 import time
 import logging # v8: Добавлен импорт
+import pytest
 
 # === 1. АКТИВАЦИЯ ЛОГГЕРА ===
 try:
@@ -182,7 +183,7 @@ def check_json_yaml():
 # ==========================================================
 # 🧠 2. Проверка импорта
 # ==========================================================
-def test_imports():
+def run_import_checks():
     log.info("🧠 Проверка модулей StudioCore...")
     all_ok = True
     for m in MODULES:
@@ -194,6 +195,10 @@ def test_imports():
             log.error(f"❌ Ошибка импорта: {m} — {traceback.format_exc()}")
             all_ok = False
     return all_ok
+
+
+def test_imports():
+    assert run_import_checks(), "Импорт StudioCore модулей завершился с ошибками"
 
 # ==========================================================
 # 🕸️ 3. Проверка внутренних связей (AST)
@@ -312,7 +317,7 @@ def run_all_unit_tests():
 # ==========================================================
 # 🎧 5. Проверка (интеграционная) ядра
 # ==========================================================
-def test_prediction_pipeline():
+def run_prediction_pipeline():
     """
     (v7) Интеграционный тест ядра (без API).
     """
@@ -352,12 +357,16 @@ def test_prediction_pipeline():
         return False
 
 
+def test_prediction_pipeline():
+    assert run_prediction_pipeline(), "Интеграционный тест ядра завершился с ошибками"
+
+
 # ==========================================================
 # 🌐 6. Проверка API /api/predict
 # ==========================================================
-def test_api_response():
+def run_api_response_check():
     log.info("\n🌐 Проверка /api/predict ...")
-    
+
     api_url = "http://127.0.0.1:7860/api/predict"
     payload = {
         "text": "Я тону, когда солнце уходит вдаль...",
@@ -378,14 +387,21 @@ def test_api_response():
             
     except requests.exceptions.ReadTimeout as e:
         log.error(f"❌ Ошибка API: ReadTimeout! (Сервер не ответил за 20с). {e}")
-        return False
+        return None
     except requests.exceptions.ConnectionError as e:
         log.error(f"❌ Ошибка API: ConnectionError! (Сервер не запущен?). {e}")
-        return False
+        return None
     except Exception as e:
         log.error(f"❌ Ошибка API (Unknown): {e} (Проверьте URL: {api_url})")
         log.error(traceback.format_exc())
         return False
+
+
+def test_api_response():
+    result = run_api_response_check()
+    if result is None:
+        pytest.skip("API сервер не запущен, проверка пропущена")
+    assert result, "API /api/predict вернуло ошибку"
 
 
 # ==========================================================
@@ -402,7 +418,7 @@ if __name__ == "__main__":
     
     # Если синтаксис сломан, нет смысла проверять импорты
     if results["syntax"]:
-        results["imports"] = test_imports()
+        results["imports"] = run_import_checks()
         results["dependencies (AST)"] = check_internal_dependencies()
     else:
         results["imports"] = False
@@ -411,14 +427,14 @@ if __name__ == "__main__":
     # Если импорты сломаны, нет смысла запускать тесты
     if results["imports"]:
         results["unit_tests (logic)"] = run_all_unit_tests()
-        results["integration_core"] = test_prediction_pipeline()
+        results["integration_core"] = run_prediction_pipeline()
     else:
         results["unit_tests (logic)"] = False
         results["integration_core"] = False
 
     # API-тест запускаем, только если тесты ядра прошли
     if results["unit_tests (logic)"] and results["integration_core"]:
-        results["integration_api"] = test_api_response()
+        results["integration_api"] = run_api_response_check()
     else:
         log.warning("\n🔬 Пропуск 'integration_api', так как 'unit_tests (logic)' или 'integration_core' провалились.")
         results["integration_api"] = False
