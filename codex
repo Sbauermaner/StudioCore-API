@@ -10,6 +10,7 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -54,6 +55,46 @@ def _deep_merge_dict(first: Dict[str, Any], second: Dict[str, Any]) -> Dict[str,
         else:
             merged[key] = value
     return merged
+
+
+def _run_git(args: Sequence[str], check: bool = True) -> subprocess.CompletedProcess:
+    """Execute a git command and optionally raise on failure."""
+    proc = subprocess.run(
+        ["git", *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if check and proc.returncode != 0:
+        details = proc.stderr.strip() or proc.stdout.strip() or "unknown error"
+        raise RuntimeError(
+            f"git {' '.join(args)} failed with exit code {proc.returncode}: {details}"
+        )
+    return proc
+
+
+def _git_has_remote() -> bool:
+    remotes = _run_git(["remote"], check=False)
+    return bool(remotes.stdout.strip())
+
+
+def _ensure_branch(branch: str) -> None:
+    probe = _run_git(["rev-parse", "--verify", branch], check=False)
+    if probe.returncode != 0:
+        raise RuntimeError(f"Branch '{branch}' was not found in this repository")
+
+
+def _ensure_clean_worktree() -> None:
+    status = _run_git(["status", "--porcelain"], check=True)
+    if status.stdout.strip():
+        raise RuntimeError(
+            "The working tree contains uncommitted changes. Commit or stash them before running Codex PR automation."
+        )
+
+
+def _format_git_output(proc: subprocess.CompletedProcess) -> str:
+    message = proc.stdout.strip() or proc.stderr.strip()
+    return message or "Already up to date."
 
 
 class LoaderFile:
@@ -159,7 +200,7 @@ def diagnose(args: argparse.Namespace) -> int:
                 "STUDIOCORE_VERSION": getattr(module, "STUDIOCORE_VERSION", "unknown"),
                 "MONOLITH_VERSION": getattr(module, "MONOLITH_VERSION", "unknown"),
             }
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except Exception as exc:
             failures.append(f"Runtime import failed: {exc}")
             report["runtime"] = {"error": str(exc)}
 
@@ -207,27 +248,30 @@ def diagnose(args: argparse.Namespace) -> int:
         if not path.endswith(".py") or not os.path.exists(path):
             continue
         loader_file = LoaderFile(path)
-        file_report = {
-            "path": path,
-            "order": loader_file.detect_order(),
-        }
+        file_report = {"path": path, "order": loader_file.detect_order()}
         loader_file_reports.append(file_report)
+
         changed = False
         actions: List[str] = []
+
         if args.fix_loader_order:
             if loader_file.ensure_order(EXPECTED_LOADER_ORDER):
                 changed = True
                 actions.append("fix_loader_order")
+
         if args.ensure_v6_priority:
             if loader_file.ensure_order(EXPECTED_LOADER_ORDER):
                 changed = True
                 actions.append("ensure_v6_priority")
+
         if args.fix_version_duplicates:
             if loader_file.fix_duplicates(["STUDIOCORE_VERSION", "MONOLITH_VERSION"]):
                 changed = True
                 actions.append("fix_version_duplicates")
+
         if changed:
             loader_file.save()
+
         if actions:
             report.setdefault("repairs", []).append({"path": path, "actions": actions})
 
@@ -245,17 +289,20 @@ def diagnose(args: argparse.Namespace) -> int:
         loader_graph = getattr(module, "LOADER_GRAPH", {})
         default_order = list(getattr(module, "DEFAULT_LOADER_ORDER", []))
         loader_status = getattr(module, "LOADER_STATUS", {})
+
         runtime_loader_report = {
             "default_order": default_order,
             "graph": {},
             "status": loader_status,
         }
+
         for key, meta in loader_graph.items():
             runtime_loader_report["graph"][key] = {
                 "available": bool(meta.get("loader")),
                 "name": meta.get("name"),
                 "version": meta.get("version"),
             }
+
         report["loader"]["runtime"] = runtime_loader_report
 
         if args.check_loader and default_order:
@@ -280,7 +327,7 @@ def diagnose(args: argparse.Namespace) -> int:
             else:
                 try:
                     fallback_meta["loader"]()
-                except Exception as exc:  # pragma: no cover - defensive
+                except Exception as exc:
                     failures.append(f"Fallback loader failed to instantiate: {exc}")
 
     if args.deep_merge and runtime_loader_report:
@@ -289,40 +336,12 @@ def diagnose(args: argparse.Namespace) -> int:
 
     success = not failures
 
-    print("=== Codex Diagnostics ===")
-    print("Command: diagnose")
-    print(f"Targets resolved: {len(report['targets'])}")
-    if args.commit:
-        print(f"Requested commit tag: {args.commit}")
-    if report["runtime"]:
-        print("Runtime:", json.dumps(report["runtime"], ensure_ascii=False))
-    if report["versions"]:
-        print("Versions:", json.dumps(report["versions"], ensure_ascii=False))
-    if report["env"]:
-        print("Env:", json.dumps(report["env"], ensure_ascii=False))
-    if report["init"]:
-        print("Init:", json.dumps(report["init"], ensure_ascii=False))
-    if report["subsystems"]:
-        print("Subsystems:", json.dumps(report["subsystems"], ensure_ascii=False))
-    if report["loader"]:
-        print("Loader:", json.dumps(report["loader"], ensure_ascii=False))
-    if report["repairs"]:
-        print("Repairs:", json.dumps(report["repairs"], ensure_ascii=False))
-    if failures:
-        print("Status: FAIL")
-        for item in failures:
-            print(" -", item)
-    else:
-        print("Status: OK")
-    print("==========================")
     print(json.dumps(report, indent=2, ensure_ascii=False))
-
     return 0 if success else 1
 
 
 def runtime_checks(args: argparse.Namespace) -> int:
     """Run the full diagnostic suite and optionally store the output."""
-
     diag_args = argparse.Namespace(
         full=True,
         runtime=True,
@@ -364,6 +383,65 @@ def runtime_checks(args: argparse.Namespace) -> int:
     return exit_code
 
 
+# ============================
+# 🚀 NEW: Codex Pull Request Automation
+# ============================
+
+def merge_pull_request(args: argparse.Namespace) -> int:
+    """Synchronize a feature branch with the target branch and merge it."""
+
+    source = args.source
+    target = args.target
+    summary: List[str] = []
+
+    try:
+        if not args.allow_dirty:
+            _ensure_clean_worktree()
+
+        _ensure_branch(source)
+        _ensure_branch(target)
+
+        previous_branch = (
+            _run_git(["rev-parse", "--abbrev-ref", "HEAD"], check=True).stdout.strip()
+        )
+
+        if not args.skip_fetch:
+            if _git_has_remote():
+                fetch_proc = _run_git(["fetch", "--all"], check=True)
+                summary.append(f"Fetched remote refs: {_format_git_output(fetch_proc)}")
+            else:
+                summary.append("Skipped fetch — no git remotes are configured.")
+
+        _run_git(["checkout", source], check=True)
+        sync_proc = _run_git(["merge", target], check=True)
+        summary.append(f"Synced {source} with {target}: {_format_git_output(sync_proc)}")
+
+        _run_git(["checkout", target], check=True)
+        merge_cmd = ["merge"]
+        if args.strategy == "ff-only":
+            merge_cmd.append("--ff-only")
+        elif args.strategy == "no-ff":
+            merge_cmd.append("--no-ff")
+        merge_cmd.append(source)
+
+        merge_proc = _run_git(merge_cmd, check=True)
+        summary.append(f"Merged {source} into {target}: {_format_git_output(merge_proc)}")
+
+        if args.restore_branch and previous_branch not in {source, target}:
+            _run_git(["checkout", previous_branch], check=True)
+            summary.append(f"Restored working branch: {previous_branch}")
+
+    except RuntimeError as exc:
+        print(f"❌ {exc}")
+        return 1
+
+    print("Codex PR automation summary:")
+    for line in summary:
+        print(f" - {line}")
+    print(f"✅ Pull request workflow complete: {source} merged into {target}.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codex", description="StudioCore Codex utility")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -378,7 +456,7 @@ def build_parser() -> argparse.ArgumentParser:
     diagnose_parser.add_argument("--check-monolith", action="store_true", help="Validate monolith availability")
     diagnose_parser.add_argument("--check-v6", action="store_true", help="Ensure v6 loader is available")
     diagnose_parser.add_argument("--check-versions", action="store_true", help="Ensure version constants are present")
-    diagnose_parser.add_argument("--verify-fallback-chain", action="store_true", help="Verify fallback chain is usable")
+    diagnose_parser.add_argument("--verify-fallback-chain", action="show", help="Verify fallback chain is usable")
     diagnose_parser.add_argument("--fix-loader-order", action="store_true", help="Rewrite loader order to the canonical sequence")
     diagnose_parser.add_argument("--fix-version-duplicates", action="store_true", help="Remove duplicate version assignments")
     diagnose_parser.add_argument("--ensure-v6-priority", action="store_true", help="Guarantee that v6 stays the primary loader")
@@ -391,22 +469,23 @@ def build_parser() -> argparse.ArgumentParser:
         "runtime-checks",
         help="Execute the full diagnostic stack and persist a log",
     )
-    runtime_parser.add_argument(
-        "--target",
-        default="studiocore/*",
-        help="Glob pattern passed to the diagnose command",
-    )
-    runtime_parser.add_argument(
-        "--commit",
-        default=None,
-        help="Optional commit tag recorded inside the log header",
-    )
-    runtime_parser.add_argument(
-        "--output",
-        default="test_log.txt",
-        help="Destination file for the captured diagnostic output (use '-' to skip writing)",
-    )
+    runtime_parser.add_argument("--target", default="studiocore/*")
+    runtime_parser.add_argument("--commit", default=None)
+    runtime_parser.add_argument("--output", default="test_log.txt")
     runtime_parser.set_defaults(func=runtime_checks)
+
+    # ⭐ NEW: merge-pr command
+    pr_parser = subparsers.add_parser(
+        "merge-pr",
+        help="Sync a feature branch with the latest target branch commits and merge it",
+    )
+    pr_parser.add_argument("source", help="Branch to merge into the target")
+    pr_parser.add_argument("--target", default="main")
+    pr_parser.add_argument("--skip-fetch", action="store_true")
+    pr_parser.add_argument("--allow_dirty", action="store_true")
+    pr_parser.add_argument("--strategy", choices=["merge", "ff-only", "no-ff"], default="merge")
+    pr_parser.add_argument("--restore-branch", action="store_true")
+    pr_parser.set_defaults(func=merge_pull_request)
 
     return parser
 
@@ -417,5 +496,5 @@ def main(argv: List[str] | None = None) -> int:
     return args.func(args)
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     sys.exit(main())
