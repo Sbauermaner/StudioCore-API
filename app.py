@@ -44,7 +44,12 @@ from typing import Optional
 
 # === 3. Импорт ядра ===
 try:
-    from studiocore import get_core, STUDIOCORE_VERSION
+    from studiocore import (
+        get_core,
+        STUDIOCORE_VERSION,
+        MONOLITH_VERSION,
+        LOADER_STATUS,
+    )
     CORE = get_core()
     CORE_LOADED = True
     log.info(f"Ядро StudioCore {STUDIOCORE_VERSION} успешно импортировано.")
@@ -57,6 +62,37 @@ except Exception as e:
 # === 4. Инициализация FastAPI ===
 log.debug("Инициализация FastAPI...")
 app = FastAPI(title="StudioCore API")
+
+# ===============================================
+# NEW: /status endpoint
+# ===============================================
+@app.get("/status")
+async def status():
+    try:
+        core = get_core()
+        return {
+            "status": "ok",
+            "engine": type(core).__name__,
+            "loader": LOADER_STATUS,
+            "core_version": STUDIOCORE_VERSION,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "loader": LOADER_STATUS,
+        }
+
+# ===============================================
+# NEW: /version endpoint
+# ===============================================
+@app.get("/version")
+async def version():
+    return {
+        "version": STUDIOCORE_VERSION,
+        "monolith": MONOLITH_VERSION,
+        "loader": LOADER_STATUS,
+    }
 
 # === 5. CORS ===
 app.add_middleware(
