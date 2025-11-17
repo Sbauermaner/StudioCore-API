@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
-
 from .emotion_dictionary_extended import EmotionLexiconExtended
 
 
@@ -11,6 +10,8 @@ class GenreWeightsEngine:
     """Approximate poetic/dramatic genre classifier based on structural cues."""
 
     def __init__(self) -> None:
+
+        # Весовые профили жанров
         self.genre_profiles: Dict[str, Dict[str, float]] = {
             "лирика": {
                 "structure_weight": 0.40,
@@ -74,7 +75,7 @@ class GenreWeightsEngine:
             },
         }
 
-        # Лексические паттерны жанров
+        # Паттерны жанровой лексики
         self.genre_keywords: Dict[str, List[str]] = {
             "лирика": ["сердце", "луна", "ночь", "тихий", "шёпот"],
             "элегия": ["скорбь", "прах", "минувшее", "тень", "вечность"],
@@ -88,6 +89,7 @@ class GenreWeightsEngine:
             "комедия": ["смех", "шут", "курьёз", "ирония", "фарс"],
         }
 
+        # Маркеры повествовательной структуры
         self.narrative_markers = {
             "dialogue": ("—", " - ", ":"),
             "conflict": ("конфликт", "спор", "битва", "война", "столкновение"),
@@ -96,35 +98,44 @@ class GenreWeightsEngine:
 
         self.emotion_lexicon = EmotionLexiconExtended()
 
-    # -------------------
+    # -------------------------------
     # STRUCTURE METRICS
-    # -------------------
+    # -------------------------------
 
     def _rhyme_score(self, text: str) -> float:
         lines = [line.strip() for line in text.split("\n") if line.strip()]
         if len(lines) < 2:
             return 0.0
+
         rhymes = 0
         for current, following in zip(lines, lines[1:]):
-            if len(current) > 3 and len(following) > 3 and current[-2:] == following[-2:]:
+            if (
+                len(current) > 3
+                and len(following) > 3
+                and current[-2:] == following[-2:]
+            ):
                 rhymes += 1
+
         return rhymes / len(lines)
 
     def _structure_score(self, text: str) -> float:
         lengths = [len(line) for line in text.split("\n") if line.strip()]
         if not lengths:
             return 0.0
+
         avg_length = sum(lengths) / len(lengths)
         variance = sum(abs(length - avg_length) for length in lengths)
+
         return 1.0 - min(1.0, variance / 300)
 
-    # -------------------
+    # -------------------------------
     # EMOTION METRICS
-    # -------------------
+    # -------------------------------
 
     def _emotion_score(self, tags: Dict[str, Any]) -> float:
-        raw_emotions = tags.get("emotions", {})
-        emotions = raw_emotions if isinstance(raw_emotions, dict) else {}
+        emotions = tags.get("emotions", {})
+        if not isinstance(emotions, dict):
+            emotions = {}
 
         hit_count = sum(
             1 for value in emotions.values()
@@ -146,25 +157,28 @@ class GenreWeightsEngine:
 
         normalized_hits = hit_count / max(len(self.emotion_lexicon.emotion_words), 1)
         base = normalized_hits * 3
+
         return min(1.0, base + drama_bonus + intensity * 0.5)
 
-    # -------------------
+    # -------------------------------
     # LEXICON METRICS
-    # -------------------
+    # -------------------------------
 
     def _lexicon_score(self, text: str, genre: str) -> float:
         keywords = self.genre_keywords.get(genre, [])
         if not keywords:
             return 0.0
+
         lowered = text.lower()
         hits = sum(lowered.count(keyword) for keyword in keywords)
         unique_hits = sum(1 for keyword in keywords if keyword in lowered)
+
         score = (hits * 0.6 + unique_hits * 0.4) / max(len(keywords), 1)
         return min(1.0, score)
 
-    # -------------------
+    # -------------------------------
     # NARRATIVE METRICS
-    # -------------------
+    # -------------------------------
 
     def _narrative_score(self, text: str, register: str | None = None) -> float:
         lowered = text.lower()
@@ -182,9 +196,9 @@ class GenreWeightsEngine:
 
         return min(1.0, raw_score + register_bonus)
 
-    # -------------------
+    # -------------------------------
     # FINAL PREDICTION
-    # -------------------
+    # -------------------------------
 
     def predict(self, text: str) -> Dict[str, float]:
         tags = self.emotion_lexicon.get_emotion(text)
@@ -192,6 +206,7 @@ class GenreWeightsEngine:
         rhyme = self._rhyme_score(text)
         structure = self._structure_score(text)
         structure_combo = (rhyme + structure) / 2
+
         emotion = self._emotion_score(tags)
         narrative = self._narrative_score(text, tags.get("register"))
 
@@ -207,6 +222,4 @@ class GenreWeightsEngine:
             )
             predictions[genre] = round(score, 4)
 
-        return dict(
-            sorted(predictions.items(), key=lambda item: item[1], reverse=True)
-        )
+        return dict(sorted(predictions.items(), key=lambda i: i[1], reverse=True))

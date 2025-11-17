@@ -7,7 +7,6 @@
 - драматическая насыщенность
 """
 from __future__ import annotations
-
 from typing import Any, Dict, List
 
 
@@ -15,6 +14,7 @@ class EmotionLexiconExtended:
     """Rule-based helper that tags the text with broad emotional buckets."""
 
     def __init__(self) -> None:
+
         # Основные эмоциональные категории
         self.emotion_words: Dict[str, List[str]] = {
             "love": ["люблю", "любовь", "нежность", "ласка", "страсть"],
