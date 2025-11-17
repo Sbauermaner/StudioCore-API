@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Codex helper CLI for StudioCore loader diagnostics."""
+# -*- coding: utf-8 -*-
+"""Codex helper CLI for StudioCore loader diagnostics and PR automation."""
 from __future__ import annotations
 
 import argparse
@@ -16,6 +17,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+# ============================
+# Default subsystem expectations
+# ============================
 DEFAULT_SUBSYSTEMS = [
     "emotion",
     "tlp",
@@ -30,6 +34,10 @@ DEFAULT_SUBSYSTEMS = [
 
 EXPECTED_LOADER_ORDER = ("v6", "monolith", "fallback")
 
+
+# ============================
+# Utility functions
+# ============================
 
 def _resolve_target(pattern: str) -> List[str]:
     matches = sorted(glob.glob(pattern, recursive=True))
@@ -47,19 +55,7 @@ def _instantiate_core(module: Any):
     return get_core()
 
 
-def _deep_merge_dict(first: Dict[str, Any], second: Dict[str, Any]) -> Dict[str, Any]:
-    merged = dict(first)
-    for key, value in second.items():
-        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-            merged[key] = _deep_merge_dict(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
-
-
 def _run_git(args: Sequence[str], check: bool = True) -> subprocess.CompletedProcess:
-    """Execute a git command and optionally raise on failure."""
-
     proc = subprocess.run(
         ["git", *args],
         capture_output=True,
@@ -80,6 +76,7 @@ def _git_has_remote() -> bool:
 
 
 def _ensure_branch(branch: str, *, create: bool = False, start_point: Optional[str] = None) -> bool:
+    """Ensure branch exists, or create it."""
     probe = _run_git(["rev-parse", "--verify", branch], check=False)
     if probe.returncode == 0:
         return False
@@ -99,13 +96,24 @@ def _ensure_clean_worktree() -> None:
 
 
 def _format_git_output(proc: subprocess.CompletedProcess) -> str:
-    message = proc.stdout.strip() or proc.stderr.strip()
-    return message or "Already up to date."
+    msg = proc.stdout.strip() or proc.stderr.strip()
+    return msg or "Already up to date."
 
 
+def _deep_merge_dict(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+    merged = dict(a)
+    for key, value in b.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = _deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+# ============================
+# Loader file helper
+# ============================
 class LoaderFile:
-    """Utility helpers for manipulating the StudioCore loader file."""
-
     ORDER_PATTERN = re.compile(r"DEFAULT_LOADER_ORDER\s*=\s*\((?P<body>.*?)\)", re.S)
 
     def __init__(self, path: str):
@@ -120,68 +128,57 @@ class LoaderFile:
         return re.findall(r"['\"]([^'\"]+)['\"]", body)
 
     def ensure_order(self, expected: Sequence[str]) -> bool:
-        block = "DEFAULT_LOADER_ORDER = (\n" + "\n".join(f'    "{item}",' for item in expected) + "\n)"
+        block = "DEFAULT_LOADER_ORDER = (\n" + "\n".join(f'    "{x}",' for x in expected) + "\n)"
         if self.ORDER_PATTERN.search(self.source):
             new_source = self.ORDER_PATTERN.sub(block, self.source, count=1)
         else:
             insert_at = self.source.find("STUDIOCORE_VERSION")
-            if insert_at == -1:
-                insert_at = 0
-            else:
-                insert_at = self.source.find("\n", insert_at)
-                insert_at = self.source.find("\n", insert_at + 1) if insert_at != -1 else len(self.source)
+            insert_at = self.source.find("\n", insert_at) if insert_at != -1 else 0
             new_source = self.source[:insert_at] + "\n" + block + "\n" + self.source[insert_at:]
-        if new_source != self.source:
+        changed = new_source != self.source
+        if changed:
             self.source = new_source
-            return True
-        return False
+        return changed
 
     def fix_duplicates(self, names: Sequence[str]) -> bool:
         seen = {name: 0 for name in names}
         changed = False
-        lines = self.source.splitlines()
-        new_lines: List[str] = []
-        for line in lines:
+        new_lines = []
+        for line in self.source.splitlines():
             stripped = line.strip()
-            drop_line = False
+            drop = False
             for name in names:
                 if stripped.startswith(f"{name} ="):
                     seen[name] += 1
                     if seen[name] > 1:
+                        drop = True
                         changed = True
-                        drop_line = True
                     break
-            if not drop_line:
+            if not drop:
                 new_lines.append(line)
         if changed:
-            trailing = "\n" if self.source.endswith("\n") else ""
-            self.source = "\n".join(new_lines) + trailing
+            self.source = "\n".join(new_lines) + ("\n" if self.source.endswith("\n") else "")
         return changed
 
-    def save(self) -> None:
+    def save(self):
         self.path.write_text(self.source, encoding="utf-8")
 
+
+# ============================
+# Diagnostics
+# ============================
 
 def diagnose(args: argparse.Namespace) -> int:
     if args.full:
         for flag in [
-            "runtime",
-            "check_init",
-            "check_subsystems",
-            "check_env",
-            "check_loader",
-            "check_monolith",
-            "check_v6",
-            "check_versions",
-            "verify_fallback_chain",
-            "fix_loader_order",
-            "fix_version_duplicates",
-            "ensure_v6_priority",
-            "deep_merge",
+            "runtime", "check_init", "check_subsystems", "check_env",
+            "check_loader", "check_monolith", "check_v6", "check_versions",
+            "verify_fallback_chain", "fix_loader_order",
+            "fix_version_duplicates", "ensure_v6_priority", "deep_merge",
         ]:
             setattr(args, flag, True)
 
-    report: Dict[str, Any] = {
+    report = {
         "command": "diagnose",
         "targets": _resolve_target(args.target),
         "commit": args.commit,
@@ -193,183 +190,126 @@ def diagnose(args: argparse.Namespace) -> int:
         "versions": {},
         "repairs": [],
     }
-    failures: List[str] = []
+    failures = []
 
     module = None
     core = None
 
-    if args.runtime or args.check_init or args.check_subsystems or args.check_versions or args.check_loader:
+    # Runtime import
+    if args.runtime or args.check_init or args.check_subsystems:
         try:
             module = _load_module("studiocore")
             report["runtime"] = {
-                "module": getattr(module, "__file__", "unknown"),
-                "STUDIOCORE_VERSION": getattr(module, "STUDIOCORE_VERSION", "unknown"),
-                "MONOLITH_VERSION": getattr(module, "MONOLITH_VERSION", "unknown"),
+                "module": getattr(module, "__file__", "?"),
+                "STUDIOCORE_VERSION": getattr(module, "STUDIOCORE_VERSION", "?"),
+                "MONOLITH_VERSION": getattr(module, "MONOLITH_VERSION", "?"),
             }
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except Exception as exc:
             failures.append(f"Runtime import failed: {exc}")
             report["runtime"] = {"error": str(exc)}
 
     if module and args.check_versions:
         versions = {
-            "STUDIOCORE_VERSION": getattr(module, "STUDIOCORE_VERSION", "unknown"),
-            "MONOLITH_VERSION": getattr(module, "MONOLITH_VERSION", "unknown"),
+            "STUDIOCORE_VERSION": getattr(module, "STUDIOCORE_VERSION", "?"),
+            "MONOLITH_VERSION": getattr(module, "MONOLITH_VERSION", "?"),
         }
         report["versions"] = versions
-        for key, value in versions.items():
-            if value in {None, "unknown"}:
-                failures.append(f"{key} is not set")
+        for k, v in versions.items():
+            if v in {None, "?", "unknown"}:
+                failures.append(f"{k} is not set")
 
-    if module and (
-        args.check_init
-        or args.check_subsystems
-        or args.check_loader
-        or args.verify_fallback_chain
-        or args.check_v6
-        or args.check_monolith
-    ):
+    # Initialize core
+    if module and args.check_init:
         try:
             core = _instantiate_core(module)
             report["init"] = {
                 "core_type": type(core).__name__,
-                "is_fallback": bool(getattr(core, "is_fallback", False)),
+                "is_fallback": getattr(core, "is_fallback", False),
             }
         except Exception as exc:
             failures.append(f"Core initialization failed: {exc}")
             report["init"] = {"error": str(exc)}
 
+    # Check subsystems
     if core and args.check_subsystems:
         active = [name for name in DEFAULT_SUBSYSTEMS if hasattr(core, name)]
         missing = sorted(set(DEFAULT_SUBSYSTEMS) - set(active))
-        report["subsystems"] = {
-            "expected": DEFAULT_SUBSYSTEMS,
-            "active": active,
-            "missing": missing,
-        }
+        report["subsystems"] = {"expected": DEFAULT_SUBSYSTEMS, "active": active, "missing": missing}
         if missing:
-            failures.append(f"Missing subsystems: {', '.join(missing)}")
+            failures.append("Missing subsystems: " + ", ".join(missing))
 
-    loader_file_reports: List[Dict[str, Any]] = []
+    # Loader file repair
+    loader_file_reports = []
     for path in report["targets"]:
-        if not path.endswith(".py") or not os.path.exists(path):
-            continue
-        loader_file = LoaderFile(path)
-        file_report = {
-            "path": path,
-            "order": loader_file.detect_order(),
-        }
-        loader_file_reports.append(file_report)
-        changed = False
-        actions: List[str] = []
-        if args.fix_loader_order:
-            if loader_file.ensure_order(EXPECTED_LOADER_ORDER):
+        if path.endswith(".py") and os.path.exists(path):
+            lf = LoaderFile(path)
+            f_report = {"path": path, "order": lf.detect_order()}
+            loader_file_reports.append(f_report)
+
+            changed = False
+            actions = []
+
+            if args.fix_loader_order and lf.ensure_order(EXPECTED_LOADER_ORDER):
                 changed = True
                 actions.append("fix_loader_order")
-        if args.ensure_v6_priority:
-            if loader_file.ensure_order(EXPECTED_LOADER_ORDER):
+
+            if args.ensure_v6_priority and lf.ensure_order(EXPECTED_LOADER_ORDER):
                 changed = True
                 actions.append("ensure_v6_priority")
-        if args.fix_version_duplicates:
-            if loader_file.fix_duplicates(["STUDIOCORE_VERSION", "MONOLITH_VERSION"]):
+
+            if args.fix_version_duplicates and lf.fix_duplicates(["STUDIOCORE_VERSION", "MONOLITH_VERSION"]):
                 changed = True
                 actions.append("fix_version_duplicates")
-        if changed:
-            loader_file.save()
-        if actions:
-            report.setdefault("repairs", []).append({"path": path, "actions": actions})
+
+            if changed:
+                lf.save()
+
+            if actions:
+                report["repairs"].append({"path": path, "actions": actions})
 
     if loader_file_reports:
         report["loader"]["files"] = loader_file_reports
 
+    # Env
     if args.check_env:
         report["env"] = {
             "STUDIOCORE_MONOLITH": os.getenv("STUDIOCORE_MONOLITH"),
             "STUDIOCORE_LOADER_ORDER": os.getenv("STUDIOCORE_LOADER_ORDER"),
         }
 
-    runtime_loader_report: Dict[str, Any] = {}
-    if module and (args.check_loader or args.verify_fallback_chain or args.check_v6 or args.check_monolith):
+    # Runtime loader metadata
+    if module and (args.check_loader or args.verify_fallback_chain):
         loader_graph = getattr(module, "LOADER_GRAPH", {})
         default_order = list(getattr(module, "DEFAULT_LOADER_ORDER", []))
         loader_status = getattr(module, "LOADER_STATUS", {})
-        runtime_loader_report = {
+
+        report["loader"]["runtime"] = {
             "default_order": default_order,
-            "graph": {},
+            "graph": {
+                k: {
+                    "available": bool(v.get("loader")),
+                    "name": v.get("name"),
+                    "version": v.get("version"),
+                }
+                for k, v in loader_graph.items()
+            },
             "status": loader_status,
         }
-        for key, meta in loader_graph.items():
-            runtime_loader_report["graph"][key] = {
-                "available": bool(meta.get("loader")),
-                "name": meta.get("name"),
-                "version": meta.get("version"),
-            }
-        report["loader"]["runtime"] = runtime_loader_report
 
-        if args.check_loader and default_order:
-            normalized = [key.lower() for key in default_order]
-            if normalized[: len(EXPECTED_LOADER_ORDER)] != list(EXPECTED_LOADER_ORDER):
-                failures.append("Loader order does not prioritize v6 -> monolith -> fallback")
+        normalized = [x.lower() for x in default_order]
+        if normalized[:3] != list(EXPECTED_LOADER_ORDER):
+            failures.append("Loader order does not prioritize v6 → monolith → fallback")
 
-        if args.check_v6:
-            v6_meta = loader_graph.get("v6")
-            if not (v6_meta and v6_meta.get("loader")):
-                failures.append("StudioCoreV6 loader unavailable")
-
-        if args.check_monolith:
-            mono_meta = loader_graph.get("monolith")
-            if not (mono_meta and mono_meta.get("loader")):
-                failures.append("Monolith loader unavailable")
-
-        if args.verify_fallback_chain:
-            fallback_meta = loader_graph.get("fallback")
-            if not (fallback_meta and fallback_meta.get("loader")):
-                failures.append("Fallback loader missing")
-            else:
-                try:
-                    fallback_meta["loader"]()
-                except Exception as exc:  # pragma: no cover - defensive
-                    failures.append(f"Fallback loader failed to instantiate: {exc}")
-
-    if args.deep_merge and runtime_loader_report:
-        file_summary = loader_file_reports[0] if loader_file_reports else {}
-        report["loader"]["summary"] = _deep_merge_dict(file_summary, runtime_loader_report)
-
-    success = not failures
-
-    print("=== Codex Diagnostics ===")
-    print("Command: diagnose")
-    print(f"Targets resolved: {len(report['targets'])}")
-    if args.commit:
-        print(f"Requested commit tag: {args.commit}")
-    if report["runtime"]:
-        print("Runtime:", json.dumps(report["runtime"], ensure_ascii=False))
-    if report["versions"]:
-        print("Versions:", json.dumps(report["versions"], ensure_ascii=False))
-    if report["env"]:
-        print("Env:", json.dumps(report["env"], ensure_ascii=False))
-    if report["init"]:
-        print("Init:", json.dumps(report["init"], ensure_ascii=False))
-    if report["subsystems"]:
-        print("Subsystems:", json.dumps(report["subsystems"], ensure_ascii=False))
-    if report["loader"]:
-        print("Loader:", json.dumps(report["loader"], ensure_ascii=False))
-    if report["repairs"]:
-        print("Repairs:", json.dumps(report["repairs"], ensure_ascii=False))
-    if failures:
-        print("Status: FAIL")
-        for item in failures:
-            print(" -", item)
-    else:
-        print("Status: OK")
-    print("==========================")
+    # Final
     print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 0 if not failures else 1
 
-    return 0 if success else 1
 
+# ============================
+# Full runtime-checks
+# ============================
 
 def runtime_checks(args: argparse.Namespace) -> int:
-    """Run the full diagnostic suite and optionally store the output."""
-
     diag_args = argparse.Namespace(
         full=True,
         runtime=True,
@@ -390,191 +330,145 @@ def runtime_checks(args: argparse.Namespace) -> int:
         func=diagnose,
     )
 
-    buffer = io.StringIO()
-    with contextlib.redirect_stdout(buffer):
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
         exit_code = diagnose(diag_args)
 
-    output = buffer.getvalue()
+    output = buf.getvalue()
     print(output, end="")
 
     if args.output and args.output != "-":
-        log_path = Path(args.output)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now(timezone.utc).isoformat()
-        header = f"=== Runtime Check @ {timestamp} ===\n"
-        with log_path.open("a", encoding="utf-8") as handle:
-            handle.write(header)
-            handle.write(output)
+        path = Path(args.output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now(timezone.utc).isoformat()
+        header = f"=== Runtime Check @ {ts} ===\n"
+        with path.open("a", encoding="utf-8") as f:
+            f.write(header + output)
             if not output.endswith("\n"):
-                handle.write("\n")
+                f.write("\n")
 
     return exit_code
 
 
-def merge_pull_request(args: argparse.Namespace) -> int:
-    """Synchronize a feature branch with the target branch and merge it."""
+# ============================
+# Pull-request automation
+# ============================
 
+def merge_pr(args: argparse.Namespace) -> int:
     source = args.source
     target = args.target
-    summary: List[str] = []
+    summary = []
 
     try:
         if not args.allow_dirty:
             _ensure_clean_worktree()
 
-        previous_branch = (
+        # Create branches if missing
+        if _ensure_branch(
+            source,
+            create=args.create_missing,
+            start_point=args.create_source_from or "HEAD",
+        ):
+            summary.append(f"Created missing branch '{source}'")
+
+        if _ensure_branch(
+            target,
+            create=args.create_missing,
+            start_point=args.create_target_from or "HEAD",
+        ):
+            summary.append(f"Created missing branch '{target}'")
+
+        previous = (
             _run_git(["rev-parse", "--abbrev-ref", "HEAD"], check=True).stdout.strip()
         )
 
-        source_ref = args.create_source_from or "HEAD"
-        target_ref = args.create_target_from or "HEAD"
-
-        if _ensure_branch(source, create=args.create_missing, start_point=source_ref):
-            summary.append(
-                f"Created missing source branch '{source}' from {source_ref}"
-            )
-        if _ensure_branch(target, create=args.create_missing, start_point=target_ref):
-            summary.append(
-                f"Created missing target branch '{target}' from {target_ref}"
-            )
-
+        # Fetch updates
         if not args.skip_fetch:
             if _git_has_remote():
-                fetch_proc = _run_git(["fetch", "--all"], check=True)
-                summary.append(
-                    f"Fetched remote refs: {_format_git_output(fetch_proc)}"
-                )
+                fetch = _run_git(["fetch", "--all"], check=True)
+                summary.append(f"Fetched: {_format_git_output(fetch)}")
             else:
-                summary.append("Skipped fetch — no git remotes are configured.")
+                summary.append("No remote — fetch skipped.")
 
+        # Sync source with target
         _run_git(["checkout", source], check=True)
-        sync_proc = _run_git(["merge", target], check=True)
-        summary.append(
-            f"Synced {source} with {target}: {_format_git_output(sync_proc)}"
-        )
+        sync = _run_git(["merge", target], check=True)
+        summary.append(f"Synced {source} with {target}: {_format_git_output(sync)}")
 
+        # Merge source → target
         _run_git(["checkout", target], check=True)
-        merge_cmd = ["merge"]
+        cmd = ["merge"]
         if args.strategy == "ff-only":
-            merge_cmd.append("--ff-only")
+            cmd.append("--ff-only")
         elif args.strategy == "no-ff":
-            merge_cmd.append("--no-ff")
-        merge_cmd.append(source)
+            cmd.append("--no-ff")
+        cmd.append(source)
+        merge_exec = _run_git(cmd, check=True)
+        summary.append(f"Merged {source} → {target}: {_format_git_output(merge_exec)}")
 
-        merge_proc = _run_git(merge_cmd, check=True)
-        summary.append(
-            f"Merged {source} into {target}: {_format_git_output(merge_proc)}"
-        )
-
-        if args.restore_branch and previous_branch not in {source, target}:
-            _run_git(["checkout", previous_branch], check=True)
-            summary.append(f"Restored working branch: {previous_branch}")
+        # Restore previous branch
+        if args.restore_branch and previous not in {source, target}:
+            _run_git(["checkout", previous], check=True)
+            summary.append(f"Restored branch: {previous}")
 
     except RuntimeError as exc:
         print(f"❌ {exc}")
         return 1
 
-    print("Codex PR automation summary:")
+    print("Codex PR Summary:")
     for line in summary:
-        print(f" - {line}")
-    print(f"✅ Pull request workflow complete: {source} merged into {target}.")
+        print(" -", line)
+    print(f"✅ Completed: {source} → {target}")
     return 0
 
 
+# ============================
+# CLI parser
+# ============================
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codex", description="StudioCore Codex utility")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command", required=True)
 
-    diagnose_parser = subparsers.add_parser("diagnose", help="Run StudioCore diagnostics")
-    diagnose_parser.add_argument("--full", action="store_true", help="Enable every diagnostic and repair routine")
-    diagnose_parser.add_argument("--runtime", action="store_true", help="Check runtime availability")
-    diagnose_parser.add_argument("--check-init", action="store_true", help="Instantiate StudioCore")
-    diagnose_parser.add_argument("--check-subsystems", action="store_true", help="Validate core subsystems")
-    diagnose_parser.add_argument("--check-env", action="store_true", help="Capture relevant environment variables")
-    diagnose_parser.add_argument("--check-loader", action="store_true", help="Validate loader metadata")
-    diagnose_parser.add_argument("--check-monolith", action="store_true", help="Validate monolith availability")
-    diagnose_parser.add_argument("--check-v6", action="store_true", help="Ensure v6 loader is available")
-    diagnose_parser.add_argument("--check-versions", action="store_true", help="Ensure version constants are present")
-    diagnose_parser.add_argument("--verify-fallback-chain", action="store_true", help="Verify fallback chain is usable")
-    diagnose_parser.add_argument("--fix-loader-order", action="store_true", help="Rewrite loader order to the canonical sequence")
-    diagnose_parser.add_argument("--fix-version-duplicates", action="store_true", help="Remove duplicate version assignments")
-    diagnose_parser.add_argument("--ensure-v6-priority", action="store_true", help="Guarantee that v6 stays the primary loader")
-    diagnose_parser.add_argument("--deep-merge", action="store_true", help="Deep merge file + runtime loader data")
-    diagnose_parser.add_argument("--target", default="studiocore/*", help="Glob pattern for modules to scan")
-    diagnose_parser.add_argument("--commit", default=None, help="Optional commit tag for reporting")
-    diagnose_parser.set_defaults(func=diagnose)
+    # ---- diagnose
+    p = sub.add_parser("diagnose", help="Run diagnostics")
+    p.add_argument("--full", action="store_true")
+    p.add_argument("--runtime", action="store_true")
+    p.add_argument("--check-init", action="store_true")
+    p.add_argument("--check-subsystems", action="store_true")
+    p.add_argument("--check-env", action="store_true")
+    p.add_argument("--check-loader", action="store_true")
+    p.add_argument("--check-monolith", action="store_true")
+    p.add_argument("--check-v6", action="store_true")
+    p.add_argument("--check-versions", action="store_true")
+    p.add_argument("--verify-fallback-chain", action="store_true")
+    p.add_argument("--fix-loader-order", action="store_true")
+    p.add_argument("--fix-version-duplicates", action="store_true")
+    p.add_argument("--ensure-v6-priority", action="store_true")
+    p.add_argument("--deep-merge", action="store_true")
+    p.add_argument("--target", default="studiocore/*")
+    p.add_argument("--commit", default=None)
+    p.set_defaults(func=diagnose)
 
-    runtime_parser = subparsers.add_parser(
-        "runtime-checks",
-        help="Execute the full diagnostic stack and persist a log",
-    )
-    runtime_parser.add_argument(
-        "--target",
-        default="studiocore/*",
-        help="Glob pattern passed to the diagnose command",
-    )
-    runtime_parser.add_argument(
-        "--commit",
-        default=None,
-        help="Optional commit tag recorded inside the log header",
-    )
-    runtime_parser.add_argument(
-        "--output",
-        default="test_log.txt",
-        help="Destination file for the captured diagnostic output (use '-' to skip writing)",
-    )
-    runtime_parser.set_defaults(func=runtime_checks)
+    # ---- runtime-checks
+    p2 = sub.add_parser("runtime-checks", help="Full diagnostic suite")
+    p2.add_argument("--target", default="studiocore/*")
+    p2.add_argument("--commit", default=None)
+    p2.add_argument("--output", default="test_log.txt")
+    p2.set_defaults(func=runtime_checks)
 
-    pr_parser = subparsers.add_parser(
-        "merge-pr",
-        help="Sync a feature branch with the latest target branch commits and merge it",
-    )
-    pr_parser.add_argument(
-        "source",
-        help="Branch to merge into the target (e.g., codex/check-studiocore-runtime)",
-    )
-    pr_parser.add_argument(
-        "--target",
-        default="main",
-        help="Target branch to receive the changes (default: main)",
-    )
-    pr_parser.add_argument(
-        "--skip-fetch",
-        action="store_true",
-        help="Skip fetching remotes before syncing",
-    )
-    pr_parser.add_argument(
-        "--allow-dirty",
-        action="store_true",
-        help="Allow running even if the working tree has uncommitted changes",
-    )
-    pr_parser.add_argument(
-        "--strategy",
-        choices=["merge", "ff-only", "no-ff"],
-        default="merge",
-        help="Merge strategy used when integrating the source into the target",
-    )
-    pr_parser.add_argument(
-        "--restore-branch",
-        action="store_true",
-        help="Checkout the original working branch after the automation completes",
-    )
-    pr_parser.add_argument(
-        "--create-missing",
-        action="store_true",
-        help="Create the source/target branches from HEAD if they do not exist",
-    )
-    pr_parser.add_argument(
-        "--create-source-from",
-        default=None,
-        help="Optional ref used when creating the source branch (default: HEAD)",
-    )
-    pr_parser.add_argument(
-        "--create-target-from",
-        default=None,
-        help="Optional ref used when creating the target branch (default: HEAD)",
-    )
-    pr_parser.set_defaults(func=merge_pull_request)
+    # ---- merge-pr
+    p3 = sub.add_parser("merge-pr", help="Sync + merge branches")
+    p3.add_argument("source", help="Source branch")
+    p3.add_argument("--target", default="main")
+    p3.add_argument("--skip-fetch", action="store_true")
+    p3.add_argument("--allow-dirty", action="store_true")
+    p3.add_argument("--strategy", choices=["merge", "ff-only", "no-ff"], default="merge")
+    p3.add_argument("--restore-branch", action="store_true")
+    p3.add_argument("--create-missing", action="store_true")
+    p3.add_argument("--create-source-from", default=None)
+    p3.add_argument("--create-target-from", default=None)
+    p3.set_defaults(func=merge_pr)
 
     return parser
 
@@ -585,5 +479,5 @@ def main(argv: List[str] | None = None) -> int:
     return args.func(args)
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     sys.exit(main())
