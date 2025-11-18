@@ -7,6 +7,7 @@ structured data so downstream tooling can evolve without breaking imports.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Iterable, Sequence
 
 from .bpm_engine import BPMEngine
@@ -494,6 +495,160 @@ class StudioCoreV6:
         cinematic_spread = _clamp(0.2 + transition_delta * 0.3 + chorus_intensity * 0.2 + motif_count * 0.05)
         vocal_intention = _clamp(avg_intensity)
         structure_tension = _clamp(section_intel_payload.get("structure_tension", 0.0))
+        text_lower = text.lower()
+        tokens = [token for token in re.split(r"[^a-z0-9а-яё]+", text_lower) if token]
+        token_count = max(len(tokens), 1)
+        lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+        line_count = max(len(lines), 1)
+        palette_items = [
+            str(item).lower()
+            for item in (instrumentation_payload.get("palette") or [])
+            if isinstance(item, str)
+        ]
+        command_blob = " ".join(
+            str(command.get("raw") or command.get("value") or "").lower()
+            for command in commands
+            if isinstance(command, dict)
+        )
+        hint_blob = str(semantic_hints).lower() if semantic_hints else ""
+
+        def _token_hits(keywords: Sequence[str]) -> int:
+            hits = 0
+            for token in tokens:
+                for keyword in keywords:
+                    if keyword and keyword in token:
+                        hits += 1
+                        break
+            return hits
+
+        poetic_keywords = (
+            "lyric",
+            "poem",
+            "ode",
+            "sonnet",
+            "haiku",
+            "ballad",
+            "serenade",
+            "lullaby",
+            "lyrical",
+            "серд",
+            "люб",
+            "луна",
+            "звезд",
+            "тиши",
+            "ветер",
+            "лепест",
+            "шеп",
+            "сон",
+            "dream",
+            "soul",
+            "moon",
+            "star",
+            "ocean",
+            "tear",
+            "rose",
+        )
+        imagery_hits = _token_hits(poetic_keywords)
+        imagery_score = imagery_hits / token_count
+        punctuation_score = sum(line.count(",") + line.count(";") + line.count(":") for line in lines)
+        punctuation_score = punctuation_score / max(line_count * 4, 1)
+        long_lines = sum(1 for line in lines if len(line) > 70)
+        long_line_score = long_lines / line_count
+        motif_score = (section_intel_payload.get("motifs", {}).get("count", 0) or 0) / max(len(sections) or 1, 1)
+        poetic_density = _clamp(imagery_score * 2.2 + punctuation_score * 0.4 + long_line_score * 0.3 + motif_score * 0.1)
+
+        swing_keywords = ("swing", "shuffle", "bebop", "boogie", "ragtime", "stride", "jive")
+        swing_keyword_hits = _token_hits(swing_keywords)
+        swing_keyword_score = swing_keyword_hits / line_count
+        if any(keyword in command_blob for keyword in swing_keywords):
+            swing_keyword_score += 0.25
+        if any(keyword in hint_blob for keyword in swing_keywords):
+            swing_keyword_score += 0.25
+        swing_keyword_score = _clamp(swing_keyword_score)
+        poly_variance = float((bpm_payload.get("poly_rhythm") or {}).get("variance", 0.0) or 0.0)
+        swing_ratio = _clamp(0.6 * swing_keyword_score + 0.4 * _clamp(poly_variance / 40.0))
+
+        jazz_keywords = swing_keywords + ("jazz", "bossa", "samba", "fusion", "manouche", "bebop")
+        jazz_text_score = _clamp(_token_hits(jazz_keywords) / line_count)
+        jazz_palette_keywords = ("sax", "trumpet", "trombone", "clarinet", "upright", "brush", "double bass", "rhodes", "jazz")
+        palette_jazz_hits = 0
+        for name in palette_items:
+            if any(keyword in name for keyword in jazz_palette_keywords):
+                palette_jazz_hits += 1
+        palette_jazz_score = _clamp(palette_jazz_hits / max(len(palette_items), 1))
+        modal_shift_score = _clamp(len(tonality_payload.get("modal_shifts", [])) / max(len(sections) or 1, 4))
+        jazz_complexity = _clamp(0.35 * palette_jazz_score + 0.35 * modal_shift_score + 0.3 * max(jazz_text_score, swing_ratio))
+
+        electronic_keywords = (
+            "synth",
+            "pad",
+            "edm",
+            "electro",
+            "techno",
+            "trance",
+            "house",
+            "club",
+            "808",
+            "fm",
+            "digital",
+            "chip",
+            "glitch",
+            "modular",
+            "drum machine",
+        )
+        palette_electronic_hits = 0
+        for name in palette_items:
+            if any(keyword in name for keyword in electronic_keywords):
+                palette_electronic_hits += 1
+        palette_electronic_score = _clamp(palette_electronic_hits / max(len(palette_items), 1))
+        text_electronic_hits = sum(1 for keyword in electronic_keywords if keyword in text_lower or keyword in command_blob or keyword in hint_blob)
+        text_electronic_score = _clamp(text_electronic_hits / 5.0)
+        bpm_pressure = _clamp((bpm_value - 100.0) / 120.0)
+        electronic_pressure = _clamp(0.5 * palette_electronic_score + 0.3 * text_electronic_score + 0.2 * bpm_pressure)
+
+        comedy_keywords = (
+            "comedy",
+            "comic",
+            "funny",
+            "humor",
+            "humour",
+            "parody",
+            "satire",
+            "joke",
+            "lol",
+            "lmao",
+            "haha",
+            "rofl",
+            "юмор",
+            "юморист",
+            "шутк",
+            "смешн",
+            "ирони",
+            "сарказ",
+            "парод",
+            "анекдот",
+            "комед",
+            "угар",
+        )
+        comedy_hits = _token_hits(comedy_keywords)
+        comedy_blob_hits = sum(1 for keyword in comedy_keywords if keyword in command_blob or keyword in hint_blob)
+        laughter_keywords = ("haha", "ahah", "ahaha", "хаха", "ахаха")
+        laughter_hits = sum(1 for keyword in laughter_keywords if keyword in text_lower)
+        comedy_factor = _clamp((comedy_hits / line_count) * 0.6 + comedy_blob_hits * 0.15 + laughter_hits * 0.1)
+
+        rde_axes = {
+            "epic": float(emotion_profile.get("epic", 0.0)),
+            "hope": float(max(emotion_profile.get("joy", 0.0), tlp_profile.get("love", 0.0))),
+            "pain": float(
+                max(
+                    emotion_profile.get("anger", 0.0),
+                    emotion_profile.get("fear", 0.0),
+                    tlp_profile.get("pain", 0.0),
+                )
+            ),
+            "sadness": float(emotion_profile.get("sadness", 0.0)),
+        }
+
         genre_feature_inputs = {
             "semantic_aggression": semantic_aggression,
             "power_vector": power_vector,
@@ -506,6 +661,13 @@ class StudioCoreV6:
             "cinematic_spread": cinematic_spread,
             "vocal_intention": vocal_intention,
             "structure_tension": structure_tension,
+            "swing_ratio": swing_ratio,
+            "jazz_complexity": jazz_complexity,
+            "electronic_pressure": electronic_pressure,
+            "comedy_factor": comedy_factor,
+            "poetic_density": poetic_density,
+            "rde": rde_axes,
+            "tlp": dict(tlp_profile),
         }
         feature_map = self.build_feature_map(genre_feature_inputs)
         domain_genre = self.genre_matrix.evaluate(feature_map)
@@ -728,31 +890,58 @@ class StudioCoreV6:
         return normalized, mode, base_key
 
     def build_feature_map(self, analysis: Dict[str, Any]) -> Dict[str, float]:
-        source: Dict[str, Any] = {}
-        if isinstance(analysis, dict):
-            if isinstance(analysis.get("features"), dict):
-                source = dict(analysis["features"])
-            else:
-                source = dict(analysis)
+        """
+        Унифицированная карта признаков для жанрового движка.
+        analysis — сводный словарь, который собирают RDE/TLP/Rhythm/Tone/Section.
+        """
+        from .lyrical_emotion import LyricalEmotionEngine
+
+        if not isinstance(analysis, dict):
+            analysis = {}
+
+        source: Dict[str, Any] = dict(analysis.get("features") or analysis)
+
+        # вычисляем лирическую эмоцию (даже если это не лирика — будет ~0)
+        lee = LyricalEmotionEngine().from_analysis(source)
 
         def _value(key: str) -> float:
             try:
-                return round(float(source.get(key, 0.0)), 3)
+                return float(source.get(key, 0.0))
             except (TypeError, ValueError):
                 return 0.0
 
         return {
+            # жёсткие признаки
             "sai": _value("semantic_aggression"),
             "power": _value("power_vector"),
             "rhythm_density": _value("rhythm_density"),
             "edge": _value("edge_factor"),
+
+            # нарратив/эмоция
             "narrative_pressure": _value("narrative_pressure"),
             "emotional_gradient": _value("emotional_gradient"),
-            "harmonic_lumen_minor": _value("hl_minor"),
-            "harmonic_lumen_major": _value("hl_major"),
+
+            # тональность
+            "hl_minor": _value("hl_minor"),
+            "hl_major": _value("hl_major"),
+
+            # кино/масштаб
             "cinematic_spread": _value("cinematic_spread"),
+
+            # вокал
             "vocal_intention": _value("vocal_intention"),
+
+            # структура
             "structure_tension": _value("structure_tension"),
+
+            # джаз/свинг/электронная плотность
+            "swing_ratio": _value("swing_ratio"),
+            "jazz_complexity": _value("jazz_complexity"),
+            "electronic_pressure": _value("electronic_pressure"),
+
+            # Лирика/комедия
+            "lyrical_emotion_score": float(lee.get("lyrical_emotion_score", 0.0)),
+            "comedy_factor": _value("comedy_factor"),
         }
 
     @staticmethod
