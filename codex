@@ -70,9 +70,23 @@ def _run_git(args: Sequence[str], check: bool = True) -> subprocess.CompletedPro
     return proc
 
 
-def _git_has_remote() -> bool:
+def _get_default_remote() -> Optional[str]:
     remotes = _run_git(["remote"], check=False)
-    return bool(remotes.stdout.strip())
+    for line in remotes.stdout.splitlines():
+        name = line.strip()
+        if name:
+            return name
+    return None
+
+
+def _fast_forward_branch(branch: str, *, remote: str) -> Optional[str]:
+    remote_ref = f"{remote}/{branch}"
+    probe = _run_git(["rev-parse", "--verify", remote_ref], check=False)
+    if probe.returncode != 0:
+        return f"Remote ref '{remote_ref}' not found — fast-forward skipped."
+    _run_git(["checkout", branch], check=True)
+    ff_merge = _run_git(["merge", "--ff-only", remote_ref], check=True)
+    return f"Fast-forwarded {branch} to {remote_ref}: {_format_git_output(ff_merge)}"
 
 
 def _ensure_branch(branch: str, *, create: bool = False, start_point: Optional[str] = None) -> bool:
@@ -382,13 +396,22 @@ def merge_pr(args: argparse.Namespace) -> int:
             _run_git(["rev-parse", "--abbrev-ref", "HEAD"], check=True).stdout.strip()
         )
 
+        remote_name = _get_default_remote()
+
         # Fetch updates
         if not args.skip_fetch:
-            if _git_has_remote():
+            if remote_name:
                 fetch = _run_git(["fetch", "--all"], check=True)
                 summary.append(f"Fetched: {_format_git_output(fetch)}")
             else:
                 summary.append("No remote — fetch skipped.")
+
+        # Fast-forward local branches to their remotes so we merge the freshest refs
+        if remote_name and not args.skip_fetch:
+            for branch in (source, target):
+                message = _fast_forward_branch(branch, remote=remote_name)
+                if message:
+                    summary.append(message)
 
         # Sync source with target
         _run_git(["checkout", source], check=True)
