@@ -663,20 +663,60 @@ class CommandInterpreter:
 class StyleEngine:
     """Assemble stylistic guidance for the arrangement and prompts."""
 
-    GENRE_MAP = {
-        "joy": "indie pop",
-        "sadness": "ambient ballad",
-        "anger": "industrial rock",
-        "fear": "cinematic darkwave",
-        "peace": "neo-classical",
-        "epic": "epic orchestral",
-    }
+    def style_signature(self, emotions: Dict[str, float], tlp: Dict[str, float]) -> str:
+        """Return the high-level style label used by PatchedStyleMatrix."""
+
+        if not emotions:
+            return "neutral modal"
+
+        love = tlp.get("love", 0.0)
+        pain = tlp.get("pain", 0.0)
+        truth = tlp.get("truth", 0.0)
+        conscious_frequency = tlp.get("conscious_frequency", 0.0)
+
+        dominant_value = max(emotions.values())
+        dominant_candidates = [name for name, value in emotions.items() if value == dominant_value]
+        if len(dominant_candidates) == 1:
+            dominant = dominant_candidates[0]
+        else:
+            if "sadness" in dominant_candidates and pain > love:
+                dominant = "sadness"
+            elif "joy" in dominant_candidates and love >= pain:
+                dominant = "joy"
+            else:
+                dominant = dominant_candidates[0]
+
+        fear_bias = emotions.get("fear", 0.0) >= 0.09 and emotions.get("joy", 0.0) <= 0.15
+
+        if fear_bias or (conscious_frequency > 0.6 and truth > 0.1) or dominant in {"anger", "fear", "epic"}:
+            return "dramatic harmonic minor"
+
+        if dominant in {"sadness", "melancholy"}:
+            return "melancholic minor"
+
+        if dominant in {"joy", "peace", "awe"}:
+            return "majestic major"
+
+        if pain >= 0.01 and pain > love:
+            return "melancholic minor"
+
+        if love >= 0.01 and love >= pain:
+            return "majestic major"
+
+        return "neutral modal"
 
     def genre_selection(self, emotions: Dict[str, float], tlp: Dict[str, float]) -> str:
-        if not emotions:
-            return "ambient"
-        dominant = max(emotions, key=emotions.get)
-        return self.GENRE_MAP.get(dominant, "experimental")
+        """Mimic the v5 PatchedStyleMatrix genre rules."""
+
+        style = self.style_signature(emotions, tlp)
+
+        if style == "melancholic minor":
+            return "lyrical adaptive"
+        if style == "majestic major":
+            return "lyrical adaptive"
+        if style == "dramatic harmonic minor":
+            return "cinematic adaptive"
+        return "cinematic narrative"
 
     def mood_selection(self, emotions: Dict[str, float], tlp: Dict[str, float]) -> str:
         cf = tlp.get("conscious_frequency", 0.5)
@@ -701,9 +741,20 @@ class StyleEngine:
     def tone_style(self, tonality: Dict[str, Any]) -> str:
         return f"{tonality.get('mode', 'major')} mood, keys {', '.join(tonality.get('section_keys', []))}"
 
-    def final_style_prompt_build(self, *, genre: str, mood: str, instrumentation: str, vocal: str, visual: str, tone: str) -> str:
+    def final_style_prompt_build(
+        self,
+        *,
+        genre: str,
+        style: str | None,
+        mood: str,
+        instrumentation: str,
+        vocal: str,
+        visual: str,
+        tone: str,
+    ) -> str:
+        style_segment = f"Style: {style}; " if style else ""
         return (
-            f"Genre: {genre}; Mood: {mood}; Vocals: {vocal}; Instruments: {instrumentation}; "
+            f"Genre: {genre}; {style_segment}Mood: {mood}; Vocals: {vocal}; Instruments: {instrumentation}; "
             f"Visuals: {visual}; Tonality: {tone}."
         )
 

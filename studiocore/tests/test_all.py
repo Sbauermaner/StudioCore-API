@@ -22,6 +22,7 @@ import traceback
 import unittest
 import time
 import logging # v8: Добавлен импорт
+import pytest
 
 # === 1. АКТИВАЦИЯ ЛОГГЕРА ===
 try:
@@ -182,18 +183,24 @@ def check_json_yaml():
 # ==========================================================
 # 🧠 2. Проверка импорта
 # ==========================================================
-def test_imports():
+def run_import_checks() -> bool:
+    """Проверяет, что все модули импортируются без ошибок."""
+
     log.info("🧠 Проверка модулей StudioCore...")
     all_ok = True
     for m in MODULES:
         try:
             importlib.import_module(m)
             log.info(f"✅ Импортирован: {m}")
-        except Exception as e:
+        except Exception:
             # v7: Используем полный traceback для ошибок импорта
             log.error(f"❌ Ошибка импорта: {m} — {traceback.format_exc()}")
             all_ok = False
     return all_ok
+
+
+def test_imports():
+    assert run_import_checks(), "Некоторые модули StudioCore не импортируются"
 
 # ==========================================================
 # 🕸️ 3. Проверка внутренних связей (AST)
@@ -312,13 +319,12 @@ def run_all_unit_tests():
 # ==========================================================
 # 🎧 5. Проверка (интеграционная) ядра
 # ==========================================================
-def test_prediction_pipeline():
-    """
-    (v7) Интеграционный тест ядра (без API).
-    """
+def run_prediction_pipeline_check() -> bool:
+    """Интеграционный тест ядра (без API)."""
+
     log.info("\n🎧 Проверка (интеграционная) ядра StudioCore...")
     try:
-        # v16: Исправлен ImportError. 
+        # v16: Исправлен ImportError.
         from studiocore.monolith_v4_3_1 import PatchedLyricMeter
         from studiocore.style import PatchedStyleMatrix
         # v15: Исправлен ImportError
@@ -333,13 +339,13 @@ def test_prediction_pipeline():
         log.debug("Движки успешно инициализированы.")
 
         text = "This is an integration test"
-        log.debug(f"Вызов: emo_engine.analyze (integration test)")
+        log.debug("Вызов: emo_engine.analyze (integration test)")
         emo = emo_engine.analyze(text)
-        log.debug(f"Вызов: tlp_engine.analyze (integration test)")
+        log.debug("Вызов: tlp_engine.analyze (integration test)")
         tlp = tlp_engine.analyze(text)
-        log.debug(f"Вызов: PatchedLyricMeter.bpm_from_density (integration test)")
+        log.debug("Вызов: PatchedLyricMeter.bpm_from_density (integration test)")
         bpm = lyric_meter.bpm_from_density(text, emo)
-        log.debug(f"Вызов: StyleMatrix.build (integration test)")
+        log.debug("Вызов: StyleMatrix.build (integration test)")
         # v6: Добавлен voice_hint=None
         style = style_matrix.build(emo, tlp, text, bpm, {}, None)
 
@@ -352,40 +358,64 @@ def test_prediction_pipeline():
         return False
 
 
+def test_prediction_pipeline():
+    assert run_prediction_pipeline_check(), "Интеграционный тест ядра завершился ошибкой"
+
+
 # ==========================================================
 # 🌐 6. Проверка API /api/predict
 # ==========================================================
-def test_api_response():
+def run_api_response_check(*, raise_for_connection: bool = False, raise_for_timeout: bool = False) -> bool:
+    """Выполняет запрос к /api/predict и проверяет базовые поля."""
+
     log.info("\n🌐 Проверка /api/predict ...")
-    
+
     api_url = "http://127.0.0.1:7860/api/predict"
     payload = {
         "text": "Я тону, когда солнце уходит вдаль...",
-        "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92}
+        "tlp": {"truth": 0.06, "love": 0.08, "pain": 0.14, "conscious_frequency": 0.92},
     }
-    
+
     try:
         # v7: Таймаут 20с (для "Плана C" - быстрые словари)
-        r = requests.post(api_url, json=payload, timeout=20) 
-        
-        if r.status_code == 200:
-            data = r.json()
-            log.info(f"✅ API OK | BPM={data.get('bpm')} | Style={data.get('style')}")
-            return True
-        else:
-            log.error(f"❌ Ошибка API: HTTP {r.status_code}. Ответ: {r.text[:200]}")
-            return False
-            
-    except requests.exceptions.ReadTimeout as e:
-        log.error(f"❌ Ошибка API: ReadTimeout! (Сервер не ответил за 20с). {e}")
+        response = requests.post(api_url, json=payload, timeout=20)
+    except requests.exceptions.ReadTimeout as exc:
+        if raise_for_timeout:
+            raise
+        log.error(f"❌ Ошибка API: ReadTimeout! (Сервер не ответил за 20с). {exc}")
         return False
-    except requests.exceptions.ConnectionError as e:
-        log.error(f"❌ Ошибка API: ConnectionError! (Сервер не запущен?). {e}")
+    except requests.exceptions.ConnectionError as exc:
+        if raise_for_connection:
+            raise
+        log.error(f"❌ Ошибка API: ConnectionError! (Сервер не запущен?). {exc}")
         return False
-    except Exception as e:
-        log.error(f"❌ Ошибка API (Unknown): {e} (Проверьте URL: {api_url})")
+    except Exception as exc:
+        log.error(f"❌ Ошибка API (Unknown): {exc} (Проверьте URL: {api_url})")
         log.error(traceback.format_exc())
         return False
+
+    if response.status_code != 200:
+        log.error(f"❌ Ошибка API: HTTP {response.status_code}. Ответ: {response.text[:200]}")
+        return False
+
+    data = response.json()
+    ok = "bpm" in data and "style" in data
+    if ok:
+        log.info(f"✅ API OK | BPM={data.get('bpm')} | Style={data.get('style')}")
+    else:
+        log.error("❌ Ответ API не содержит обязательных полей 'bpm' или 'style'.")
+    return ok
+
+
+def test_api_response():
+    try:
+        success = run_api_response_check(raise_for_connection=True, raise_for_timeout=True)
+    except requests.exceptions.ConnectionError as exc:
+        pytest.skip(f"API server is not running: {exc}")
+    except requests.exceptions.ReadTimeout as exc:
+        pytest.skip(f"API server did not respond in time: {exc}")
+
+    assert success, "Ответ API не соответствует ожиданиям"
 
 
 # ==========================================================
@@ -402,7 +432,7 @@ if __name__ == "__main__":
     
     # Если синтаксис сломан, нет смысла проверять импорты
     if results["syntax"]:
-        results["imports"] = test_imports()
+        results["imports"] = run_import_checks()
         results["dependencies (AST)"] = check_internal_dependencies()
     else:
         results["imports"] = False
@@ -411,14 +441,14 @@ if __name__ == "__main__":
     # Если импорты сломаны, нет смысла запускать тесты
     if results["imports"]:
         results["unit_tests (logic)"] = run_all_unit_tests()
-        results["integration_core"] = test_prediction_pipeline()
+        results["integration_core"] = run_prediction_pipeline_check()
     else:
         results["unit_tests (logic)"] = False
         results["integration_core"] = False
 
     # API-тест запускаем, только если тесты ядра прошли
     if results["unit_tests (logic)"] and results["integration_core"]:
-        results["integration_api"] = test_api_response()
+        results["integration_api"] = run_api_response_check()
     else:
         log.warning("\n🔬 Пропуск 'integration_api', так как 'unit_tests (logic)' или 'integration_core' провалились.")
         results["integration_api"] = False
