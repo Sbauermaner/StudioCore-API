@@ -150,5 +150,26 @@ def extract_raw_blocks(text: str) -> List[str]:
         clean_block = block.replace("TAG_PLACEHOLDER", "").replace("HINT_PLACEHOLDER", "").strip()
         if clean_block:
             cleaned_blocks.append(clean_block)
-            
+
     return cleaned_blocks
+
+
+def detect_language(text: str) -> Dict[str, Any]:
+    """Very small heuristic to guess whether the text is Cyrillic or Latin."""
+
+    cyrillic = sum(1 for ch in text if "\u0400" <= ch <= "\u04FF")
+    latin = sum(1 for ch in text if "A" <= ch <= "z")
+    if cyrillic > latin:
+        language = "ru"
+    elif latin > cyrillic:
+        language = "en"
+    else:
+        language = "multilingual"
+    confidence = round(min(1.0, max(cyrillic, latin) / max(len(text) or 1, 1)), 3)
+    return {"language": language, "confidence": confidence}
+
+
+def translate_text_for_analysis(text: str, language: str) -> str:
+    """Placeholder translation hook for StudioCore v6."""
+
+    return text

@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
-"""
-🎧 StudioCore v5.2.1 — Adaptive Annotation Engine (v10 - NameError ИСПРАВЛЕН)
-Gradio + FastAPI + Централизованное логирование
+"""StudioCore v6.3 MAXI — FastAPI/Gradio bridge.
+
+The application historically shipped with a v5 loader description.  After the
+MAXI merge the runtime exposes StudioCoreV6 by default, plus legacy fallbacks
+and structured diagnostics.  The docstring now mirrors the real runtime so
+external tooling (Dashboards, GitHub Actions) immediately sees that the MAXI
+stack is active.
 """
 
 import os
@@ -46,6 +50,7 @@ from typing import Optional
 try:
     from studiocore import (
         get_core,
+        loader_diagnostics,
         STUDIOCORE_VERSION,
         MONOLITH_VERSION,
         LOADER_STATUS,
@@ -75,12 +80,15 @@ async def status():
             "engine": type(core).__name__,
             "loader": LOADER_STATUS,
             "core_version": STUDIOCORE_VERSION,
+            "monolith_version": MONOLITH_VERSION,
         }
     except Exception as e:
         return {
             "status": "error",
             "error": str(e),
             "loader": LOADER_STATUS,
+            "core_version": STUDIOCORE_VERSION,
+            "monolith_version": MONOLITH_VERSION,
         }
 
 # ===============================================
@@ -92,6 +100,23 @@ async def version():
         "version": STUDIOCORE_VERSION,
         "monolith": MONOLITH_VERSION,
         "loader": LOADER_STATUS,
+        "diagnostics": loader_diagnostics().__dict__,
+    }
+
+
+# ===============================================
+# NEW: /diagnostics endpoint
+# ===============================================
+@app.get("/diagnostics")
+async def diagnostics():
+    diag = loader_diagnostics()
+    return {
+        "requested_order": list(diag.engine_order),
+        "attempted": list(diag.attempted),
+        "errors": list(diag.errors),
+        "active": diag.active,
+        "monolith_module": diag.monolith_module,
+        "monolith_version": diag.monolith_version,
     }
 
 # === 5. CORS ===

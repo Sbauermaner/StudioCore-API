@@ -22,6 +22,12 @@ from .instrument import (
     instrument_selection as _instrument_selection,
 )
 from .rhythm import LyricMeter
+try:  # pragma: no cover - compatibility shim
+    from .text_utils import get_last_section_metadata
+except ImportError:  # pragma: no cover - legacy builds
+    def get_last_section_metadata() -> list:
+        return []
+
 from .text_utils import extract_sections, normalize_text_preserve_symbols
 from .tone import ToneSyncEngine
 from .user_override_manager import UserOverrideManager
@@ -70,10 +76,12 @@ class TextStructureEngine:
 
     def __init__(self) -> None:
         self._last_sections: List[str] = []
+        self._structured_meta: List[Dict[str, Any]] = []
 
     def auto_section_split(self, text: str) -> List[str]:
         sections = _section_texts(text)
         self._last_sections = sections
+        self._structured_meta = get_last_section_metadata()
         return list(sections)
 
     def _ensure_sections(self, text: str, sections: Sequence[str] | None = None) -> List[str]:
@@ -107,6 +115,12 @@ class TextStructureEngine:
             "text": sections[match_index],
             "confidence": round(confidence, 3),
         }
+
+    def section_metadata(self) -> List[Dict[str, Any]]:
+        return [
+            {"tag": item.get("tag"), "meta": dict(item.get("meta", {})), "lines": list(item.get("lines", []))}
+            for item in self._structured_meta
+        ]
 
     def detect_intro(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
         return self._resolve_section("intro", text, sections, 0)
@@ -631,92 +645,136 @@ class CommandInterpreter:
                 return command
         return None
 
-    def execute_bpm_commands(self, commands: Iterable[Dict[str, Any]], base_bpm: int | None = None) -> Dict[str, Any]:
-        command = self._extract_command(commands, ["bpm", "tempo"])
-        if not command:
-            return {"bpm": base_bpm}
+    @staticmethod
+    def _to_float(value: Any) -> float | None:
         try:
-            value = float(command["value"])
-        except ValueError:
-            return {"bpm": base_bpm, "error": "invalid_value"}
-        return {"bpm": int(round(value)), "source": command["raw"]}
+            return float(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _parse_number_list(value: str, allow_arrow: bool = False) -> List[float]:
+        if not value:
+            return []
+        separators = ["/", ",", "→", "-", " "]
+        if allow_arrow:
+            normalized = value.replace("->", "→").replace("=>", "→")
+        else:
+            normalized = value
+        for sep in separators:
+            normalized = normalized.replace(sep, " ")
+        values: List[float] = []
+        for token in normalized.split():
+            num = CommandInterpreter._to_float(token)
+            if num is not None:
+                values.append(num)
+        return values
+
+    def execute_bpm_commands(self, commands: Iterable[Dict[str, Any]], base_bpm: int | None = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"bpm": base_bpm}
+        fallback = base_bpm if base_bpm is not None else 120
+        offset = 0.0
+        parallels: List[float] = []
+        fractures: List[float] = []
+        for command in commands:
+            ctype = (command.get("type") or "").lower()
+            value = command.get("value", "")
+            if ctype in {"bpm", "tempo", "set bpm"}:
+                parsed = self._to_float(value)
+                if parsed is not None:
+                    payload["bpm"] = parsed
+                    payload["source"] = command.get("raw")
+            elif ctype == "raise bpm":
+                delta = self._to_float(value)
+                if delta is not None:
+                    offset += delta
+                    payload["source"] = command.get("raw")
+            elif ctype == "lower bpm":
+                delta = self._to_float(value)
+                if delta is not None:
+                    offset -= delta
+                    payload["source"] = command.get("raw")
+            elif ctype in {"parallel bpm", "parallel"}:
+                parallels = self._parse_number_list(str(value))
+            elif ctype in {"fracture rhythm", "fracture"}:
+                fractures = self._parse_number_list(str(value), allow_arrow=True)
+        base = payload.get("bpm", fallback)
+        if base is not None and offset:
+            payload["bpm"] = max(1.0, float(base) + offset)
+        if parallels:
+            payload["parallel"] = parallels
+        if fractures:
+            payload["fracture"] = fractures
+        return payload
 
     def execute_key_commands(self, commands: Iterable[Dict[str, Any]], default_key: str | None = None) -> Dict[str, Any]:
-        command = self._extract_command(commands, ["key", "scale"])
+        command = self._extract_command(commands, ["key", "scale", "set key"])
         if not command:
             return {"key": default_key}
         return {"key": command["value"], "source": command["raw"]}
 
     def execute_rhythm_commands(self, commands: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
-        command = self._extract_command(commands, ["rhythm", "groove"])
+        command = self._extract_command(commands, ["rhythm", "groove", "set intensity"])
         if not command:
             return {"rhythm": None}
         return {"rhythm": command["value"], "source": command["raw"]}
 
     def execute_emotion_commands(self, commands: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
-        command = self._extract_command(commands, ["emotion", "mood"])
-        if not command:
-            return {"emotion": None}
-        return {"emotion": command["value"], "source": command["raw"]}
+        emotion_cmd = self._extract_command(commands, ["emotion", "set emotion"])
+        mood_cmd = self._extract_command(commands, ["mood", "set mood"])
+        intensity_cmd = self._extract_command(commands, ["intensity", "set intensity"])
+        result: Dict[str, Any] = {}
+        if emotion_cmd:
+            result["emotion"] = emotion_cmd["value"]
+            result.setdefault("source", emotion_cmd.get("raw"))
+        if mood_cmd:
+            result["mood"] = mood_cmd["value"]
+            result.setdefault("source", mood_cmd.get("raw"))
+        if intensity_cmd:
+            result["intensity"] = intensity_cmd["value"]
+            result.setdefault("source", intensity_cmd.get("raw"))
+        if not result:
+            result["emotion"] = None
+        return result
+
+    def execute_style_commands(self, commands: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+        result: Dict[str, Any] = {}
+        for command in commands:
+            ctype = command.get("type")
+            if ctype in {"set genre", "genre"}:
+                result["genre"] = command.get("value")
+                result.setdefault("source", []).append(command.get("raw"))
+            elif ctype in {"set vocal", "vocal"}:
+                result["vocal"] = command.get("value")
+                result.setdefault("source", []).append(command.get("raw"))
+            elif ctype in {"set mood", "mood"}:
+                result["mood"] = command.get("value")
+                result.setdefault("source", []).append(command.get("raw"))
+            elif ctype in {"set intensity", "intensity"}:
+                result["intensity"] = command.get("value")
+                result.setdefault("source", []).append(command.get("raw"))
+        if "source" in result and isinstance(result["source"], list):
+            result["source"] = ", ".join(filter(None, result["source"]))
+        return result
 
 
 class StyleEngine:
     """Assemble stylistic guidance for the arrangement and prompts."""
 
-    def style_signature(self, emotions: Dict[str, float], tlp: Dict[str, float]) -> str:
-        """Return the high-level style label used by PatchedStyleMatrix."""
-
-        if not emotions:
-            return "neutral modal"
-
-        love = tlp.get("love", 0.0)
-        pain = tlp.get("pain", 0.0)
-        truth = tlp.get("truth", 0.0)
-        conscious_frequency = tlp.get("conscious_frequency", 0.0)
-
-        dominant_value = max(emotions.values())
-        dominant_candidates = [name for name, value in emotions.items() if value == dominant_value]
-        if len(dominant_candidates) == 1:
-            dominant = dominant_candidates[0]
-        else:
-            if "sadness" in dominant_candidates and pain > love:
-                dominant = "sadness"
-            elif "joy" in dominant_candidates and love >= pain:
-                dominant = "joy"
-            else:
-                dominant = dominant_candidates[0]
-
-        fear_bias = emotions.get("fear", 0.0) >= 0.09 and emotions.get("joy", 0.0) <= 0.15
-
-        if fear_bias or (conscious_frequency > 0.6 and truth > 0.1) or dominant in {"anger", "fear", "epic"}:
-            return "dramatic harmonic minor"
-
-        if dominant in {"sadness", "melancholy"}:
-            return "melancholic minor"
-
-        if dominant in {"joy", "peace", "awe"}:
-            return "majestic major"
-
-        if pain >= 0.01 and pain > love:
-            return "melancholic minor"
-
-        if love >= 0.01 and love >= pain:
-            return "majestic major"
-
-        return "neutral modal"
+    GENRE_MAP = {
+        "joy": "indie pop",
+        "sadness": "ambient ballad",
+        "anger": "industrial rock",
+        "fear": "cinematic darkwave",
+        "peace": "neo-classical",
+        "epic": "epic orchestral",
+    }
 
     def genre_selection(self, emotions: Dict[str, float], tlp: Dict[str, float]) -> str:
-        """Mimic the v5 PatchedStyleMatrix genre rules."""
-
-        style = self.style_signature(emotions, tlp)
-
-        if style == "melancholic minor":
-            return "lyrical adaptive"
-        if style == "majestic major":
-            return "lyrical adaptive"
-        if style == "dramatic harmonic minor":
-            return "cinematic adaptive"
-        return "cinematic narrative"
+        if not emotions:
+            return "ambient"
+        dominant = max(emotions, key=emotions.get)
+        return self.GENRE_MAP.get(dominant, "experimental")
 
     def mood_selection(self, emotions: Dict[str, float], tlp: Dict[str, float]) -> str:
         cf = tlp.get("conscious_frequency", 0.5)
@@ -741,22 +799,19 @@ class StyleEngine:
     def tone_style(self, tonality: Dict[str, Any]) -> str:
         return f"{tonality.get('mode', 'major')} mood, keys {', '.join(tonality.get('section_keys', []))}"
 
-    def final_style_prompt_build(
-        self,
-        *,
-        genre: str,
-        style: str | None,
-        mood: str,
-        instrumentation: str,
-        vocal: str,
-        visual: str,
-        tone: str,
-    ) -> str:
-        style_segment = f"Style: {style}; " if style else ""
-        return (
-            f"Genre: {genre}; {style_segment}Mood: {mood}; Vocals: {vocal}; Instruments: {instrumentation}; "
-            f"Visuals: {visual}; Tonality: {tone}."
-        )
+    def final_style_prompt_build(self, *, genre: str, mood: str, instrumentation: str, vocal: str, visual: str, tone: str) -> str:
+        entries = [
+            ("GENRE", genre),
+            ("MOOD", mood),
+            ("VOCALS", vocal),
+            ("INSTRUMENTS", instrumentation),
+            ("VISUALS", visual),
+            ("TONALITY", tone),
+        ]
+        prompt_parts = [f"({label}: {value})" for label, value in entries if value]
+        prompt_parts.append(f"(INSTRUMENTAL_BREAK: {instrumentation or 'dynamic'})")
+        prompt_parts.append("[END]")
+        return " ".join(prompt_parts)
 
 
 class UserOverrideEngine:
@@ -895,8 +950,6 @@ class FinalCompiler:
             "zero_pulse": payload.get("zero_pulse"),
             "style": payload.get("style"),
             "commands": payload.get("commands"),
-            "extended_genre": payload.get("extended_genre"),
-            "extended_emotions": payload.get("extended_emotions"),
         }
         return merged
 
