@@ -64,6 +64,12 @@ def _load_monolith(name: str) -> Tuple[Optional[Type[Any]], Optional[Type[Any]],
         module = importlib.import_module(f".{name}", package=__name__)
     except ImportError as exc:  # pragma: no cover - diagnostics only
         return None, None, "missing", str(exc)
+    except Exception as exc:  # pragma: no cover - diagnostics only
+        # Preserve the historical "safe loader" behaviour by ensuring unexpected
+        # import-time failures still allow the fallback path to run.  Diagnostics
+        # capture the error so callers can inspect the failure reason.
+        message = f"Failed to import monolith '{name}': {type(exc).__name__}: {exc}"
+        return None, None, "error", message
 
     version = getattr(module, "STUDIOCORE_VERSION", "unknown")
     core_cls = getattr(module, "StudioCore", None)
