@@ -3,7 +3,7 @@
 GenreUniverseLoader v1
 Массовая загрузка жанров в глобальный реестр StudioCore.
 
-Сюда мы вставим:
+Включает:
 - 1500+ музыкальных жанров мира
 - 400+ EDM направлений
 - 100+ лирических форм
@@ -16,6 +16,7 @@ GenreUniverseLoader v1
 """
 
 from .genre_universe import GenreUniverse
+
 
 def load_genre_universe():
     U = GenreUniverse()
@@ -79,9 +80,8 @@ def load_genre_universe():
         "italo_disco", "eurodance", "handsup", "hardbass",
         "lofi_edm", "future_bass", "melodic_bass",
         "bass_house", "g_house", "latin_house",
-        "kawaii_futures", "hyperpop_edm"
+        "kawaii_futures", "hyperpop_edm",
     ]
-
     for genre in edm_genres:
         U.add_electronic(genre)
 
@@ -116,9 +116,8 @@ def load_genre_universe():
         "japanese_rock", "visual_keirock", "k_rock",
         "latin_rock", "balkan_metal", "turkish_rock",
         "slavic_metal", "ukrainian_black_metal",
-        "polish_black_metal", "french_black_metal"
+        "polish_black_metal", "french_black_metal",
     ]
-
     for genre in rock_metal_genres:
         U.add_music(genre)
 
@@ -147,9 +146,8 @@ def load_genre_universe():
         "electric_blues", "soul_blues",
         "rhythm_and_blues", "texas_blues", "country_blues",
         # --- ETHNO JAZZ ---
-        "arabic_jazz", "japanese_jazz", "afro_jazz", "celtic_jazz"
+        "arabic_jazz", "japanese_jazz", "afro_jazz", "celtic_jazz",
     ]
-
     for genre in jazz_genres:
         U.add_music(genre)
 
@@ -179,9 +177,8 @@ def load_genre_universe():
         "spirituals", "doo_wop",
         # --- CROSS & ELECTRO ---
         "electro_soul", "electro_rnb",
-        "synth_soul", "nu_soulwave"
+        "synth_soul", "nu_soulwave",
     ]
-
     for genre in pop_rnb_soul:
         U.add_music(genre)
 
@@ -192,60 +189,49 @@ def load_genre_universe():
         "boom_bap", "classic_boom_bap",
         "golden_age_rap", "lyrical_rap",
         "conscious_rap", "political_rap",
-
         # --- TRAP BLOCK ---
         "trap", "modern_trap", "atl_trap", "uk_trap",
         "latin_trap", "emo_trap", "cloud_trap",
         "industrial_trap", "horror_trap",
         "trap_metal", "trap_core",
-
         # --- DRILL BLOCK ---
         "drill", "uk_drill", "ny_drill", "chi_drill",
         "philly_drill", "russian_drill",
         "melodic_drill", "dark_drill",
-
         # --- PHONK BLOCK ---
         "phonk", "memphis_phonk", "drift_phonk",
         "cowbell_phonk", "dark_phonk", "trap_phonk",
         "experimental_phonk", "russian_phonk",
-
         # --- MAINSTREAM RAP ---
         "rap", "hard_rap", "street_rap", "gangsta_rap",
         "g_funk", "west_coast_rap", "east_coast_rap",
         "dirty_south_rap", "midwest_rap",
         "mixtape_rap", "club_rap",
-
         # --- EMO / CLOUD / ALT ---
         "emo_rap", "cloud_rap", "lofi_rap",
         "alt_rap", "post_rap", "hyper_rap",
-
         # --- HARD / INDUSTRIAL / EXP ---
         "horrorcore", "industrial_hiphop",
         "noise_rap", "drone_rap",
         "dystopian_rap", "aggressive_rap",
-
         # --- JAZZ & FUNK RAP ---
         "jazz_rap", "funk_rap", "neo_soul_rap",
         "art_rap",
-
         # --- WORLD RAP ---
         "latin_rap", "arab_rap", "turkish_rap",
         "afro_trap", "afro_rap",
         "french_rap", "italian_rap", "german_rap",
         "ukrainian_rap", "russian_rap", "polish_rap",
         "asian_rap", "k_rap", "j_rap", "thai_rap",
-
         # --- SOUND / EXP HYBRIDS ---
         "soundcloud_rap", "rage_rap", "dnb_rap",
         "glitch_rap", "cyber_rap", "digital_rap",
         "synth_rap", "edm_rap",
-
         # --- VOCAL SUBSTYLES ---
         "fast_rap", "double_time_rap",
         "freestyle_rap", "battle_rap",
-        "storytelling_rap", "spoken_rap"
+        "storytelling_rap", "spoken_rap",
     ]
-
     for genre in hiphop_mega:
         U.add_music(genre)
 
@@ -258,54 +244,44 @@ def load_genre_universe():
         "finnish_folk", "norwegian_folk", "swedish_folk",
         "icelandic_folk", "german_folk", "french_folk",
         "italian_folk", "iberian_folk", "greek_folk",
-
         # --- MIDDLE EAST ---
         "arabic_folk", "arabic_maqam", "persian_folk",
         "turkish_folk", "anatolian_folk",
         "kurdish_folk", "bedouin_folk",
         "israeli_folk", "levant_folk",
-
         # --- ASIA ---
         "japanese_folk", "okinawan_folk",
         "chinese_folk", "mongolian_folk",
         "korean_folk", "thai_folk", "vietnamese_folk",
         "indian_folk", "raaga_classical", "hindustani",
         "carnatic", "tibetan_folk",
-
         # --- AFRICA ---
         "west_african_folk", "east_african_folk",
         "north_african_folk", "south_african_folk",
         "afro_traditional", "tribal_folk",
-
         # --- AMERICAS ---
         "native_american", "andes_folk",
         "latin_folk", "brazilian_folk", "mexican_folk",
         "inca_traditional", "amazon_folk",
-
         # --- OCEANIA ---
         "australian_aboriginal_folk", "maori_folk",
         "polynesian_folk", "melanesian_folk",
-
         # --- NORTHERN / SHAMANIC ---
         "tuvan_throat_singing", "sami_joik",
         "mongolian_throat_singing", "arctic_folk",
         "siberian_shamanic",
-
         # --- ANCIENT / RITUAL / SPIRITUAL ---
         "ancient_chant", "ritual_music", "shamanic_drums",
         "sacred_folk", "tribal_chant", "monastic_chant",
-
         # --- INSTRUMENT-BASED TAGS ---
         "ethno_flute", "tagelharpa", "hurdy_gurdy",
         "koto_folk", "erhu_folk", "sitar_folk",
         "oud_folk", "duduk_folk", "rebab_folk",
         "pan_flute_folk", "didgeridoo_folk",
-
         # --- HYBRID ETHNO CORE ---
         "ethno_ambient", "ethno_trance", "ethno_rock",
-        "world_fusion", "global_tribal"
+        "world_fusion", "global_tribal",
     ]
-
     for genre in world_ethno:
         U.add_music(genre)
 
@@ -319,7 +295,7 @@ def load_genre_universe():
         "microfiction", "flash_fiction",
         # --- DRAMA CORE ---
         "tragedy", "comedy", "tragicomedy",
-        "drama", "melodrama", "historical_drama",
+        "drama", "melodрама", "historical_drama",
         "political_drama", "social_drama",
         # --- PHILOSOPHICAL / SPIRITUAL ---
         "philosophical_novel", "existential_prose",
@@ -341,9 +317,8 @@ def load_genre_universe():
         "religious_text", "scripture_style",
         # --- MODERN HYBRIDS ---
         "magical_realism", "metafiction",
-        "postmodern_prose"
+        "postmodern_prose",
     ]
-
     for g in literature_genres:
         U.add_literature(g)
 
@@ -381,9 +356,8 @@ def load_genre_universe():
         "burlesque_poem",
         # --- GOTHIC / DARK FORMS (дополнение) ---
         "gothic_ballad", "horror_lyric",
-        "dark_romantic_lyric", "shadow_lyric"
+        "dark_romantic_lyric", "shadow_lyric",
     ]
-
     for f in lyric_forms:
         U.add_lyric_form(f)
 
@@ -394,7 +368,6 @@ def load_genre_universe():
         "film_dialogue", "montage_poetry",
         "narrative_voiceover", "cinematic_monologue",
         "cinematic_recitation", "ost_lyric",
-
         # --- GENRES OF CINEMA ---
         "drama_film", "war_film", "action_film",
         "political_thriller", "psychological_thriller",
@@ -403,39 +376,32 @@ def load_genre_universe():
         "fantasy_film", "sci_fi_film",
         "post_apocalyptic_film",
         "documentary_film", "mockumentary",
-
         # --- THEATRE CORE ---
         "theatre_play", "mono_play", "dialogue_play",
         "classical_theatre", "modern_theatre",
         "absurd_theatre", "ritual_theatre",
         "shadow_theatre",
-
         # --- DRAMATIC STRUCTURE TAGS ---
         "three_act_structure", "five_act_structure",
         "freytag_pyramid",
         "character_arc", "hero_journey",
         "conflict_axis", "dramatic_turn",
-
         # --- PERFORMANCE ARTS ---
         "spoken_theatre", "performance_art",
         "sound_performance", "physical_theatre",
         "stage_reading", "dramatic_reading",
-
         # --- COMEDY / STAGE ---
         "stand_up", "sketch_comedy",
         "stage_comedy", "musical_theatre",
         "broadway_style", "cabaret",
-
         # --- OPERA / VOCAL THEATRE ---
         "opera", "chamber_opera", "rock_opera",
         "operetta", "cantata", "oratorio",
-
         # --- HYBRID FORMS ---
         "cinematic_folktale", "epic_stage_poetry",
         "tragic_musical", "dramatic_recitative",
-        "spoken_song", "melodic_monologue"
+        "spoken_song", "melodic_monologue",
     ]
-
     for cf in cinematic_forms:
         U.add_stage(cf)
 
