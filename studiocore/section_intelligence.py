@@ -118,8 +118,30 @@ class SectionIntelligenceEngine:
         outro["label"] = "outro"
         return outro
 
+    def compute_structure_tension(self, sections: Sequence[str] | None) -> float:
+        segments = [section.strip() for section in (sections or self._last_sections) if section and section.strip()]
+        if not segments:
+            return 0.0
+
+        def _section_energy(payload: str) -> float:
+            words = payload.split()
+            unique = len(set(words)) or 1
+            punctuation = sum(payload.count(symbol) for symbol in "!?" )
+            density = len(words) / max(unique, 1)
+            return density + punctuation * 0.1
+
+        tension = 0.0
+        previous = None
+        for section in segments:
+            energy = _section_energy(section)
+            if previous is not None:
+                tension += abs(energy - previous) * 0.25
+            previous = energy
+        return round(min(1.0, tension), 3)
+
     def analyze(self, text: str, sections: Sequence[str] | None, emotion_curve: Sequence[float] | None = None) -> Dict[str, Any]:
         sections = self._ensure_sections(sections, text)
+        structure_tension = self.compute_structure_tension(sections)
         return {
             "motifs": self.detect_repeated_motif(sections, text),
             "chorus_pattern": self.detect_chorus_by_pattern(sections, text),
@@ -130,4 +152,5 @@ class SectionIntelligenceEngine:
             "transition_drop": self.detect_transition_drop(emotion_curve),
             "intro": self.detect_intro(sections, text),
             "outro": self.detect_outro(sections, text),
+            "structure_tension": structure_tension,
         }

@@ -110,3 +110,17 @@ class GenreMatrixEngine:
             "dominant": dominant,
             "keywords": keyword_hits,
         }
+
+
+class GenreMatrixExtended(GenreMatrixEngine):
+    """Bridge keyword detection with the domain-based genre weights."""
+
+    def evaluate(self, feature_map: Dict[str, float] | None) -> str | None:
+        if not feature_map:
+            return None
+        if not any(feature_map.values()):
+            return None
+        from .genre_weights import GenreWeightsEngine
+
+        engine = GenreWeightsEngine()
+        return engine.infer_genre(feature_map)
