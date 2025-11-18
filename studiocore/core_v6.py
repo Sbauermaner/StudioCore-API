@@ -32,6 +32,7 @@ from .logical_engines import (
     ZeroPulseEngine,
 )
 from .instrument_dynamics import InstrumentalDynamicsEngine
+from .genre_matrix_extended import GenreMatrixExtended
 from .section_intelligence import SectionIntelligenceEngine
 from .suno_annotations import SunoAnnotationEngine
 from .text_utils import detect_language, translate_text_for_analysis
@@ -54,6 +55,7 @@ class StudioCoreV6:
         self.instrumentation_engine = InstrumentationEngine()
         self.section_intelligence = SectionIntelligenceEngine()
         self.instrument_dynamics = InstrumentalDynamicsEngine()
+        self.genre_matrix = GenreMatrixExtended()
         self.rem_engine = REM_Synchronizer()
         self.zero_pulse_engine = ZeroPulseEngine()
         self.command_interpreter = CommandInterpreter()
@@ -207,6 +209,8 @@ class StudioCoreV6:
         section_intel_payload = auto_context.get("section_intelligence") or self.section_intelligence.analyze(
             text, sections, auto_context.get("emotion_curve")
         )
+        if section_intel_payload.get("structure_tension") is None:
+            section_intel_payload["structure_tension"] = self.section_intelligence.compute_structure_tension(sections)
 
         emotion_profile = self._merge_semantic_hints(
             auto_context.get("emotion_profile", {}),
@@ -440,11 +444,79 @@ class StudioCoreV6:
             zero_pulse_payload,
         )
 
+        # 13b. Domain feature map for the genre engine
+        def _clamp(value: float) -> float:
+            try:
+                return round(max(0.0, min(1.0, float(value))), 3)
+            except (TypeError, ValueError):
+                return 0.0
+
+        bpm_value = bpm_payload.get("estimate") or bpm_estimate or 0.0
+        avg_intensity = vocal_payload.get("average_intensity", 0.0) or 0.0
+        conflict_value = emotion_payload.get("conflict", {}).get("conflict", 0.0) or 0.0
+        semantic_aggression = _clamp(conflict_value + emotion_profile.get("anger", 0.0) * 0.4)
+        power_vector = _clamp((bpm_value / 180.0) + avg_intensity * 0.3)
+        bpm_curve_values = bpm_payload.get("curve") or bpm_curve or []
+        bpm_deltas = [abs(bpm_curve_values[idx] - bpm_curve_values[idx - 1]) for idx in range(1, len(bpm_curve_values))]
+        if bpm_deltas:
+            density = sum(bpm_deltas) / max(len(bpm_deltas), 1)
+            rhythm_density = _clamp(density / max(bpm_value or 120.0, 1.0))
+        else:
+            rhythm_density = _clamp(bpm_value / 200.0)
+        edge_factor = emotion_profile.get("anger", 0.0) * 0.6
+        tone = vocal_payload.get("tone")
+        if tone == "intense":
+            edge_factor += 0.3
+        elif tone == "balanced":
+            edge_factor += 0.15
+        edge_factor = _clamp(edge_factor)
+        acceleration = meaning_payload.get("acceleration", [])
+        accel_value = (
+            sum(abs(value) for value in acceleration) / max(len(acceleration), 1)
+            if acceleration
+            else 0.0
+        )
+        fractures = meaning_payload.get("fractures", {}).get("count", 0)
+        narrative_pressure = _clamp(accel_value + fractures * 0.1)
+        gradient_curve = emotion_payload.get("curve") or emotion_curve or []
+        if gradient_curve:
+            amplitude = max(gradient_curve) - min(gradient_curve)
+            gradient_max = max(max(gradient_curve), 1.0)
+            emotional_gradient = _clamp(amplitude / gradient_max)
+        else:
+            emotional_gradient = _clamp(conflict_value)
+        mode = (tonality_payload.get("mode") or "").lower()
+        harmonic_lumen_minor = _clamp(0.8 if "minor" in mode else 0.2 if "modal" in mode else 0.1)
+        harmonic_lumen_major = _clamp(0.8 if "major" in mode else 0.2 if "modal" in mode else 0.1)
+        transition_delta = section_intel_payload.get("transition_drop", {}).get("delta", 0.0) or 0.0
+        chorus_intensity = section_intel_payload.get("chorus_emotion", {}).get("intensity", 0.0) or 0.0
+        motif_count = section_intel_payload.get("motifs", {}).get("count", 0) or 0
+        cinematic_spread = _clamp(0.2 + transition_delta * 0.3 + chorus_intensity * 0.2 + motif_count * 0.05)
+        vocal_intention = _clamp(avg_intensity)
+        structure_tension = _clamp(section_intel_payload.get("structure_tension", 0.0))
+        genre_feature_inputs = {
+            "semantic_aggression": semantic_aggression,
+            "power_vector": power_vector,
+            "rhythm_density": rhythm_density,
+            "edge_factor": edge_factor,
+            "narrative_pressure": narrative_pressure,
+            "emotional_gradient": emotional_gradient,
+            "hl_minor": harmonic_lumen_minor,
+            "hl_major": harmonic_lumen_major,
+            "cinematic_spread": cinematic_spread,
+            "vocal_intention": vocal_intention,
+            "structure_tension": structure_tension,
+        }
+        feature_map = self.build_feature_map(genre_feature_inputs)
+        domain_genre = self.genre_matrix.evaluate(feature_map)
+        genre_analysis = {"feature_map": feature_map, "domain_genre": domain_genre}
+
         # 14. Style synthesis
         style_commands = command_payload.get("style") or {}
         style_genre = (
             style_commands.get("genre")
             or semantic_hints.get("style", {}).get("genre")
+            or domain_genre
             or self.style_engine.genre_selection(emotion_profile, tlp_profile)
         )
         style_mood = (
@@ -473,6 +545,8 @@ class StudioCoreV6:
             "tone": style_tone,
             "prompt": style_prompt,
         }
+        if domain_genre:
+            style_payload["domain_genre"] = domain_genre
         if style_commands.get("intensity"):
             style_payload["intensity"] = style_commands["intensity"]
         if style_commands:
@@ -537,6 +611,7 @@ class StudioCoreV6:
             "suno_annotations": suno_annotations,
             "override_debug": override_manager.debug_summary(),
             "rde_summary": rde_summary,
+            "genre_analysis": genre_analysis,
         }
         result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(override_manager, result)
         if language_info:
@@ -561,6 +636,7 @@ class StudioCoreV6:
         merged["override_debug"] = payload.get("override_debug", {})
         merged["language"] = payload.get("language", payload.get("auto_context", {}).get("language"))
         merged["rde_summary"] = payload.get("rde_summary", {})
+        merged["genre_analysis"] = payload.get("genre_analysis", {})
         return merged
 
     def _apply_vocal_fusion(self, vocal_payload: Dict[str, Any], overrides: UserOverrides | None) -> Dict[str, Any]:
@@ -650,6 +726,34 @@ class StudioCoreV6:
         elif "major" in key_reference:
             mode = "major"
         return normalized, mode, base_key
+
+    def build_feature_map(self, analysis: Dict[str, Any]) -> Dict[str, float]:
+        source: Dict[str, Any] = {}
+        if isinstance(analysis, dict):
+            if isinstance(analysis.get("features"), dict):
+                source = dict(analysis["features"])
+            else:
+                source = dict(analysis)
+
+        def _value(key: str) -> float:
+            try:
+                return round(float(source.get(key, 0.0)), 3)
+            except (TypeError, ValueError):
+                return 0.0
+
+        return {
+            "sai": _value("semantic_aggression"),
+            "power": _value("power_vector"),
+            "rhythm_density": _value("rhythm_density"),
+            "edge": _value("edge_factor"),
+            "narrative_pressure": _value("narrative_pressure"),
+            "emotional_gradient": _value("emotional_gradient"),
+            "harmonic_lumen_minor": _value("hl_minor"),
+            "harmonic_lumen_major": _value("hl_major"),
+            "cinematic_spread": _value("cinematic_spread"),
+            "vocal_intention": _value("vocal_intention"),
+            "structure_tension": _value("structure_tension"),
+        }
 
     @staticmethod
     def _merge_semantic_hints(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
