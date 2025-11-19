@@ -368,7 +368,9 @@ class StudioCoreV6:
         }
         vocal_payload = self._merge_semantic_hints(vocal_payload, semantic_hints.get("vocal", {}))
         vocal_payload = self._apply_vocal_fusion(vocal_payload, override_manager.overrides)
-        vocal_payload = self.override_engine.apply_to_vocals(vocal_payload, override_manager)
+        vocal_for_instrumentation = self.override_engine.apply_to_vocals(
+            vocal_payload, override_manager
+        )
 
         # 6. Breathing cues
         breathing_profile = {
@@ -402,7 +404,6 @@ class StudioCoreV6:
             "locks": bpm_locks,
         }
         bpm_payload = self._merge_semantic_hints(bpm_payload, semantic_hints.get("bpm", {}))
-        bpm_payload = self.override_engine.apply_to_rhythm(bpm_payload, override_manager)
 
         annotations_from_text = structure_context.get("annotations", [])
         if annotations_from_text:
@@ -456,7 +457,7 @@ class StudioCoreV6:
             base_palette=instrument_selection.get("palette"),
         )
         instrument_voice = self.instrumentation_engine.instrument_based_on_voice(
-            vocal_payload.get("style"),
+            vocal_for_instrumentation.get("style"),
             target_energy=bpm_mapping.get("target_energy"),
         )
         instrument_color = self.instrumentation_engine.instrument_color_sync(
@@ -798,7 +799,6 @@ class StudioCoreV6:
         if style_commands:
             style_payload["commands"] = style_commands
         style_payload = self._merge_semantic_hints(style_payload, semantic_hints.get("style", {}))
-        style_payload = self.override_engine.apply_to_style(style_payload, override_manager)
 
         rde_snapshot = self.rde_engine.compose(
             bpm_payload=bpm_payload,
@@ -1056,7 +1056,11 @@ class StudioCoreV6:
         self, payload: Dict[str, Any], manager: UserOverrideManager
     ) -> Dict[str, Any]:
         if payload.get("_overrides_applied"):
-            return payload
+            debug_info = payload.get("override_debug", {})
+            applied = (
+                debug_info.get("applied_overrides", {}) if isinstance(debug_info, dict) else {}
+            )
+            return copy.deepcopy(applied)
 
         adjustments: Dict[str, Any] = {}
 
@@ -1083,6 +1087,12 @@ class StudioCoreV6:
                     sections,
                     base_bpm=applied_bpm.get("estimate") or bpm.get("estimate"),
                 )
+                applied_bpm["estimate"], applied_bpm["curve"], applied_bpm["locks"] = self._enforce_bpm_limits(
+                    applied_bpm.get("estimate"),
+                    applied_bpm.get("curve"),
+                    manager.overrides,
+                    len(sections),
+                )
 
             payload["bpm"] = applied_bpm
             adjustments["bpm"] = copy.deepcopy(applied_bpm)
@@ -1097,10 +1107,10 @@ class StudioCoreV6:
         # DEBUG
         payload["_overrides_applied"] = True
         override_debug = manager.debug_summary()
-        override_debug["applied_overrides"] = adjustments
+        override_debug["applied_overrides"] = copy.deepcopy(adjustments)
         payload["override_debug"] = override_debug
 
-        return payload
+        return copy.deepcopy(adjustments)
 
     def _resolve_sections_from_hints(
         self,
