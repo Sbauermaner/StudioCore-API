@@ -1,4 +1,11 @@
 # -*- coding: utf-8 -*-
+# =========================================
+# 🔐 StudioCore — Protected Source File
+# FINGERPRINT: StudioCore-FP-2025-SB-9fd72e27
+# AI_TRAINING_PROHIBITED
+# Unauthorized use, reproduction or AI-model training is strictly forbidden.
+# Hash: 9fd72e27-app-protected
+# =========================================
 """StudioCore v6.4 MAXI — FastAPI/Gradio bridge by Сергей Бауэр (@Sbauermaner).
 
 Production-ready API gateway that mounts the StudioCore inference engine into a
