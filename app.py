@@ -47,6 +47,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
+# ============================================================
+# StudioCore Signature Block (Do Not Remove)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
+# AI_TRAINING_PROHIBITED
+# This file is part of StudioCore v6.4 MAXI (Protected Edition)
+# ============================================================
+
 # === 3. Импорт ядра ===
 try:
     from studiocore import (
@@ -101,7 +109,10 @@ def create_core_instance(force_reload: bool = False):
 def _validate_input_length(text: str | None) -> tuple[bool, str | None]:
     payload = text or ""
     if len(payload) > MAX_INPUT_LENGTH:
-        return False, f"⚠️ Текст превышает лимит {MAX_INPUT_LENGTH} символов. Сократите ввод."
+        return (
+            False,
+            f"⚠️ Текст слишком длинный (>{MAX_INPUT_LENGTH} символов). Сократите ввод для обработки.",
+        )
     return True, None
 
 # === 4. Инициализация FastAPI ===
@@ -164,6 +175,35 @@ async def diagnostics():
         "monolith_module": diag.monolith_module,
         "monolith_version": diag.monolith_version,
     }
+
+
+@app.get("/health")
+async def health(force_reload: bool = False):
+    """Проверка того, что ядро можно создать и запустить минимальный анализ."""
+
+    try:
+        core = create_core_instance(force_reload=force_reload)
+        probe = core.analyze("healthcheck ping", preferred_gender="auto")
+        status = "ok" if isinstance(probe, dict) and "error" not in probe else "degraded"
+        return {
+            "status": status,
+            "core_inits": CORE_SUCCESSFUL_INITS,
+            "reload_required": CORE_RELOAD_REQUIRED,
+            "last_error": LAST_CORE_ERROR,
+        }
+    except Exception as exc:  # pragma: no cover - defensive guard
+        global CORE_RELOAD_REQUIRED
+        CORE_RELOAD_REQUIRED = True
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "error": str(exc),
+                "core_inits": CORE_SUCCESSFUL_INITS,
+                "reload_required": CORE_RELOAD_REQUIRED,
+                "last_error": LAST_CORE_ERROR,
+            },
+        )
 
 
 @app.post("/healthcheck")
