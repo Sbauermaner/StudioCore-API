@@ -1,0 +1,158 @@
+"""Regression-style fuzzing for StudioCore v6.4.
+
+The FakeUserEngine generates hundreds of diverse payloads that emulate noisy
+user input. Each sample is pushed through the public StudioCoreV6 interface to
+validate stateless behaviour and payload integrity. The goal is to catch sticky
+weights, repeated overrides, or disappearing commands before they reach users.
+"""
+
+from __future__ import annotations
+
+import random
+from typing import Dict, Iterable, List, Set
+
+from studiocore.core_v6 import StudioCoreV6
+from studiocore.text_utils import detect_language, extract_commands_and_tags, translate_text_for_analysis
+
+
+class FakeUserEngine:
+    """Synthetic load generator for StudioCoreV6.
+
+    The generator purposely mixes languages, section tags, and command tokens to
+    exercise the full pipeline: commands → structure → overrides → bpm/emotions/
+    tones/genre → symbiosis → SunoAnnotations.
+    """
+
+    TAGS = ["[Verse]", "[Chorus]", "[Bridge]"]
+    COMMAND_TOKENS = [
+        "BPM:120",
+        "BPM:90",
+        "KEY:Am",
+        "KEY:Dm",
+        "STYLE:dark_melancholic",
+        "STYLE:cinematic_ballad",
+    ]
+    LANGUAGE_LINES: Dict[str, List[str]] = {
+        "ru": [
+            "Ветер шепчет древний стих",
+            "Любовь и боль сплетают мост",
+            "Сердце гремит как барабан",
+        ],
+        "en": [
+            "Shadows dance in neon rain",
+            "Hold the line, the chorus rises",
+            "Broken chords ignite the night",
+        ],
+        "de": [
+            "Lauter Traum aus altem Licht",
+            "Herz aus Stahl und leiser Klang",
+            "Brücke aus Tönen hält uns fest",
+        ],
+        "it": [
+            "Notte blu senza riposo",
+            "Canto piano tra le stelle",
+            "Battito lento, voce chiara",
+        ],
+        "es": [
+            "Ritmo arde en mi memoria",
+            "Puente largo sobre el mar",
+            "Verso corto, alma abierta",
+        ],
+    }
+
+    def __init__(self, *, seed: int = 42, batch_size: int = 500) -> None:
+        self.random = random.Random(seed)
+        self.batch_size = batch_size
+
+    def _random_language(self, index: int) -> str:
+        languages = list(self.LANGUAGE_LINES.keys())
+        return languages[index % len(languages)]
+
+    def _random_line(self, language: str) -> str:
+        samples = self.LANGUAGE_LINES.get(language, self.LANGUAGE_LINES["en"])
+        return self.random.choice(samples)
+
+    def _command_line(self) -> str:
+        command_count = self.random.randint(1, 3)
+        commands = self.random.sample(self.COMMAND_TOKENS, command_count)
+        noisy_suffix = self.random.choice(
+            ["", " dramatic", " soft glitch", " raw energy", " minor sway"]
+        )
+        return " ".join(commands) + noisy_suffix
+
+    def _build_text(self, index: int) -> str:
+        language = self._random_language(index)
+        tag_count = self.random.randint(1, len(self.TAGS))
+        tags = self.random.sample(self.TAGS, tag_count)
+
+        lines: List[str] = [self._command_line()]
+        for tag in tags:
+            lines.append(tag)
+            line_count = self.random.randint(1, 4)
+            for _ in range(line_count):
+                lines.append(self._random_line(language))
+        if self.random.random() < 0.2:
+            # Inject a very long, noisy line to exercise edge cases without repeating tags.
+            remaining_tags = [tag for tag in self.TAGS if tag not in tags]
+            maybe_tag = self.random.choice(remaining_tags) if remaining_tags else ""
+            extra_tail = " ".join(self.random.choice(self.LANGUAGE_LINES[language]) for _ in range(6))
+            lines.append(f"{extra_tail} {maybe_tag}".strip())
+        return "\n".join(lines)
+
+    def generate_texts(self) -> Iterable[str]:
+        for idx in range(self.batch_size):
+            yield self._build_text(idx)
+
+    def _assert_integrity(self, text: str, result: Dict[str, object]) -> None:
+        cleaned_text, expected_commands, _ = extract_commands_and_tags(text)
+        final_commands = result.get("commands", {}) if isinstance(result, dict) else {}
+        detected_commands = final_commands.get("detected", []) if isinstance(final_commands, dict) else []
+        final_raws = {cmd.get("raw") for cmd in detected_commands if isinstance(cmd, dict)}
+
+        for command in expected_commands.get("detected", []):
+            raw = command.get("raw") if isinstance(command, dict) else None
+            if raw:
+                assert raw in final_raws, f"Command '{raw}' disappeared for text: {cleaned_text[:50]}"
+
+        preserved_tags = final_commands.get("preserved_tags") or []
+        assert len(preserved_tags) == len(set(preserved_tags)), "Tags are sticking between requests"
+
+        assert "_overrides_applied" not in result, "Internal override marker leaked into payload"
+
+        language_info = result.get("language", {}) if isinstance(result, dict) else {}
+        assert not language_info.get("was_translated"), "Translation flag should remain False"
+
+        structure_headers = result.get("auto_context", {}).get("section_headers", []) if isinstance(result, dict) else []
+        assert isinstance(structure_headers, list), "Structure metadata must reset per request"
+
+    def run(self) -> Dict[str, Set[str]]:
+        bpm_values: Set[str] = set()
+        genres: Set[str] = set()
+
+        for idx, text in enumerate(self.generate_texts()):
+            language_info = detect_language(text)
+            translated, was_translated = translate_text_for_analysis(text, language_info["language"])
+            assert translated == text and was_translated is False
+
+            core = StudioCoreV6()
+            result = core.analyze(text, preferred_gender="auto")
+            self._assert_integrity(text, result)
+
+            bpm_estimate = result.get("bpm", {}).get("estimate") if isinstance(result, dict) else None
+            if bpm_estimate is not None:
+                bpm_values.add(f"{float(bpm_estimate):.2f}")
+            genre = result.get("style", {}).get("genre") if isinstance(result, dict) else None
+            if genre:
+                genres.add(str(genre))
+
+        return {"bpm_values": bpm_values, "genres": genres}
+
+
+def test_fake_user_engine_regression():
+    engine = FakeUserEngine(batch_size=500)
+    summary = engine.run()
+
+    # Ensure weights do not stick to a single value across the batch.
+    assert len(summary["bpm_values"]) > 1, "BPM weights appear to be stuck"
+    assert len(summary["genres"]) > 1, "Genre matrix outputs are not varying"
+
