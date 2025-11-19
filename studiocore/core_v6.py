@@ -101,12 +101,14 @@ class StudioCoreV6:
         params = self._merge_user_params(dict(kwargs))
         overrides: UserOverrides = params.get("user_overrides")
         override_manager = UserOverrideManager(overrides)
-        normalized_text, command_bundle, preserved_tags = extract_commands_and_tags(incoming_text)
+        cleaned_text, command_bundle, preserved_tags = extract_commands_and_tags(incoming_text)
         commands = list(command_bundle.get("detected", []))
-        language_info = detect_language(normalized_text)
-        language_info["original_text_preview"] = normalized_text[:500]
-        translated_text = translate_text_for_analysis(normalized_text, language_info["language"])
-        language_info["was_translated"] = translated_text != normalized_text
+        language_info = detect_language(cleaned_text)
+        language_info["original_text_preview"] = cleaned_text[:500]
+        translated_text, was_translated = translate_text_for_analysis(
+            cleaned_text, language_info["language"]
+        )
+        language_info["was_translated"] = bool(was_translated)
         structure_context = self._build_structure_context(
             translated_text,
             params.get("semantic_hints"),
@@ -128,7 +130,7 @@ class StudioCoreV6:
             structure_context=structure_context,
             override_manager=override_manager,
             language_info=language_info,
-            original_text=normalized_text,
+            original_text=cleaned_text,
             command_bundle=command_bundle,
         )
         return self._finalize_result(backend_payload)
@@ -886,6 +888,7 @@ class StudioCoreV6:
         merged["language"] = payload.get("language", payload.get("auto_context", {}).get("language"))
         merged["rde_summary"] = payload.get("rde_summary", {})
         merged["genre_analysis"] = payload.get("genre_analysis", {})
+        merged.pop("_overrides_applied", None)
         return merged
 
     def _apply_vocal_fusion(self, vocal_payload: Dict[str, Any], overrides: UserOverrides | None) -> Dict[str, Any]:
@@ -1052,35 +1055,52 @@ class StudioCoreV6:
     def _apply_user_overrides_once(
         self, payload: Dict[str, Any], manager: UserOverrideManager
     ) -> Dict[str, Any]:
+        if payload.get("_overrides_applied"):
+            return payload
+
         adjustments: Dict[str, Any] = {}
-        vocal_payload = payload.get("vocal", {})
-        if isinstance(vocal_payload, dict):
-            applied_vocal = self.override_engine.apply_to_vocals(vocal_payload, manager)
+
+        # VOCAL
+        vocal = payload.get("vocal")
+        if isinstance(vocal, dict):
+            applied_vocal = self.override_engine.apply_to_vocals(vocal, manager)
             payload["vocal"] = applied_vocal
             adjustments["vocal"] = copy.deepcopy(applied_vocal)
 
-        bpm_payload = payload.get("bpm", {})
-        if isinstance(bpm_payload, dict):
-            applied_bpm = self.override_engine.apply_to_rhythm(bpm_payload, manager)
+        # BPM
+        bpm = payload.get("bpm")
+        if isinstance(bpm, dict):
+            applied_bpm = self.override_engine.apply_to_rhythm(bpm, manager)
+
             sections = payload.get("structure", {}).get("sections", [])
-            if sections and applied_bpm.get("estimate") not in {None, bpm_payload.get("estimate")}:
+            estimate_changed = (
+                applied_bpm.get("estimate") is not None
+                and applied_bpm.get("estimate") != bpm.get("estimate")
+            )
+
+            if sections and estimate_changed:
                 applied_bpm["curve"] = self.bpm_engine.meaning_bpm_curve(
                     sections,
-                    base_bpm=applied_bpm.get("estimate") or bpm_payload.get("estimate"),
+                    base_bpm=applied_bpm.get("estimate") or bpm.get("estimate"),
                 )
+
             payload["bpm"] = applied_bpm
             adjustments["bpm"] = copy.deepcopy(applied_bpm)
 
-        style_payload = payload.get("style", {})
-        if isinstance(style_payload, dict):
-            applied_style = self.override_engine.apply_to_style(style_payload, manager)
+        # STYLE
+        style = payload.get("style")
+        if isinstance(style, dict):
+            applied_style = self.override_engine.apply_to_style(style, manager)
             payload["style"] = applied_style
             adjustments["style"] = copy.deepcopy(applied_style)
 
+        # DEBUG
+        payload["_overrides_applied"] = True
         override_debug = manager.debug_summary()
         override_debug["applied_overrides"] = adjustments
         payload["override_debug"] = override_debug
-        return adjustments
+
+        return payload
 
     def _resolve_sections_from_hints(
         self,

@@ -1,0 +1,50 @@
+========================================
+РАЗДЕЛ 1 — ЛИЦЕНЗИОННАЯ ЗАЩИТА
+========================================
+- LICENSE (Enhanced MIT, brand/AI/SaaS/коммерция ограничения): ✔ найдено — ./LICENSE
+- NOTICE (защита бренда StudioCore): ✔ найдено — ./NOTICE
+- README (верхний блок с предупреждением # 🔒 StudioCore …): ✔ найдено — ./README.md
+- FINGERPRINT: StudioCore-FP-2025-SB-9fd72e27: ✔ найдено — ./studiocore/__init__.py
+- StudioCore Signature Block: ✔ найдено (см. файлы с блоками в разделах 2/3)
+- AI_TRAINING_PROHIBITED: ✔ найдено (см. файлы с блоками в разделах 2/3)
+- Версия в studiocore/__init__.py = "v6.4.0-protected": ✔ подтверждено
+
+========================================
+РАЗДЕЛ 2 — STATELESS ПАТЧИ
+========================================
+- Глобальный CORE отсутствует; экземпляры ядра создаются на запрос: ✔ ок (app.create_core_instance()/api_predict)
+- Каждый запрос создаёт новый StudioCoreV6(): ✔ ок (create_core_instance → module.StudioCoreV6())
+- Модульных кэшей `_last_*` нет: ✔ ок
+- extract_commands_and_tags вызывается до нормализации текста: ✔ ок (analyze: cleaned_text, commands до других шагов)
+- Пайплайн (commands/tags → structure → overrides → bpm/emotions/tones/genres → symbiosis → SunoAnnotations): ✔ ок (analyze и _backend_analyze порядок сохранён; SunoAnnotations добавляется последним)
+- translate_text_for_analysis возвращает (text, False): ✔ ок
+- В файле text_utils импортирован Tuple: ✔ ок
+- section_metadata хранится только внутри TextStructureEngine (instance state): ✔ ок
+- Overrides применяются ОДИН раз; функция соответствует эталонной версии: ✔ ок
+
+========================================
+РАЗДЕЛ 3 — АНТИПИРАТСКИЕ СИГНАТУРЫ
+========================================
+- core_v6.py: StudioCore Signature Block / Fingerprint / Hash / AI_TRAINING_PROHIBITED — ✔ найдено
+- monolith_v4_3_1.py: StudioCore Signature Block / Fingerprint / Hash / AI_TRAINING_PROHIBITED — ✔ найдено
+- app.py: StudioCore Signature Block / Fingerprint / Hash / AI_TRAINING_PROHIBITED — ❌ не найдено
+- logger.py: StudioCore Signature Block / Fingerprint / Hash / AI_TRAINING_PROHIBITED — ✔ найдено
+- rhythm.py: StudioCore Signature Block / Fingerprint / Hash / AI_TRAINING_PROHIBITED — ✔ найдено
+- genre_matrix_extended.py: StudioCore Signature Block / Fingerprint / Hash / AI_TRAINING_PROHIBITED — ✔ найдено
+
+========================================
+РАЗДЕЛ 4 — ЧИСТКА OPEN-SOURCE ТЕРМИНОВ
+========================================
+- «open source», «opensource», «open-source», «public project», «free project», «бесплатный проект», «открытый проект»: ✔ не обнаружено
+
+========================================
+РАЗДЕЛ 5 — ЛОГ-ФАЙЛЫ НА МЕСТЕ
+========================================
+- lg.txt содержит секцию "## Обновление от 19 ноября 2025 — Stateless рефакторинг v6.4": ✔ есть
+- lgp.txt содержит "## Аудит после рефакторинга — 19 ноября 2025": ✔ есть
+- diff.txt существует: ✔ есть
+
+========================================
+РАЗДЕЛ 6 — ИТОГ
+========================================
+- Обнаружена проблема: в app.py отсутствует StudioCore Signature Block / Fingerprint / Hash / AI_TRAINING_PROHIBITED.

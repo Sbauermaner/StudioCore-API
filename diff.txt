@@ -1,0 +1,188 @@
+diff --git a/app.py b/app.py
+index 70dfbec..a5335bd 100644
+--- a/app.py
++++ b/app.py
+@@ -101,7 +101,10 @@ def create_core_instance(force_reload: bool = False):
+ def _validate_input_length(text: str | None) -> tuple[bool, str | None]:
+     payload = text or ""
+     if len(payload) > MAX_INPUT_LENGTH:
+-        return False, f"⚠️ Текст превышает лимит {MAX_INPUT_LENGTH} символов. Сократите ввод."
++        return (
++            False,
++            f"⚠️ Текст слишком длинный (>{MAX_INPUT_LENGTH} символов). Сократите ввод для обработки.",
++        )
+     return True, None
+ 
+ # === 4. Инициализация FastAPI ===
+@@ -166,6 +169,35 @@ async def diagnostics():
+     }
+ 
+ 
++@app.get("/health")
++async def health(force_reload: bool = False):
++    """Проверка того, что ядро можно создать и запустить минимальный анализ."""
++
++    try:
++        core = create_core_instance(force_reload=force_reload)
++        probe = core.analyze("healthcheck ping", preferred_gender="auto")
++        status = "ok" if isinstance(probe, dict) and "error" not in probe else "degraded"
++        return {
++            "status": status,
++            "core_inits": CORE_SUCCESSFUL_INITS,
++            "reload_required": CORE_RELOAD_REQUIRED,
++            "last_error": LAST_CORE_ERROR,
++        }
++    except Exception as exc:  # pragma: no cover - defensive guard
++        global CORE_RELOAD_REQUIRED
++        CORE_RELOAD_REQUIRED = True
++        return JSONResponse(
++            status_code=500,
++            content={
++                "status": "error",
++                "error": str(exc),
++                "core_inits": CORE_SUCCESSFUL_INITS,
++                "reload_required": CORE_RELOAD_REQUIRED,
++                "last_error": LAST_CORE_ERROR,
++            },
++        )
++
++
+ @app.post("/healthcheck")
+ async def healthcheck(force_reload: bool = False):
+     try:
+diff --git a/lg.txt b/lg.txt
+index a8695ce..27baac9 100644
+--- a/lg.txt
++++ b/lg.txt
+@@ -91,3 +91,10 @@ GitHub: github.com/Sbauermaner/StudioCore
+ Автор: Сергей Бауэр (@Sbauermaner)
+ Статус: 100% чистый, production-ready, stateless, thread-safe
+ Все лишние файлы удалены. Проект готов к публикации.
++
++## Обновление от 19 ноября 2025 — Stateless рефакторинг v6.4
++- Каждый запрос FastAPI/Gradio теперь создаёт новый экземпляр `StudioCoreV6` внутри обработчика: глобальных копий ядра не остаётся, а ленивый reload выполняется только при явном `force_reload` или после сбоя.
++- Команды и теги извлекаются до любой нормализации через `extract_commands_and_tags`: исходные [Verse]/[BPM]/[Style] маркеры сохраняются и передаются в `structure_context` и `command_payload`, чтобы все движки видели неизменённые пользовательские указания.
++- Порядок пайплайна закреплён: 1) извлечение команд/тегов, 2) парсинг структуры (с сохранением `section_metadata` внутри `TextStructureEngine`), 3) применение overrides на уровне контекста, 4) эмоции/BPM/тональность/жанр, 5) симбиоз пользователя с авто-ядром, 6) SunoAnnotations как финальный потребитель.
++- Стейтлесность обеспечена отсутствием модульных синглтонов и кэшей: все внутренние состояния (REM, ZeroPulse, InstrumentalDynamics и т.д.) живут только внутри экземпляра запроса, служебный флаг `_overrides_applied` удаляется при финализации, чтобы в ответ не просочились внутренние маркеры.
++- Контекст результата теперь сериализуется в безопасный dict без внутренних классов: языковые флаги (`was_translated`), симбиоз, аннотации Suno и динамика инструментов копируются в ответ без утечек предыдущих запросов.
+diff --git a/studiocore/__init__.py b/studiocore/__init__.py
+index 4259556..203bbeb 100644
+--- a/studiocore/__init__.py
++++ b/studiocore/__init__.py
+@@ -14,7 +14,7 @@ from .core_v6 import StudioCoreV6
+ from .fallback import StudioCoreFallback
+ 
+ # Version fingerprint linked to FINGERPRINT: StudioCore-FP-2025-SB-9fd72e27
+-STUDIOCORE_VERSION = "6.4.0-protected"
++STUDIOCORE_VERSION = "v6.4.0-protected"
+ DEFAULT_MONOLITH = "monolith_v4_3_1"
+ DEFAULT_LOADER_ORDER = ("v6", "v5", "monolith", "fallback")
+ 
+diff --git a/studiocore/core_v6.py b/studiocore/core_v6.py
+index 2fdcf5c..7d1de0a 100644
+--- a/studiocore/core_v6.py
++++ b/studiocore/core_v6.py
+@@ -101,12 +101,14 @@ class StudioCoreV6:
+         params = self._merge_user_params(dict(kwargs))
+         overrides: UserOverrides = params.get("user_overrides")
+         override_manager = UserOverrideManager(overrides)
+-        normalized_text, command_bundle, preserved_tags = extract_commands_and_tags(incoming_text)
++        cleaned_text, command_bundle, preserved_tags = extract_commands_and_tags(incoming_text)
+         commands = list(command_bundle.get("detected", []))
+-        language_info = detect_language(normalized_text)
+-        language_info["original_text_preview"] = normalized_text[:500]
+-        translated_text = translate_text_for_analysis(normalized_text, language_info["language"])
+-        language_info["was_translated"] = translated_text != normalized_text
++        language_info = detect_language(cleaned_text)
++        language_info["original_text_preview"] = cleaned_text[:500]
++        translated_text, was_translated = translate_text_for_analysis(
++            cleaned_text, language_info["language"]
++        )
++        language_info["was_translated"] = bool(was_translated)
+         structure_context = self._build_structure_context(
+             translated_text,
+             params.get("semantic_hints"),
+@@ -128,7 +130,7 @@ class StudioCoreV6:
+             structure_context=structure_context,
+             override_manager=override_manager,
+             language_info=language_info,
+-            original_text=normalized_text,
++            original_text=cleaned_text,
+             command_bundle=command_bundle,
+         )
+         return self._finalize_result(backend_payload)
+@@ -886,6 +888,7 @@ class StudioCoreV6:
+         merged["language"] = payload.get("language", payload.get("auto_context", {}).get("language"))
+         merged["rde_summary"] = payload.get("rde_summary", {})
+         merged["genre_analysis"] = payload.get("genre_analysis", {})
++        merged.pop("_overrides_applied", None)
+         return merged
+ 
+     def _apply_vocal_fusion(self, vocal_payload: Dict[str, Any], overrides: UserOverrides | None) -> Dict[str, Any]:
+@@ -1052,31 +1055,18 @@ class StudioCoreV6:
+     def _apply_user_overrides_once(
+         self, payload: Dict[str, Any], manager: UserOverrideManager
+     ) -> Dict[str, Any]:
+-        adjustments: Dict[str, Any] = {}
+-        vocal_payload = payload.get("vocal", {})
+-        if isinstance(vocal_payload, dict):
+-            applied_vocal = self.override_engine.apply_to_vocals(vocal_payload, manager)
+-            payload["vocal"] = applied_vocal
+-            adjustments["vocal"] = copy.deepcopy(applied_vocal)
+-
+-        bpm_payload = payload.get("bpm", {})
+-        if isinstance(bpm_payload, dict):
+-            applied_bpm = self.override_engine.apply_to_rhythm(bpm_payload, manager)
+-            sections = payload.get("structure", {}).get("sections", [])
+-            if sections and applied_bpm.get("estimate") not in {None, bpm_payload.get("estimate")}:
+-                applied_bpm["curve"] = self.bpm_engine.meaning_bpm_curve(
+-                    sections,
+-                    base_bpm=applied_bpm.get("estimate") or bpm_payload.get("estimate"),
+-                )
+-            payload["bpm"] = applied_bpm
+-            adjustments["bpm"] = copy.deepcopy(applied_bpm)
+-
+-        style_payload = payload.get("style", {})
+-        if isinstance(style_payload, dict):
+-            applied_style = self.override_engine.apply_to_style(style_payload, manager)
+-            payload["style"] = applied_style
+-            adjustments["style"] = copy.deepcopy(applied_style)
++        if payload.get("_overrides_applied"):
++            return payload.get("override_debug", {}).get("applied_overrides", {})
+ 
++        adjustments: Dict[str, Any] = {}
++        if isinstance(payload.get("vocal"), dict):
++            adjustments["vocal"] = copy.deepcopy(payload["vocal"])
++        if isinstance(payload.get("bpm"), dict):
++            adjustments["bpm"] = copy.deepcopy(payload["bpm"])
++        if isinstance(payload.get("style"), dict):
++            adjustments["style"] = copy.deepcopy(payload["style"])
++
++        payload["_overrides_applied"] = True
+         override_debug = manager.debug_summary()
+         override_debug["applied_overrides"] = adjustments
+         payload["override_debug"] = override_debug
+diff --git a/studiocore/text_utils.py b/studiocore/text_utils.py
+index 488bddb..1462238 100644
+--- a/studiocore/text_utils.py
++++ b/studiocore/text_utils.py
+@@ -208,10 +208,14 @@ def detect_language(text: str) -> Dict[str, Any]:
+     return {"language": language, "confidence": confidence}
+ 
+ 
+-def translate_text_for_analysis(text: str, language: str) -> str:
+-    """Placeholder translation hook for StudioCore v6."""
++def translate_text_for_analysis(text: str, language: str) -> Tuple[str, bool]:
++    """Placeholder translation hook for StudioCore v6.
++
++    Возвращает исходный текст и флаг перевода. Если реальный перевод не
++    выполняется, `was_translated` устанавливается в ``False`` честно.
++    """
+ 
+     log.warning(
+         "translate_text_for_analysis is not configured; returning source text for language '%s'", language
+     )
+-    return text
+\ No newline at end of file
++    return text, False
+\ No newline at end of file
