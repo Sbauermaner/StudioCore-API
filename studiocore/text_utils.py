@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 import re
+
 from typing import Any, Dict, List, Tuple
 
 log = logging.getLogger(__name__)
@@ -208,10 +209,14 @@ def detect_language(text: str) -> Dict[str, Any]:
     return {"language": language, "confidence": confidence}
 
 
-def translate_text_for_analysis(text: str, language: str) -> str:
-    """Placeholder translation hook for StudioCore v6."""
+def translate_text_for_analysis(text: str, language: str) -> Tuple[str, bool]:
+    """Placeholder translation hook for StudioCore v6.
+
+    Возвращает исходный текст и флаг перевода. Если реальный перевод не
+    выполняется, `was_translated` устанавливается в ``False`` честно.
+    """
 
     log.warning(
         "translate_text_for_analysis is not configured; returning source text for language '%s'", language
     )
-    return text
+    return text, False
