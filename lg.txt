@@ -1,0 +1,81 @@
+# Общая логика проекта
+
+## Назначение
+StudioCore-API объединяет FastAPI и Gradio, чтобы предоставить HTTP-интерфейс и визуальный UI к музыкальному анализатору StudioCore v6.3 MAXI. Приложение принимает текст песен, строит структурированный отчёт (жанр, BPM, эмоции, подсказки Suno, аннотации) и предоставляет средства самодиагностики, встроенные тесты и CLI для офлайн-проверок.
+
+## Архитектура и основные слои
+- **Верхний уровень (`app.py`)** — настраивает логирование, запускает FastAPI, монтирует Gradio-интерфейс, создаёт глобальный экземпляр ядра (`get_core()`), добавляет системный self-check и тестовый раннер.
+- **Загрузчик (`studiocore/__init__.py`)** — управляет последовательностью загрузки движков (v6 → v5 → monolith → fallback), собирает диагностику (`LoaderDiagnostics`), предоставляет `get_core()` и статус `LOADER_STATUS`.
+- **Ядро `StudioCoreV6` (`studiocore/core_v6.py`)** — композиция движков: TextStructure, Emotion, Color, Vocal, Breathing, BPM, Tonality, Instrumentation, SectionIntelligence, InstrumentalDynamics, GenreMatrix, REM, ZeroPulse, CommandInterpreter, Style, LyricsAnnotation, SunoAnnotation, UserOverride, Symbiosis, TLP, RDE. Оборачивает legacy-monolith, объединяет контекст и формирует итоговый JSON.
+- **Логические движки (`studiocore/logical_engines.py`)** — содержит все «микродвижки»: разбиение текста на секции, распознавание эмоций, цветовых и тональных профилей, вычисление BPM, распознавание команд, формирование стиля и финального промпта, дыхание, вокал, REM-синхронизация и т.д.
+- **Вспомогательные подсистемы**:
+  - `section_parser.py` — связывает TextStructureEngine и `SectionTagAnalyzer`, возвращает секции/метаданные/аннотации.
+  - `bpm_engine.py`, `tlp_engine.py`, `rde_engine.py` — публичные фасады поверх логических движков для отдельных проверок.
+  - `instrument_dynamics.py` — строит карту плотности и подстановку инструментов к структуре.
+  - `text_utils.py` — нормализация текста, выделение секций, языковая эвристика, подготовка блоков.
+  - `user_override_manager.py` — описывает `UserOverrides` и управляет ручными предпочтениями (BPM, ключ, настроение, вокал, инструменты).
+  - `suno_annotations.py` — формирует безопасные аннотации Suno.
+  - `logger.py` — единый конфигуратор логов.
+- **Инфраструктурные скрипты**: CLI (`studiocore/app.py`), тесты (`tests/`), openapi-файлы, вспомогательные утилиты для синхронизации OpenAPI.
+
+## Поток запуска из `app.py`
+1. Добавление корня репозитория в `sys.path` и настройка логов через `studiocore.logger.setup_logging` (уровень DEBUG).
+2. Импорт `studiocore` и немедленная загрузка ядра через `get_core()`, фиксация статуса (`CORE`, `CORE_LOADED`).
+3. Создание приложения FastAPI, подключение CORS и регистрация диагностических GET-эндпоинтов `/status`, `/version`, `/diagnostics`.
+4. Описание модели запроса `PredictRequest` и POST `/api/predict`, который вызывает `CORE.analyze()`.
+5. Запуск фонового self-check (`auto_core_check`) — через 5 секунд отправляет POST на `http://127.0.0.1:7860/api/predict` и логирует результат.
+6. Определение Gradio-интерфейса: вкладка анализа (textbox + radio + кнопка, вывод промптов Suno и аннотированного текста) и вкладка тестов (кнопка запуска `run_inline_tests`, textbox для логов). Результат Gradio монтируется в FastAPI по `/`.
+7. При прямом запуске `app.py` стартует `uvicorn` на `0.0.0.0:7860`.
+
+## Основные пакеты и ответственность
+### `studiocore/__init__.py`
+- Строит граф загрузчиков `LOADER_GRAPH` (v6, v5, monolith, fallback), хранит версию (`STUDIOCORE_VERSION = "v6.3-maxi"`).
+- `get_core()` перебирает порядок (`_requested_loader_order`), пытается создать экземпляр, обновляет глобальный `LOADER_STATUS` и `LoaderDiagnostics` (активный движок, ошибки, порядок, fallback-статус).
+- `_detect_latest_monolith()` и `_import_monolith()` ищут «monolith_vX_Y_Z.py», определяют версии и классы `StudioCore`, `StudioCoreV5`.
+
+### `studiocore/core_v6.py`
+- В конструкторе создаёт все поддвижки (TextStructureEngine, SectionParser, EmotionEngine, ColorEngine, VocalEngine, BreathingEngine, BPMEngine, MeaningVelocityEngine, TonalityEngine, InstrumentationEngine, SectionIntelligence, InstrumentalDynamics, GenreMatrixExtended, REM_Synchronizer, ZeroPulseEngine, CommandInterpreter, StyleEngine, LyricsAnnotationEngine, FinalCompiler, SunoAnnotationEngine, UserOverrideEngine, UserAdaptiveSymbiosisEngine, TruthLovePainEngine, RhythmDynamicsEmotionEngine) и хранит ссылку на `LegacyCore`.
+- `analyze()` делает:
+  1. Слияние входных параметров и ручных override'ов (`_merge_user_params`).
+  2. Определение языка (`detect_language`), простую «переводную» заглушку (`translate_text_for_analysis`).
+  3. Автогенерацию контекста (`_auto_generate_missing_params`): автосекции, подсказки по структуре, команды, профиль эмоций и дыхания, подсказки языка, аннотации из `SectionParser`.
+  4. Вызов `_backend_analyze` для углублённой обработки и наследника монолита.
+  5. Пост-обработку (`_finalize_result`) — слияние слоёв, генерация структуры, промптов, аннотаций, консистентности, Suno-данных, симбиоза и отладочной информации.
+- `_backend_analyze()` связывает все подсистемы: структуру, эмоциональные слои, цвета, вокал, дыхание, BPM, Meaning Velocity, тональность, инструменты, команды, REM/ZeroPulse, динамику инструментов, жанровый анализ (`build_feature_map` + `GenreMatrixExtended`), стиль, RDE-снимок, Suno-аннотации.
+- `_apply_vocal_fusion`, `_enforce_bpm_limits`, `_align_section_keys`, `_merge_semantic_hints` обеспечивают согласование пользовательских и автоматических данных.
+
+### `studiocore/logical_engines.py`
+- `TextStructureEngine` хранит последние секции/метаданные и умеет автоматически разбивать текст, находить intro/verse/chorus/bridge/outro, вычислять паузы и zero-pulse.
+- `EmotionEngine`, `ColorEmotionEngine`, `VocalEngine`, `BreathingEngine`, `BPMEngine`, `MeaningVelocityEngine`, `TonalityEngine`, `InstrumentationEngine`, `CommandInterpreter`, `StyleEngine`, `LyricsAnnotationEngine`, `FinalCompiler`, `REM_Synchronizer`, `ZeroPulseEngine`, `UserOverrideEngine`, `UserAdaptiveSymbiosisEngine` реализуют соответствующие вычисления: эмоции, цветовые карты, вокальный профиль (тип, тон, стиль, динамика), дыхание и синхронизацию с эмоциями, BPM-кривые и привязку к дыханию, семантическое ускорение текста, выбор модальности/ключей и модальных сдвигов, подбор инструментов, интерпретацию команд вида `[BPM:+10]`, генерацию промпта/аннотаций, конфликтность слоёв, наложение тишины, применение пользовательских override'ов и сбор симбиоз-состояния.
+
+### Другие подсистемы
+- `section_parser.SectionParser` — обёртка вокруг TextStructureEngine и `SectionTagAnalyzer`, возвращает `SectionParseResult` (список секций, метаданные, аннотации) и умеет применять эффекты аннотаций к эмоциям/BPM.
+- `instrument_dynamics.InstrumentalDynamicsEngine` — строит карту плотности и динамические подсказки по секциям, учитывая BPM, эмоции и zero-pulse.
+- `suno_annotations.SunoAnnotationEngine` — формирует для каждой секции строку вида `(Chorus 2) (BPM ~ 128) (Vocal: airy female) …`, защищает аннотации скобками, добавляет команды.
+- `text_utils` — нормализует текст (уборка управляющих символов, типографика, схлопывание пустых строк), умеет выделять секции по тегам `[Verse]` или заголовкам `Припев:`, разделять блоки, выявлять язык (по доле кириллицы/латиницы), перевод в текущей версии — заглушка.
+- `user_override_manager` — описывает ручные параметры (BPM, ключ, жанр, настроение, вокальные профили, инструментальные палитры, структуру) и накладывает их на ритм/стиль/вокал, а также строит отладочное резюме.
+- `rde_engine` и `tlp_engine` — лёгкие фасады, дающие удобное описание ритма×динамики×эмоций и Truth×Love×Pain со списком доминирующих осей.
+- `logger.py` — глобальная настройка логов и приглушение «шумных» библиотек.
+- `studiocore/app.py` — CLI: принимает текст/файл, запускает `StudioCore.analyze()`, пишет JSON-результат.
+
+## Поток данных и алгоритмы
+1. **HTTP запрос** (`/api/predict`): FastAPI валидирует `PredictRequest`, проверяет наличие `CORE`, вызывает `CORE.analyze()`.
+2. **Предобработка в `StudioCoreV6`**:
+   - Слияние `semantic_hints` с ручными override'ами.
+   - Определение языка, фиксация «preview», флаг `was_translated` (сейчас всегда `False`).
+   - Автогенерация контекста: `TextStructureEngine.auto_section_split`, `SectionParser`, `CommandInterpreter`, `EmotionEngine` (профиль и кривая), `SectionIntelligence`, формирование подсказок по секциям, языку, аннотациям.
+3. **Бэкенд-анализ**:
+   - Запуск legacy `StudioCore` для обратной совместимости.
+   - Структура песни (intro/verse/chorus/bridge/outro, метки, zero-pulse).
+   - Эмоции и TLP, цветовые волны и переходы.
+   - Вокал (gender, type, tone, style, dynamics, интенсивность), дыхание (inhale/broken/spasm, синхронизация), BPM (оценка, кривая, poly-rhythm, locks), Meaning Velocity (кривые смыслов, ускорение, fractures), тональность (mode, keys, модальные сдвиги, curve), инструменты (selection/emotion/voice/color/rhythm, палитра), команды, REM/ZeroPulse, инструментальная динамика, жанровые признаки и доменный жанр.
+   - Стиль и финальный промпт (genre/mood/instrumentation/vocal/visual/tone + domain_genre, intensity, команды), RDE-снимок, Suno-аннотации.
+4. **Финализация**: `FinalCompiler` объединяет данные, генерирует итоговую структуру, промпт, аннотации, проверку консистентности, переносит дополнительные слои (`suno_annotations`, `symbiosis`, `override_debug`, `rde_summary`, `genre_analysis`).
+5. **Ответ**: FastAPI/Gradio возвращают JSON (для UI — отдельное представление: summary, Suno prompt, аннотированный текст).
+
+## Жизненный цикл приложения
+- **Инициализация**: настройка логов, загрузка ядра, сбор диагностик, запуск FastAPI+Gradio, старт фонового self-check.
+- **Обработка запросов**: FastAPI маршруты `/status`, `/version`, `/diagnostics`, `/api/predict`; Gradio вкладки (анализ и тесты). Все маршруты используют общий `CORE` и общий набор подсистем.
+- **Диагностика и тесты**: self-check выполняет запрос к API; вкладка «Логи и тесты» запускает `studiocore/tests/test_all.py` через `subprocess.run` и показывает stdout/stderr; CLI (`python -m studiocore.app ...`) даёт офлайн-результат; openapi-файлы документируют публичные маршруты.
+- **Состояние во времени**: `LoaderDiagnostics` и `/status` позволяют увидеть, какой движок активен, какие попытки/ошибки были; `auto_core_check` и встроенные тесты помогают оперативно выявлять регрессии.
+
