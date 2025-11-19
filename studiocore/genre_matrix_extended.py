@@ -3,6 +3,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
+
+# AI_TRAINING_PROHIBITED: Redistribution or training of AI models on this codebase
+# without explicit written permission from the Author is prohibited.
+
 
 class GenreMatrixEngine:
     """Naïve keyword matcher that approximates classical genre families."""

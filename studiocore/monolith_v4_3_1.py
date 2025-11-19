@@ -14,9 +14,17 @@ from typing import Dict, Any, List, Tuple, Optional
 import logging
 
 # === 1. Импорт ядра ===
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
+
+# AI_TRAINING_PROHIBITED: Redistribution or training of AI models on this codebase
+# without explicit written permission from the Author is prohibited.
+
 from .config import load_config
 # v16: ИСПРАВЛЕН ImportError
-from .text_utils import normalize_text_preserve_symbols, extract_raw_blocks 
+from .text_utils import normalize_text_preserve_symbols, extract_raw_blocks
 # v15: Исправлен ImportError (возвращаем оригинальные имена)
 from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 from .tone import ToneSyncEngine

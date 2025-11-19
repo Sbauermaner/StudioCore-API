@@ -8,6 +8,7 @@ structured data so downstream tooling can evolve without breaking imports.
 from __future__ import annotations
 
 import copy
+import os
 import re
 from dataclasses import asdict
 from typing import Any, Dict, Iterable, Sequence
@@ -44,6 +45,21 @@ from .text_utils import (
     translate_text_for_analysis,
 )
 from .user_override_manager import UserOverrideManager, UserOverrides
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
+
+# AI_TRAINING_PROHIBITED: Redistribution or training of AI models on this codebase
+# without explicit written permission from the Author is prohibited.
+
+STUDIOCORE_LICENSE_ENV = os.getenv("STUDIOCORE_LICENSE", "").strip()
+
+# Anti-piracy soft hook (does not block execution, only marks environment intent)
+if STUDIOCORE_LICENSE_ENV == "":
+    # Это "юридический крючок": факт запуска без указания лицензии можно трактовать как несанкционированное использование.
+    pass
 
 
 class StudioCoreV6:

@@ -7,6 +7,14 @@ import logging
 import sys
 import os # v2: Добавлен os для определения уровня лога
 
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
+
+# AI_TRAINING_PROHIBITED: Redistribution or training of AI models on this codebase
+# without explicit written permission from the Author is prohibited.
+
 # v2: Уровень по умолчанию INFO, но можно переопределить через app.py
 LOG_LEVEL = logging.DEBUG if os.environ.get("STUDIOCORE_DEBUG") else logging.INFO
 
