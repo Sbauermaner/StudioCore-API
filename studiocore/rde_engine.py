@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, Sequence
 
 
@@ -27,7 +27,7 @@ class RhythmDynamicsEmotionEngine:
         breathing_profile: Dict[str, Any],
         emotion_profile: Dict[str, float],
         instrumentation_payload: Dict[str, Any],
-    ) -> RDESnapshot:
+    ) -> Dict[str, Any]:
         dominant = max(emotion_profile, key=emotion_profile.get) if emotion_profile else None
         palette = instrumentation_payload.get("palette")
         if isinstance(palette, dict):
@@ -36,7 +36,7 @@ class RhythmDynamicsEmotionEngine:
             palette = [palette]
         elif isinstance(palette, set):
             palette = sorted(palette)
-        return RDESnapshot(
+        snapshot = RDESnapshot(
             dominant_emotion=dominant,
             target_bpm=bpm_payload.get("estimate"),
             breath_sync=breathing_profile.get("sync_score"),
@@ -45,6 +45,7 @@ class RhythmDynamicsEmotionEngine:
             else bpm_payload.get("target_energy"),
             palette=palette,
         )
+        return asdict(snapshot)
 
 
 __all__ = ["RDESnapshot", "RhythmDynamicsEmotionEngine"]

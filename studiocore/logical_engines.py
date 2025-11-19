@@ -22,12 +22,6 @@ from .instrument import (
     instrument_selection as _instrument_selection,
 )
 from .rhythm import LyricMeter
-try:  # pragma: no cover - compatibility shim
-    from .text_utils import get_last_section_metadata
-except ImportError:  # pragma: no cover - legacy builds
-    def get_last_section_metadata() -> list:
-        return []
-
 from .text_utils import extract_sections, normalize_text_preserve_symbols
 from .tone import ToneSyncEngine
 from .user_override_manager import UserOverrideManager
@@ -75,24 +69,36 @@ class TextStructureEngine:
     }
 
     def __init__(self) -> None:
-        self._last_sections: List[str] = []
-        self._structured_meta: List[Dict[str, Any]] = []
+        self._section_metadata: List[Dict[str, Any]] = []
 
     def auto_section_split(self, text: str) -> List[str]:
-        sections = _section_texts(text)
-        self._last_sections = sections
-        self._structured_meta = get_last_section_metadata()
-        return list(sections)
+        structured = extract_sections(text)
+        sections: List[str] = []
+        metadata: List[Dict[str, Any]] = []
+        for item in structured:
+            lines = item.get("lines", [])
+            section_text = "\n".join(lines).strip()
+            if section_text:
+                sections.append(section_text)
+            metadata.append(
+                {
+                    "tag": item.get("tag"),
+                    "lines": list(lines),
+                    "line_count": len(lines),
+                }
+            )
+        if not sections and text.strip():
+            sections = [text.strip()]
+        self._section_metadata = metadata
+        return sections
 
-    def _ensure_sections(self, text: str, sections: Sequence[str] | None = None) -> List[str]:
+    def _resolve_sections(self, text: str, sections: Sequence[str] | None) -> List[str]:
         if sections is not None:
-            return list(sections)
-        if self._last_sections:
-            return list(self._last_sections)
+            return [section for section in sections if isinstance(section, str)]
         return self.auto_section_split(text)
 
     def _resolve_section(self, label: str, text: str, sections: Sequence[str] | None, fallback_index: int) -> Dict[str, Any]:
-        sections = self._ensure_sections(text, sections)
+        sections = self._resolve_sections(text, sections)
         if not sections:
             return {"label": label, "index": None, "text": "", "confidence": 0.0}
 
@@ -118,15 +124,20 @@ class TextStructureEngine:
 
     def section_metadata(self) -> List[Dict[str, Any]]:
         return [
-            {"tag": item.get("tag"), "meta": dict(item.get("meta", {})), "lines": list(item.get("lines", []))}
-            for item in self._structured_meta
+            {
+                "tag": item.get("tag"),
+                "lines": list(item.get("lines", [])),
+                "line_count": item.get("line_count", len(item.get("lines", []))),
+            }
+            for item in self._section_metadata
         ]
 
     def detect_intro(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
         return self._resolve_section("intro", text, sections, 0)
 
     def detect_verse(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
-        return self._resolve_section("verse", text, sections, 0 if len(self._ensure_sections(text, sections)) == 1 else 1)
+        resolved = self._resolve_sections(text, sections)
+        return self._resolve_section("verse", text, resolved, 0 if len(resolved) == 1 else 1)
 
     def detect_prechorus(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
         return self._resolve_section("prechorus", text, sections, 1)
@@ -135,13 +146,15 @@ class TextStructureEngine:
         return self._resolve_section("chorus", text, sections, 1)
 
     def detect_bridge(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
-        return self._resolve_section("bridge", text, sections, max(len(self._ensure_sections(text, sections)) - 2, 0))
+        resolved = self._resolve_sections(text, sections)
+        return self._resolve_section("bridge", text, resolved, max(len(resolved) - 2, 0))
 
     def detect_outro(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
-        return self._resolve_section("outro", text, sections, max(len(self._ensure_sections(text, sections)) - 1, 0))
+        resolved = self._resolve_sections(text, sections)
+        return self._resolve_section("outro", text, resolved, max(len(resolved) - 1, 0))
 
     def detect_meta_pause(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
-        sections = self._ensure_sections(text, sections)
+        sections = self._resolve_sections(text, sections)
         pause_locations: List[int] = []
         for idx, section in enumerate(sections):
             if "..." in section or "(pause" in section.lower() or "[pause" in section.lower():
@@ -150,7 +163,7 @@ class TextStructureEngine:
         return {"count": len(pause_locations), "locations": pause_locations, "confidence": confidence}
 
     def detect_zero_pulse(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
-        sections = self._ensure_sections(text, sections)
+        sections = self._resolve_sections(text, sections)
         zero_sections: List[int] = []
         for idx, section in enumerate(sections):
             if not section.strip() or "[silence]" in section.lower():
@@ -873,7 +886,18 @@ class UserAdaptiveSymbiosisEngine:
         self,
         manager: UserOverrideManager,
         payload: Dict[str, Any],
+        *,
+        applied_overrides: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
+        if applied_overrides is not None:
+            snapshot = self.merge_user_with_auto_core(manager, payload)
+            snapshot["applied_overrides"] = applied_overrides
+            snapshot["rhythm"] = payload.get("bpm", {})
+            snapshot["tonality"] = payload.get("tonality", {})
+            snapshot["vocal"] = payload.get("vocal", {})
+            snapshot["instrumentation"] = payload.get("instrumentation", {})
+            return snapshot
+
         rhythm = self.recalculate_rhythm_under_user_settings(manager, payload.get("bpm", {}))
         tone = self.recalculate_tone_under_user_settings(manager, payload.get("tonality", {}))
         vocal = self.recalculate_vocals_under_user_settings(manager, payload.get("vocal", {}))

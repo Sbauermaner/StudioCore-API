@@ -1,0 +1,992 @@
+diff --git a/app.py b/app.py
+index 8748665..c402bc8 100644
+--- a/app.py
++++ b/app.py
+@@ -14,9 +14,11 @@ import traceback
+ import threading
+ import time
+ import io
+-import uvicorn 
++import uvicorn
+ import logging
+ import subprocess # v10: ИСПРАВЛЕН NameError: name 'subprocess' is not defined
++import importlib
++from dataclasses import asdict
+ 
+ # === 1. Исправление пути импорта ===
+ # (Нужно, если запускаем app.py из корня)
+@@ -49,20 +51,57 @@ from typing import Optional
+ # === 3. Импорт ядра ===
+ try:
+     from studiocore import (
+-        get_core,
+         loader_diagnostics,
+         STUDIOCORE_VERSION,
+         MONOLITH_VERSION,
+         LOADER_STATUS,
+     )
+-    CORE = get_core()
+-    CORE_LOADED = True
+-    log.info(f"Ядро StudioCore {STUDIOCORE_VERSION} успешно импортировано.")
++    import studiocore.core_v6 as core_module
++    log.info(f"Ядро StudioCore {STUDIOCORE_VERSION} импортировано (статless режим).")
+ except Exception as e:
+-    log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить ядро: {e}")
++    log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модуль ядра: {e}")
+     log.critical(traceback.format_exc())
+-    CORE = None
+-    CORE_LOADED = False
++    core_module = None
++
++CORE_LOCK = threading.Lock()
++CORE_RELOAD_REQUIRED = False
++LAST_CORE_ERROR: str | None = None
++CORE_SUCCESSFUL_INITS = 0
++MAX_INPUT_LENGTH = 60000
++
++
++def _ensure_core_module(force_reload: bool = False):
++    global core_module, CORE_RELOAD_REQUIRED
++    if core_module is None:
++        raise RuntimeError("StudioCore модуль недоступен")
++    if force_reload or CORE_RELOAD_REQUIRED:
++        log.warning("Перезагрузка модуля StudioCoreV6 (force_reload=%s)", force_reload)
++        core_module = importlib.reload(core_module)
++        CORE_RELOAD_REQUIRED = False
++    return core_module
++
++
++def create_core_instance(force_reload: bool = False):
++    global LAST_CORE_ERROR, CORE_SUCCESSFUL_INITS, CORE_RELOAD_REQUIRED
++    module = _ensure_core_module(force_reload=force_reload or CORE_RELOAD_REQUIRED)
++    with CORE_LOCK:
++        try:
++            instance = module.StudioCoreV6()
++            CORE_SUCCESSFUL_INITS += 1
++            LAST_CORE_ERROR = None
++            return instance
++        except Exception as exc:  # pragma: no cover - defensive guard
++            LAST_CORE_ERROR = str(exc)
++            CORE_RELOAD_REQUIRED = True
++            log.error("Не удалось создать StudioCoreV6: %s", exc)
++            raise
++
++
++def _validate_input_length(text: str | None) -> tuple[bool, str | None]:
++    payload = text or ""
++    if len(payload) > MAX_INPUT_LENGTH:
++        return False, f"⚠️ Текст превышает лимит {MAX_INPUT_LENGTH} символов. Сократите ввод."
++    return True, None
+ 
+ # === 4. Инициализация FastAPI ===
+ log.debug("Инициализация FastAPI...")
+@@ -73,23 +112,17 @@ app = FastAPI(title="StudioCore API")
+ # ===============================================
+ @app.get("/status")
+ async def status():
+-    try:
+-        core = get_core()
+-        return {
+-            "status": "ok",
+-            "engine": type(core).__name__,
+-            "loader": LOADER_STATUS,
+-            "core_version": STUDIOCORE_VERSION,
+-            "monolith_version": MONOLITH_VERSION,
+-        }
+-    except Exception as e:
+-        return {
+-            "status": "error",
+-            "error": str(e),
+-            "loader": LOADER_STATUS,
+-            "core_version": STUDIOCORE_VERSION,
+-            "monolith_version": MONOLITH_VERSION,
+-        }
++    diag = loader_diagnostics()
++    return {
++        "status": "ok" if LAST_CORE_ERROR is None else "degraded",
++        "loader": LOADER_STATUS,
++        "core_version": STUDIOCORE_VERSION,
++        "monolith_version": MONOLITH_VERSION,
++        "core_inits": CORE_SUCCESSFUL_INITS,
++        "reload_required": CORE_RELOAD_REQUIRED,
++        "last_error": LAST_CORE_ERROR,
++        "diagnostics": asdict(diag),
++    }
+ 
+ # ===============================================
+ # NEW: /version endpoint
+@@ -100,7 +133,7 @@ async def version():
+         "version": STUDIOCORE_VERSION,
+         "monolith": MONOLITH_VERSION,
+         "loader": LOADER_STATUS,
+-        "diagnostics": loader_diagnostics().__dict__,
++        "diagnostics": asdict(loader_diagnostics()),
+     }
+ 
+ 
+@@ -119,6 +152,28 @@ async def diagnostics():
+         "monolith_version": diag.monolith_version,
+     }
+ 
++
++@app.post("/healthcheck")
++async def healthcheck(force_reload: bool = False):
++    try:
++        create_core_instance(force_reload=force_reload)
++        return {
++            "status": "ok",
++            "core_inits": CORE_SUCCESSFUL_INITS,
++            "reload_required": CORE_RELOAD_REQUIRED,
++            "last_error": LAST_CORE_ERROR,
++        }
++    except Exception as exc:
++        return JSONResponse(
++            status_code=500,
++            content={
++                "status": "error",
++                "error": str(exc),
++                "reload_required": CORE_RELOAD_REQUIRED,
++                "last_error": LAST_CORE_ERROR,
++            },
++        )
++
+ # === 5. CORS ===
+ app.add_middleware(
+     CORSMiddleware,
+@@ -146,32 +201,37 @@ async def api_predict(request_data: PredictRequest):
+     """
+     log.debug(f"Входящий запрос /api/predict: {request_data.text[:50]}...")
+     
+-    if not CORE_LOADED or CORE is None:
+-        log.error("API /api/predict: Ядро не загружено (Fallback).")
++    is_valid, validation_error = _validate_input_length(request_data.text)
++    if not is_valid:
++        return JSONResponse(content={"error": validation_error}, status_code=400)
++
++    try:
++        core = create_core_instance()
++    except Exception as exc:
++        log.error("API /api/predict: не удалось создать ядро: %s", exc)
+         return JSONResponse(
+-            content={"error": "⚠️ StudioCoreFallback: анализ недоступен — основное ядро не загружено."}, 
+-            status_code=500
++            content={"error": f"Ядро недоступно: {exc}"},
++            status_code=500,
+         )
+-        
++
+     try:
+-        # Сопоставляем данные из запроса с тем, что ожидает core.analyze
+-        result = CORE.analyze(
++        result = core.analyze(
+             request_data.text,
+             preferred_gender=request_data.gender,
+-            semantic_hints=request_data.semantic_hints
++            semantic_hints=request_data.semantic_hints,
+         )
+-        
+-        if isinstance(result, dict) and "error" in result:
+-             log.warning(f"API /api/predict: Ядро вернуло ошибку: {result['error']}")
+-             return JSONResponse(content=result, status_code=400)
+-        
+-        # Возвращаем полный результат (тесты ожидают 'bpm' и 'style')
+-        log.debug("API /api/predict: Анализ успешен.")
+-        return JSONResponse(content=result, status_code=200)
+-
+-    except Exception as e:
++    except Exception as exc:  # pragma: no cover - defensive guard
++        global CORE_RELOAD_REQUIRED
++        CORE_RELOAD_REQUIRED = True
+         log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА в /api/predict: {traceback.format_exc()}")
+-        return JSONResponse(content={"error": str(e)}, status_code=500)
++        return JSONResponse(content={"error": str(exc)}, status_code=500)
++
++    if isinstance(result, dict) and "error" in result:
++        log.warning(f"API /api/predict: Ядро вернуло ошибку: {result['error']}")
++        return JSONResponse(content=result, status_code=400)
++
++    log.debug("API /api/predict: Анализ успешен.")
++    return JSONResponse(content=result, status_code=200)
+ 
+ # === 7. SELF-CHECK ===
+ def auto_core_check():
+@@ -217,13 +277,19 @@ def analyze_text(text: str, gender: str = "auto"):
+     v8: Возвращает 3 строки: Summary, Suno Prompt, Annotated Text
+     """
+     log.debug(f"Gradio analyze_text: получено {len(text)} символов, gender={gender}")
+-    
++
+     if not text.strip():
+         return "⚠️ Введите текст для анализа.", "", ""
+ 
+-    if not CORE_LOADED or CORE is None:
+-        log.error("Gradio analyze_text: Ядро в режиме Fallback!")
+-        return "❌ Ядро не загружено (Fallback). Анализ невозможен. Проверьте логи.", "", ""
++    is_valid, validation_error = _validate_input_length(text)
++    if not is_valid:
++        return validation_error, "", ""
++
++    try:
++        core = create_core_instance()
++    except Exception as exc:
++        log.error("Gradio analyze_text: не удалось создать ядро: %s", exc)
++        return f"❌ Ядро не загружено: {exc}", "", ""
+ 
+     try:
+         # --- Проверка пользовательских описаний вокала ---
+@@ -243,7 +309,7 @@ def analyze_text(text: str, gender: str = "auto"):
+                 log.info(f"🎙️ [UI] Обнаружено описание вокала: {semantic_hints['voice_profile_hint']}")
+         
+         log.debug("Gradio -> core.analyze...")
+-        result = CORE.analyze(text, preferred_gender=gender, semantic_hints=semantic_hints or None)
++        result = core.analyze(text, preferred_gender=gender, semantic_hints=semantic_hints or None)
+ 
+         if isinstance(result, dict) and "error" in result:
+             log.error(f"Gradio: Ядро вернуло ошибку: {result['error']}")
+diff --git a/studiocore/core_v6.py b/studiocore/core_v6.py
+index eba2798..3043b87 100644
+--- a/studiocore/core_v6.py
++++ b/studiocore/core_v6.py
+@@ -7,6 +7,7 @@ structured data so downstream tooling can evolve without breaking imports.
+ """
+ from __future__ import annotations
+ 
++import copy
+ import re
+ from typing import Any, Dict, Iterable, Sequence
+ 
+@@ -36,7 +37,11 @@ from .instrument_dynamics import InstrumentalDynamicsEngine
+ from .genre_matrix_extended import GenreMatrixExtended
+ from .section_intelligence import SectionIntelligenceEngine
+ from .suno_annotations import SunoAnnotationEngine
+-from .text_utils import detect_language, translate_text_for_analysis
++from .text_utils import (
++    detect_language,
++    extract_commands_and_tags,
++    translate_text_for_analysis,
++)
+ from .user_override_manager import UserOverrideManager, UserOverrides
+ 
+ 
+@@ -75,31 +80,39 @@ class StudioCoreV6:
+         self._legacy_core_cls = LegacyCore
+ 
+     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
++        incoming_text = text or ""
+         params = self._merge_user_params(dict(kwargs))
+         overrides: UserOverrides = params.get("user_overrides")
+         override_manager = UserOverrideManager(overrides)
+-        language_info = detect_language(text)
+-        language_info["original_text_preview"] = text[:500]
+-        translated_text = translate_text_for_analysis(text, language_info["language"])
+-        language_info["was_translated"] = translated_text != text
+-        auto_context = self._auto_generate_missing_params(
++        normalized_text, command_bundle, preserved_tags = extract_commands_and_tags(incoming_text)
++        commands = list(command_bundle.get("detected", []))
++        language_info = detect_language(normalized_text)
++        language_info["original_text_preview"] = normalized_text[:500]
++        translated_text = translate_text_for_analysis(normalized_text, language_info["language"])
++        language_info["was_translated"] = translated_text != normalized_text
++        structure_context = self._build_structure_context(
+             translated_text,
+             params.get("semantic_hints"),
+-            overrides,
++            commands=commands,
++            preserved_tags=preserved_tags,
+             language_info=language_info,
+         )
+-
+-        semantic_hints = auto_context.get("semantic_hints", {})
++        structure_context = self._apply_overrides_to_context(
++            structure_context,
++            override_manager,
++            text=translated_text,
++        )
+ 
+         backend_payload = self._backend_analyze(
+             translated_text,
+             preferred_gender=params.get("preferred_gender", "auto"),
+             version=params.get("version"),
+-            semantic_hints=semantic_hints,
+-            auto_context=auto_context,
++            semantic_hints=structure_context.get("semantic_hints", {}),
++            structure_context=structure_context,
+             override_manager=override_manager,
+             language_info=language_info,
+-            original_text=text,
++            original_text=normalized_text,
++            command_bundle=command_bundle,
+         )
+         return self._finalize_result(backend_payload)
+ 
+@@ -131,66 +144,97 @@ class StudioCoreV6:
+         merged.update(params)
+         return merged
+ 
+-    def _auto_generate_missing_params(
++    def _build_structure_context(
+         self,
+         text: str,
+         existing_hints: Dict[str, Any] | None = None,
+-        overrides: UserOverrides | None = None,
+         *,
++        commands: Sequence[Dict[str, Any]] | None = None,
++        preserved_tags: Sequence[str] | None = None,
+         language_info: Dict[str, Any] | None = None,
+     ) -> Dict[str, Any]:
+         existing_hints = dict(existing_hints or {})
+-        if overrides and overrides.structure_hints:
+-            existing_hints.setdefault("sections", overrides.structure_hints)
+-        if overrides and overrides.semantic_hints:
+-            existing_hints = self._merge_semantic_hints(existing_hints, overrides.semantic_hints)
+-
+         auto_sections = self.text_engine.auto_section_split(text)
+         hinted_sections = existing_hints.get("sections")
+         sections = self._resolve_sections_from_hints(text, hinted_sections, fallback_sections=auto_sections)
+         section_result = self.section_parser.parse(text, sections=sections)
+-        section_meta = section_result.metadata
+-        commands = self.command_interpreter.detect_commands_in_text(text)
+-        hinted_commands = existing_hints.get("commands") if isinstance(existing_hints, dict) else None
+-        if hinted_commands:
+-            commands = _merge_command_lists(commands, hinted_commands)
+-
+-        emotion_profile = self.emotion_engine.emotion_detection(text)
+-        intensity_curve = self.emotion_engine.emotion_intensity_curve(text)
+-
+-        section_intel = self.section_intelligence.analyze(text, sections, intensity_curve)
+-
++        metadata = [dict(item) for item in section_result.metadata]
+         generated_hints = {
+             "section_count": len(sections),
+             "section_lengths": [len(_ensure_tokens(section)) for section in sections],
+-            "dominant_emotion": max(emotion_profile, key=emotion_profile.get) if emotion_profile else None,
+-            "command_count": len(commands),
+-            "section_intelligence": section_intel,
+-            "section_headers": section_meta,
++            "command_count": len(commands or []),
++            "section_headers": metadata,
+             "annotations": section_result.annotations,
+         }
+-
+-        if intensity_curve:
+-            generated_hints["emotion_curve_max"] = max(intensity_curve)
+         if hinted_sections:
+             generated_hints["sections"] = hinted_sections
+         if language_info:
+             generated_hints["language"] = dict(language_info)
+ 
+-        merged_hints = self._merge_semantic_hints(generated_hints, existing_hints)
++        semantic_hints = self._merge_semantic_hints(generated_hints, existing_hints)
++        detected_commands = list(commands or [])
++        hinted_commands = existing_hints.get("commands") if isinstance(existing_hints, dict) else None
++        if hinted_commands:
++            detected_commands = _merge_command_lists(detected_commands, hinted_commands)
+ 
+         return {
+-            "semantic_hints": merged_hints,
++            "semantic_hints": semantic_hints,
+             "sections": sections,
+-            "commands": commands,
+-            "emotion_profile": self._merge_semantic_hints(dict(emotion_profile), existing_hints.get("emotion_profile", {})),
+-            "emotion_curve": intensity_curve,
+-            "section_intelligence": section_intel,
+-            "section_metadata": section_meta,
+-            "language": language_info,
++            "commands": detected_commands,
++            "section_metadata": metadata,
+             "annotations": section_result.annotations,
++            "preserved_tags": list(preserved_tags or []),
+         }
+ 
++    def _apply_overrides_to_context(
++        self,
++        context: Dict[str, Any],
++        manager: UserOverrideManager,
++        *,
++        text: str,
++    ) -> Dict[str, Any]:
++        updated = copy.deepcopy(context)
++        overrides = manager.overrides
++        semantic_hints = updated.get("semantic_hints", {})
++        if overrides.structure_hints:
++            sections = self._resolve_sections_from_hints(
++                text,
++                overrides.structure_hints,
++                fallback_sections=updated.get("sections"),
++            )
++            updated["sections"] = sections
++            semantic_hints = self._merge_semantic_hints(semantic_hints, {"sections": overrides.structure_hints})
++        if overrides.semantic_hints:
++            semantic_hints = self._merge_semantic_hints(semantic_hints, overrides.semantic_hints)
++        manual: Dict[str, Any] = {}
++        if overrides.bpm is not None:
++            manual["bpm"] = overrides.bpm
++            semantic_hints = self._merge_semantic_hints(
++                semantic_hints,
++                {"bpm": {"target": overrides.bpm}, "target_bpm": overrides.bpm},
++            )
++        if overrides.key:
++            manual["key"] = overrides.key
++            semantic_hints = self._merge_semantic_hints(semantic_hints, {"tonality": {"manual_key": overrides.key}})
++        if overrides.genre:
++            manual["genre"] = overrides.genre
++            semantic_hints = self._merge_semantic_hints(semantic_hints, {"style": {"genre": overrides.genre}})
++        if overrides.mood:
++            manual["mood"] = overrides.mood
++            semantic_hints = self._merge_semantic_hints(semantic_hints, {"style": {"mood": overrides.mood}})
++        if overrides.vocal_profile:
++            manual["vocal_profile"] = dict(overrides.vocal_profile)
++        if overrides.instrumentation:
++            manual["instrumentation"] = list(overrides.instrumentation)
++        if overrides.color_state:
++            manual["color_state"] = overrides.color_state
++        if overrides.structure_hints:
++            manual["structure_hints"] = [dict(item) for item in overrides.structure_hints]
++        if manual:
++            updated["manual_overrides"] = manual
++        updated["semantic_hints"] = semantic_hints
++        return updated
++
+     def _backend_analyze(
+         self,
+         text: str,
+@@ -198,27 +242,42 @@ class StudioCoreV6:
+         preferred_gender: str,
+         version: str | None,
+         semantic_hints: Dict[str, Any],
+-        auto_context: Dict[str, Any],
++        structure_context: Dict[str, Any],
+         override_manager: UserOverrideManager,
+         language_info: Dict[str, Any] | None = None,
+         original_text: str | None = None,
++        command_bundle: Dict[str, Any] | None = None,
+     ) -> Dict[str, Any]:
+-        sections = auto_context.get("sections", [])
++        sections = list(structure_context.get("sections", []))
+         hinted_sections = semantic_hints.get("sections")
+         if hinted_sections:
+             sections = self._resolve_sections_from_hints(text, hinted_sections) or sections
+-        section_intel_payload = auto_context.get("section_intelligence") or self.section_intelligence.analyze(
+-            text, sections, auto_context.get("emotion_curve")
++        if not sections:
++            sections = self.text_engine.auto_section_split(text)
++        emotion_profile = self.emotion_engine.emotion_detection(text)
++        emotion_curve = self.emotion_engine.emotion_intensity_curve(text)
++        section_intel_payload = self.section_intelligence.analyze(text, sections, emotion_curve)
++        structure_context["section_intelligence"] = section_intel_payload
++        structure_context["emotion_profile"] = dict(emotion_profile)
++        structure_context["emotion_curve"] = list(emotion_curve)
++        if language_info:
++            structure_context["language"] = dict(language_info)
++
++        semantic_hints = self._merge_semantic_hints(
++            semantic_hints,
++            {
++                "dominant_emotion": max(emotion_profile, key=emotion_profile.get) if emotion_profile else None,
++                "emotion_curve_max": max(emotion_curve) if emotion_curve else None,
++                "section_intelligence": section_intel_payload,
++            },
+         )
+-        if section_intel_payload.get("structure_tension") is None:
+-            section_intel_payload["structure_tension"] = self.section_intelligence.compute_structure_tension(sections)
++        structure_context["semantic_hints"] = semantic_hints
+ 
+         emotion_profile = self._merge_semantic_hints(
+-            auto_context.get("emotion_profile", {}),
++            dict(emotion_profile),
+             semantic_hints.get("emotion_profile", {}),
+         )
+-        emotion_curve = auto_context.get("emotion_curve", [])
+-        commands = auto_context.get("commands", [])
++        commands = list(structure_context.get("commands", []))
+ 
+         # 1. Call the legacy core for full analysis.
+         try:
+@@ -227,7 +286,7 @@ class StudioCoreV6:
+                 original_text or text,
+                 preferred_gender=preferred_gender,
+                 version=version,
+-                semantic_hints=semantic_hints or None,
++                semantic_hints=copy.deepcopy(semantic_hints) if semantic_hints else None,
+             )
+         except Exception as exc:  # pragma: no cover - defensive guard
+             legacy_result = {"error": str(exc)}
+@@ -246,8 +305,10 @@ class StudioCoreV6:
+         }
+         if isinstance(semantic_hints.get("section_labels"), list):
+             structure["labels"] = list(semantic_hints["section_labels"])
+-        if auto_context.get("section_metadata"):
+-            structure["headers"] = auto_context["section_metadata"]
++        if structure_context.get("section_metadata"):
++            structure["headers"] = structure_context["section_metadata"]
++        if structure_context.get("preserved_tags"):
++            structure["preserved_tags"] = list(structure_context.get("preserved_tags", []))
+         if language_info:
+             structure["language"] = dict(language_info)
+ 
+@@ -324,7 +385,7 @@ class StudioCoreV6:
+         bpm_payload = self._merge_semantic_hints(bpm_payload, semantic_hints.get("bpm", {}))
+         bpm_payload = self.override_engine.apply_to_rhythm(bpm_payload, override_manager)
+ 
+-        annotations_from_text = auto_context.get("annotations", [])
++        annotations_from_text = structure_context.get("annotations", [])
+         if annotations_from_text:
+             annotation_effects = self.section_parser.apply_annotation_effects(
+                 emotions=emotion_profile,
+@@ -413,6 +474,10 @@ class StudioCoreV6:
+         }
+         if isinstance(semantic_hints.get("commands"), list):
+             command_payload["manual_overrides"] = list(semantic_hints["commands"])
++        if command_bundle and command_bundle.get("map"):
++            command_payload["map"] = dict(command_bundle["map"])
++        if structure_context.get("preserved_tags"):
++            command_payload["preserved_tags"] = list(structure_context.get("preserved_tags", []))
+ 
+         # 12. REM synchronization
+         rem_conflicts = self.rem_engine.detect_layer_conflicts(structure, bpm_curve, instrument_selection)
+@@ -734,19 +799,6 @@ class StudioCoreV6:
+         if semantic_hints.get("annotations"):
+             annotations = self._merge_semantic_hints(annotations, semantic_hints["annotations"])
+ 
+-        suno_annotations = self.suno_engine.build_suno_safe_annotations(
+-            sections,
+-            {
+-                "bpm": bpm_payload,
+-                "instrumentation": {
+-                    "palette": instrumentation_payload.get("palette"),
+-                    "fractures": instrument_dynamics_payload.get("fractures"),
+-                },
+-                "vocal": vocal_payload,
+-                "commands": command_payload,
+-            },
+-        )
+-
+         result = {
+             "legacy": legacy_result,
+             "structure": structure,
+@@ -768,14 +820,31 @@ class StudioCoreV6:
+             "commands": command_payload,
+             "annotations": annotations,
+             "semantic_hints": semantic_hints,
+-            "auto_context": auto_context,
++            "auto_context": structure_context,
+             "instrument_dynamics": instrument_dynamics_payload,
+-            "suno_annotations": suno_annotations,
+             "override_debug": override_manager.debug_summary(),
+             "rde_summary": rde_summary,
+             "genre_analysis": genre_analysis,
+         }
+-        result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(override_manager, result)
++        applied_overrides = self._apply_user_overrides_once(result, override_manager)
++        result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(
++            override_manager,
++            result,
++            applied_overrides=applied_overrides,
++        )
++        suno_annotations = self.suno_engine.build_suno_safe_annotations(
++            sections,
++            {
++                "bpm": result.get("bpm", {}),
++                "instrumentation": {
++                    "palette": result.get("instrumentation", {}).get("palette"),
++                    "fractures": instrument_dynamics_payload.get("fractures"),
++                },
++                "vocal": result.get("vocal", {}),
++                "commands": command_payload,
++            },
++        )
++        result["suno_annotations"] = suno_annotations
+         if language_info:
+             result["language"] = dict(language_info)
+         return result
+@@ -962,6 +1031,39 @@ class StudioCoreV6:
+                     result[key] = value
+         return result
+ 
++    def _apply_user_overrides_once(
++        self, payload: Dict[str, Any], manager: UserOverrideManager
++    ) -> Dict[str, Any]:
++        adjustments: Dict[str, Any] = {}
++        vocal_payload = payload.get("vocal", {})
++        if isinstance(vocal_payload, dict):
++            applied_vocal = self.override_engine.apply_to_vocals(vocal_payload, manager)
++            payload["vocal"] = applied_vocal
++            adjustments["vocal"] = copy.deepcopy(applied_vocal)
++
++        bpm_payload = payload.get("bpm", {})
++        if isinstance(bpm_payload, dict):
++            applied_bpm = self.override_engine.apply_to_rhythm(bpm_payload, manager)
++            sections = payload.get("structure", {}).get("sections", [])
++            if sections and applied_bpm.get("estimate") not in {None, bpm_payload.get("estimate")}:
++                applied_bpm["curve"] = self.bpm_engine.meaning_bpm_curve(
++                    sections,
++                    base_bpm=applied_bpm.get("estimate") or bpm_payload.get("estimate"),
++                )
++            payload["bpm"] = applied_bpm
++            adjustments["bpm"] = copy.deepcopy(applied_bpm)
++
++        style_payload = payload.get("style", {})
++        if isinstance(style_payload, dict):
++            applied_style = self.override_engine.apply_to_style(style_payload, manager)
++            payload["style"] = applied_style
++            adjustments["style"] = copy.deepcopy(applied_style)
++
++        override_debug = manager.debug_summary()
++        override_debug["applied_overrides"] = adjustments
++        payload["override_debug"] = override_debug
++        return adjustments
++
+     def _resolve_sections_from_hints(
+         self,
+         text: str,
+diff --git a/studiocore/logical_engines.py b/studiocore/logical_engines.py
+index 8177973..7025319 100644
+--- a/studiocore/logical_engines.py
++++ b/studiocore/logical_engines.py
+@@ -22,12 +22,6 @@ from .instrument import (
+     instrument_selection as _instrument_selection,
+ )
+ from .rhythm import LyricMeter
+-try:  # pragma: no cover - compatibility shim
+-    from .text_utils import get_last_section_metadata
+-except ImportError:  # pragma: no cover - legacy builds
+-    def get_last_section_metadata() -> list:
+-        return []
+-
+ from .text_utils import extract_sections, normalize_text_preserve_symbols
+ from .tone import ToneSyncEngine
+ from .user_override_manager import UserOverrideManager
+@@ -75,24 +69,36 @@ class TextStructureEngine:
+     }
+ 
+     def __init__(self) -> None:
+-        self._last_sections: List[str] = []
+-        self._structured_meta: List[Dict[str, Any]] = []
++        self._section_metadata: List[Dict[str, Any]] = []
+ 
+     def auto_section_split(self, text: str) -> List[str]:
+-        sections = _section_texts(text)
+-        self._last_sections = sections
+-        self._structured_meta = get_last_section_metadata()
+-        return list(sections)
++        structured = extract_sections(text)
++        sections: List[str] = []
++        metadata: List[Dict[str, Any]] = []
++        for item in structured:
++            lines = item.get("lines", [])
++            section_text = "\n".join(lines).strip()
++            if section_text:
++                sections.append(section_text)
++            metadata.append(
++                {
++                    "tag": item.get("tag"),
++                    "lines": list(lines),
++                    "line_count": len(lines),
++                }
++            )
++        if not sections and text.strip():
++            sections = [text.strip()]
++        self._section_metadata = metadata
++        return sections
+ 
+-    def _ensure_sections(self, text: str, sections: Sequence[str] | None = None) -> List[str]:
++    def _resolve_sections(self, text: str, sections: Sequence[str] | None) -> List[str]:
+         if sections is not None:
+-            return list(sections)
+-        if self._last_sections:
+-            return list(self._last_sections)
++            return [section for section in sections if isinstance(section, str)]
+         return self.auto_section_split(text)
+ 
+     def _resolve_section(self, label: str, text: str, sections: Sequence[str] | None, fallback_index: int) -> Dict[str, Any]:
+-        sections = self._ensure_sections(text, sections)
++        sections = self._resolve_sections(text, sections)
+         if not sections:
+             return {"label": label, "index": None, "text": "", "confidence": 0.0}
+ 
+@@ -118,15 +124,20 @@ class TextStructureEngine:
+ 
+     def section_metadata(self) -> List[Dict[str, Any]]:
+         return [
+-            {"tag": item.get("tag"), "meta": dict(item.get("meta", {})), "lines": list(item.get("lines", []))}
+-            for item in self._structured_meta
++            {
++                "tag": item.get("tag"),
++                "lines": list(item.get("lines", [])),
++                "line_count": item.get("line_count", len(item.get("lines", []))),
++            }
++            for item in self._section_metadata
+         ]
+ 
+     def detect_intro(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+         return self._resolve_section("intro", text, sections, 0)
+ 
+     def detect_verse(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+-        return self._resolve_section("verse", text, sections, 0 if len(self._ensure_sections(text, sections)) == 1 else 1)
++        resolved = self._resolve_sections(text, sections)
++        return self._resolve_section("verse", text, resolved, 0 if len(resolved) == 1 else 1)
+ 
+     def detect_prechorus(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+         return self._resolve_section("prechorus", text, sections, 1)
+@@ -135,13 +146,15 @@ class TextStructureEngine:
+         return self._resolve_section("chorus", text, sections, 1)
+ 
+     def detect_bridge(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+-        return self._resolve_section("bridge", text, sections, max(len(self._ensure_sections(text, sections)) - 2, 0))
++        resolved = self._resolve_sections(text, sections)
++        return self._resolve_section("bridge", text, resolved, max(len(resolved) - 2, 0))
+ 
+     def detect_outro(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+-        return self._resolve_section("outro", text, sections, max(len(self._ensure_sections(text, sections)) - 1, 0))
++        resolved = self._resolve_sections(text, sections)
++        return self._resolve_section("outro", text, resolved, max(len(resolved) - 1, 0))
+ 
+     def detect_meta_pause(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+-        sections = self._ensure_sections(text, sections)
++        sections = self._resolve_sections(text, sections)
+         pause_locations: List[int] = []
+         for idx, section in enumerate(sections):
+             if "..." in section or "(pause" in section.lower() or "[pause" in section.lower():
+@@ -150,7 +163,7 @@ class TextStructureEngine:
+         return {"count": len(pause_locations), "locations": pause_locations, "confidence": confidence}
+ 
+     def detect_zero_pulse(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+-        sections = self._ensure_sections(text, sections)
++        sections = self._resolve_sections(text, sections)
+         zero_sections: List[int] = []
+         for idx, section in enumerate(sections):
+             if not section.strip() or "[silence]" in section.lower():
+@@ -873,7 +886,18 @@ class UserAdaptiveSymbiosisEngine:
+         self,
+         manager: UserOverrideManager,
+         payload: Dict[str, Any],
++        *,
++        applied_overrides: Dict[str, Any] | None = None,
+     ) -> Dict[str, Any]:
++        if applied_overrides is not None:
++            snapshot = self.merge_user_with_auto_core(manager, payload)
++            snapshot["applied_overrides"] = applied_overrides
++            snapshot["rhythm"] = payload.get("bpm", {})
++            snapshot["tonality"] = payload.get("tonality", {})
++            snapshot["vocal"] = payload.get("vocal", {})
++            snapshot["instrumentation"] = payload.get("instrumentation", {})
++            return snapshot
++
+         rhythm = self.recalculate_rhythm_under_user_settings(manager, payload.get("bpm", {}))
+         tone = self.recalculate_tone_under_user_settings(manager, payload.get("tonality", {}))
+         vocal = self.recalculate_vocals_under_user_settings(manager, payload.get("vocal", {}))
+diff --git a/studiocore/rde_engine.py b/studiocore/rde_engine.py
+index 4fa3376..36b0a68 100644
+--- a/studiocore/rde_engine.py
++++ b/studiocore/rde_engine.py
+@@ -2,7 +2,7 @@
+ 
+ from __future__ import annotations
+ 
+-from dataclasses import dataclass
++from dataclasses import asdict, dataclass
+ from typing import Any, Dict, Sequence
+ 
+ 
+@@ -27,7 +27,7 @@ class RhythmDynamicsEmotionEngine:
+         breathing_profile: Dict[str, Any],
+         emotion_profile: Dict[str, float],
+         instrumentation_payload: Dict[str, Any],
+-    ) -> RDESnapshot:
++    ) -> Dict[str, Any]:
+         dominant = max(emotion_profile, key=emotion_profile.get) if emotion_profile else None
+         palette = instrumentation_payload.get("palette")
+         if isinstance(palette, dict):
+@@ -36,7 +36,7 @@ class RhythmDynamicsEmotionEngine:
+             palette = [palette]
+         elif isinstance(palette, set):
+             palette = sorted(palette)
+-        return RDESnapshot(
++        snapshot = RDESnapshot(
+             dominant_emotion=dominant,
+             target_bpm=bpm_payload.get("estimate"),
+             breath_sync=breathing_profile.get("sync_score"),
+@@ -45,6 +45,7 @@ class RhythmDynamicsEmotionEngine:
+             else bpm_payload.get("target_energy"),
+             palette=palette,
+         )
++        return asdict(snapshot)
+ 
+ 
+ __all__ = ["RDESnapshot", "RhythmDynamicsEmotionEngine"]
+diff --git a/studiocore/section_intelligence.py b/studiocore/section_intelligence.py
+index aecbf91..0fafd58 100644
+--- a/studiocore/section_intelligence.py
++++ b/studiocore/section_intelligence.py
+@@ -8,19 +8,15 @@ from typing import Any, Dict, List, Sequence
+ class SectionIntelligenceEngine:
+     """Detect chorus/mantra/transition cues beyond naive splitting."""
+ 
+-    def __init__(self) -> None:
+-        self._last_sections: List[str] = []
+-
+-    def _ensure_sections(self, sections: Sequence[str] | None, text: str) -> List[str]:
++    def _prepare_sections(self, sections: Sequence[str] | None, text: str | None) -> List[str]:
+         if sections:
+-            cleaned = [section.strip() for section in sections if section]
+-        else:
+-            cleaned = [block.strip() for block in text.split("\n\n") if block.strip()]
+-        self._last_sections = cleaned
+-        return cleaned
++            return [section.strip() for section in sections if section and section.strip()]
++        if text:
++            return [block.strip() for block in text.split("\n\n") if block.strip()]
++        return []
+ 
+     def detect_repeated_motif(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+-        sections = self._ensure_sections(sections, text)
++        sections = self._prepare_sections(sections, text)
+         motif_counter: Counter[str] = Counter()
+         for section in sections:
+             for line in section.splitlines():
+@@ -31,7 +27,7 @@ class SectionIntelligenceEngine:
+         return {"motifs": repeated[:8], "count": len(repeated)}
+ 
+     def detect_chorus_by_pattern(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+-        sections = self._ensure_sections(sections, text)
++        sections = self._prepare_sections(sections, text)
+         candidate = None
+         highest_repeat = -1
+         for idx, section in enumerate(sections):
+@@ -50,7 +46,7 @@ class SectionIntelligenceEngine:
+         return {"index": max_idx, "intensity": round(float(emotion_curve[max_idx]), 3)}
+ 
+     def detect_prechorus(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+-        sections = self._ensure_sections(sections, text)
++        sections = self._prepare_sections(sections, text)
+         if not sections:
+             return {"index": None, "confidence": 0.0}
+         if len(sections) < 3:
+@@ -58,7 +54,7 @@ class SectionIntelligenceEngine:
+         return {"index": max(0, self.detect_chorus_by_pattern(sections, text)["index"] - 1), "confidence": 0.6}
+ 
+     def detect_semantic_block_shift(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+-        sections = self._ensure_sections(sections, text)
++        sections = self._prepare_sections(sections, text)
+         deltas: List[int] = []
+         prev_len = None
+         for section in sections:
+@@ -70,7 +66,7 @@ class SectionIntelligenceEngine:
+         return {"index": shift_index, "delta": max(deltas) if deltas else 0}
+ 
+     def detect_mantra_section(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+-        sections = self._ensure_sections(sections, text)
++        sections = self._prepare_sections(sections, text)
+         mantra_idx = None
+         for idx, section in enumerate(sections):
+             lines = section.splitlines()
+@@ -89,7 +85,7 @@ class SectionIntelligenceEngine:
+         return {"index": idx + 1, "delta": round(drops[idx], 3)}
+ 
+     def detect_intro_ending(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+-        sections = self._ensure_sections(sections, text)
++        sections = self._prepare_sections(sections, text)
+         if not sections:
+             return {"index": None, "confidence": 0.0}
+         intro_length = len(sections[0].split())
+@@ -97,7 +93,7 @@ class SectionIntelligenceEngine:
+         return {"index": 0, "confidence": confidence}
+ 
+     def detect_outro_fade(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+-        sections = self._ensure_sections(sections, text)
++        sections = self._prepare_sections(sections, text)
+         if not sections:
+             return {"index": None, "confidence": 0.0}
+         outro_length = len(sections[-1].split())
+@@ -119,7 +115,7 @@ class SectionIntelligenceEngine:
+         return outro
+ 
+     def compute_structure_tension(self, sections: Sequence[str] | None) -> float:
+-        segments = [section.strip() for section in (sections or self._last_sections) if section and section.strip()]
++        segments = [section.strip() for section in (sections or []) if section and section.strip()]
+         if not segments:
+             return 0.0
+ 
+@@ -140,7 +136,7 @@ class SectionIntelligenceEngine:
+         return round(min(1.0, tension), 3)
+ 
+     def analyze(self, text: str, sections: Sequence[str] | None, emotion_curve: Sequence[float] | None = None) -> Dict[str, Any]:
+-        sections = self._ensure_sections(sections, text)
++        sections = self._prepare_sections(sections, text)
+         structure_tension = self.compute_structure_tension(sections)
+         return {
+             "motifs": self.detect_repeated_motif(sections, text),
+diff --git a/studiocore/text_utils.py b/studiocore/text_utils.py
+index 598d24b..488bddb 100644
+--- a/studiocore/text_utils.py
++++ b/studiocore/text_utils.py
+@@ -1,6 +1,9 @@
+ # -*- coding: utf-8 -*-
++import logging
+ import re
+-from typing import List, Dict, Any
++from typing import Any, Dict, List, Tuple
++
++log = logging.getLogger(__name__)
+ 
+ # Разрешённые символы (для подсказок и визуальных тегов; сами по себе не используются для фильтрации)
+ PUNCTUATION_SAFE = set(list(",.;:!?…—–()[]\"'“”‘’*•‧·_/|"))
+@@ -8,6 +11,7 @@ EMOJI_SAFE = set(list("♡♥❤❥❣☀☁☂☮☯☾☽★☆✨⚡☼⚔⚖
+ 
+ # [Verse 1 – soft], [Chorus], [Bridge x2] и т.п.
+ SECTION_TAG_RE = re.compile(r"^\s*\[([^\]]+)\]\s*$")
++COMMAND_BLOCK_RE = re.compile(r"\[(?P<body>[^\]]+)\]")
+ 
+ # Альтернативные заголовки секций: "Припев:", "Chorus:", "Verse 2:", "## Bridge", "# Outro" и т.п.
+ SECTION_COLON_RE = re.compile(
+@@ -73,6 +77,41 @@ def normalize_text_preserve_symbols(text: str) -> str:
+     return "\n".join(out_lines).strip()
+ 
+ 
++def extract_commands_and_tags(raw_text: str) -> Tuple[str, Dict[str, Any], List[str]]:
++    """Выделяет команды и сохраняет исходные теги до нормализации."""
++
++    if raw_text is None:
++        source = ""
++    else:
++        source = str(raw_text)
++    preserved_tags: List[str] = []
++    detected: List[Dict[str, Any]] = []
++    command_pattern = re.compile(r"^(?P<name>[A-Z_]+)\s*:?[\s]*(?P<value>.+)$")
++    for match in COMMAND_BLOCK_RE.finditer(source):
++        token = match.group(0)
++        preserved_tags.append(token)
++        body = (match.group("body") or "").strip()
++        command_match = command_pattern.match(body)
++        if command_match:
++            command_type = command_match.group("name").lower()
++            command_value = command_match.group("value").strip()
++            detected.append(
++                {
++                    "type": command_type,
++                    "value": command_value,
++                    "raw": token,
++                    "position": match.start(),
++                }
++            )
++    command_map: Dict[str, Any] = {}
++    for command in detected:
++        ctype = command.get("type")
++        if ctype and ctype not in command_map:
++            command_map[ctype] = command.get("value")
++    clean_text = normalize_text_preserve_symbols(source)
++    return clean_text, {"detected": detected, "map": command_map}, preserved_tags
++
++
+ def extract_sections(text: str) -> List[Dict[str, Any]]:
+     """
+     Делит текст на секции. Поддерживает два типа маркеров:
+@@ -172,4 +211,7 @@ def detect_language(text: str) -> Dict[str, Any]:
+ def translate_text_for_analysis(text: str, language: str) -> str:
+     """Placeholder translation hook for StudioCore v6."""
+ 
++    log.warning(
++        "translate_text_for_analysis is not configured; returning source text for language '%s'", language
++    )
+     return text
+\ No newline at end of file

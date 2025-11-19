@@ -14,9 +14,11 @@ import traceback
 import threading
 import time
 import io
-import uvicorn 
+import uvicorn
 import logging
 import subprocess # v10: ИСПРАВЛЕН NameError: name 'subprocess' is not defined
+import importlib
+from dataclasses import asdict
 
 # === 1. Исправление пути импорта ===
 # (Нужно, если запускаем app.py из корня)
@@ -49,20 +51,57 @@ from typing import Optional
 # === 3. Импорт ядра ===
 try:
     from studiocore import (
-        get_core,
         loader_diagnostics,
         STUDIOCORE_VERSION,
         MONOLITH_VERSION,
         LOADER_STATUS,
     )
-    CORE = get_core()
-    CORE_LOADED = True
-    log.info(f"Ядро StudioCore {STUDIOCORE_VERSION} успешно импортировано.")
+    import studiocore.core_v6 as core_module
+    log.info(f"Ядро StudioCore {STUDIOCORE_VERSION} импортировано (статless режим).")
 except Exception as e:
-    log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить ядро: {e}")
+    log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модуль ядра: {e}")
     log.critical(traceback.format_exc())
-    CORE = None
-    CORE_LOADED = False
+    core_module = None
+
+CORE_LOCK = threading.Lock()
+CORE_RELOAD_REQUIRED = False
+LAST_CORE_ERROR: str | None = None
+CORE_SUCCESSFUL_INITS = 0
+MAX_INPUT_LENGTH = 60000
+
+
+def _ensure_core_module(force_reload: bool = False):
+    global core_module, CORE_RELOAD_REQUIRED
+    if core_module is None:
+        raise RuntimeError("StudioCore модуль недоступен")
+    if force_reload or CORE_RELOAD_REQUIRED:
+        log.warning("Перезагрузка модуля StudioCoreV6 (force_reload=%s)", force_reload)
+        core_module = importlib.reload(core_module)
+        CORE_RELOAD_REQUIRED = False
+    return core_module
+
+
+def create_core_instance(force_reload: bool = False):
+    global LAST_CORE_ERROR, CORE_SUCCESSFUL_INITS, CORE_RELOAD_REQUIRED
+    module = _ensure_core_module(force_reload=force_reload or CORE_RELOAD_REQUIRED)
+    with CORE_LOCK:
+        try:
+            instance = module.StudioCoreV6()
+            CORE_SUCCESSFUL_INITS += 1
+            LAST_CORE_ERROR = None
+            return instance
+        except Exception as exc:  # pragma: no cover - defensive guard
+            LAST_CORE_ERROR = str(exc)
+            CORE_RELOAD_REQUIRED = True
+            log.error("Не удалось создать StudioCoreV6: %s", exc)
+            raise
+
+
+def _validate_input_length(text: str | None) -> tuple[bool, str | None]:
+    payload = text or ""
+    if len(payload) > MAX_INPUT_LENGTH:
+        return False, f"⚠️ Текст превышает лимит {MAX_INPUT_LENGTH} символов. Сократите ввод."
+    return True, None
 
 # === 4. Инициализация FastAPI ===
 log.debug("Инициализация FastAPI...")
@@ -73,23 +112,17 @@ app = FastAPI(title="StudioCore API")
 # ===============================================
 @app.get("/status")
 async def status():
-    try:
-        core = get_core()
-        return {
-            "status": "ok",
-            "engine": type(core).__name__,
-            "loader": LOADER_STATUS,
-            "core_version": STUDIOCORE_VERSION,
-            "monolith_version": MONOLITH_VERSION,
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "loader": LOADER_STATUS,
-            "core_version": STUDIOCORE_VERSION,
-            "monolith_version": MONOLITH_VERSION,
-        }
+    diag = loader_diagnostics()
+    return {
+        "status": "ok" if LAST_CORE_ERROR is None else "degraded",
+        "loader": LOADER_STATUS,
+        "core_version": STUDIOCORE_VERSION,
+        "monolith_version": MONOLITH_VERSION,
+        "core_inits": CORE_SUCCESSFUL_INITS,
+        "reload_required": CORE_RELOAD_REQUIRED,
+        "last_error": LAST_CORE_ERROR,
+        "diagnostics": asdict(diag),
+    }
 
 # ===============================================
 # NEW: /version endpoint
@@ -100,7 +133,7 @@ async def version():
         "version": STUDIOCORE_VERSION,
         "monolith": MONOLITH_VERSION,
         "loader": LOADER_STATUS,
-        "diagnostics": loader_diagnostics().__dict__,
+        "diagnostics": asdict(loader_diagnostics()),
     }
 
 
@@ -118,6 +151,28 @@ async def diagnostics():
         "monolith_module": diag.monolith_module,
         "monolith_version": diag.monolith_version,
     }
+
+
+@app.post("/healthcheck")
+async def healthcheck(force_reload: bool = False):
+    try:
+        create_core_instance(force_reload=force_reload)
+        return {
+            "status": "ok",
+            "core_inits": CORE_SUCCESSFUL_INITS,
+            "reload_required": CORE_RELOAD_REQUIRED,
+            "last_error": LAST_CORE_ERROR,
+        }
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "error": str(exc),
+                "reload_required": CORE_RELOAD_REQUIRED,
+                "last_error": LAST_CORE_ERROR,
+            },
+        )
 
 # === 5. CORS ===
 app.add_middleware(
@@ -146,32 +201,37 @@ async def api_predict(request_data: PredictRequest):
     """
     log.debug(f"Входящий запрос /api/predict: {request_data.text[:50]}...")
     
-    if not CORE_LOADED or CORE is None:
-        log.error("API /api/predict: Ядро не загружено (Fallback).")
-        return JSONResponse(
-            content={"error": "⚠️ StudioCoreFallback: анализ недоступен — основное ядро не загружено."}, 
-            status_code=500
-        )
-        
+    is_valid, validation_error = _validate_input_length(request_data.text)
+    if not is_valid:
+        return JSONResponse(content={"error": validation_error}, status_code=400)
+
     try:
-        # Сопоставляем данные из запроса с тем, что ожидает core.analyze
-        result = CORE.analyze(
+        core = create_core_instance()
+    except Exception as exc:
+        log.error("API /api/predict: не удалось создать ядро: %s", exc)
+        return JSONResponse(
+            content={"error": f"Ядро недоступно: {exc}"},
+            status_code=500,
+        )
+
+    try:
+        result = core.analyze(
             request_data.text,
             preferred_gender=request_data.gender,
-            semantic_hints=request_data.semantic_hints
+            semantic_hints=request_data.semantic_hints,
         )
-        
-        if isinstance(result, dict) and "error" in result:
-             log.warning(f"API /api/predict: Ядро вернуло ошибку: {result['error']}")
-             return JSONResponse(content=result, status_code=400)
-        
-        # Возвращаем полный результат (тесты ожидают 'bpm' и 'style')
-        log.debug("API /api/predict: Анализ успешен.")
-        return JSONResponse(content=result, status_code=200)
-
-    except Exception as e:
+    except Exception as exc:  # pragma: no cover - defensive guard
+        global CORE_RELOAD_REQUIRED
+        CORE_RELOAD_REQUIRED = True
         log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА в /api/predict: {traceback.format_exc()}")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse(content={"error": str(exc)}, status_code=500)
+
+    if isinstance(result, dict) and "error" in result:
+        log.warning(f"API /api/predict: Ядро вернуло ошибку: {result['error']}")
+        return JSONResponse(content=result, status_code=400)
+
+    log.debug("API /api/predict: Анализ успешен.")
+    return JSONResponse(content=result, status_code=200)
 
 # === 7. SELF-CHECK ===
 def auto_core_check():
@@ -217,13 +277,19 @@ def analyze_text(text: str, gender: str = "auto"):
     v8: Возвращает 3 строки: Summary, Suno Prompt, Annotated Text
     """
     log.debug(f"Gradio analyze_text: получено {len(text)} символов, gender={gender}")
-    
+
     if not text.strip():
         return "⚠️ Введите текст для анализа.", "", ""
 
-    if not CORE_LOADED or CORE is None:
-        log.error("Gradio analyze_text: Ядро в режиме Fallback!")
-        return "❌ Ядро не загружено (Fallback). Анализ невозможен. Проверьте логи.", "", ""
+    is_valid, validation_error = _validate_input_length(text)
+    if not is_valid:
+        return validation_error, "", ""
+
+    try:
+        core = create_core_instance()
+    except Exception as exc:
+        log.error("Gradio analyze_text: не удалось создать ядро: %s", exc)
+        return f"❌ Ядро не загружено: {exc}", "", ""
 
     try:
         # --- Проверка пользовательских описаний вокала ---
@@ -243,7 +309,7 @@ def analyze_text(text: str, gender: str = "auto"):
                 log.info(f"🎙️ [UI] Обнаружено описание вокала: {semantic_hints['voice_profile_hint']}")
         
         log.debug("Gradio -> core.analyze...")
-        result = CORE.analyze(text, preferred_gender=gender, semantic_hints=semantic_hints or None)
+        result = core.analyze(text, preferred_gender=gender, semantic_hints=semantic_hints or None)
 
         if isinstance(result, dict) and "error" in result:
             log.error(f"Gradio: Ядро вернуло ошибку: {result['error']}")

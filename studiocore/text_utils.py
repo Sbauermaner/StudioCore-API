@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
+import logging
 import re
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Tuple
+
+log = logging.getLogger(__name__)
 
 # Разрешённые символы (для подсказок и визуальных тегов; сами по себе не используются для фильтрации)
 PUNCTUATION_SAFE = set(list(",.;:!?…—–()[]\"'“”‘’*•‧·_/|"))
@@ -8,6 +11,7 @@ EMOJI_SAFE = set(list("♡♥❤❥❣☀☁☂☮☯☾☽★☆✨⚡☼⚔⚖
 
 # [Verse 1 – soft], [Chorus], [Bridge x2] и т.п.
 SECTION_TAG_RE = re.compile(r"^\s*\[([^\]]+)\]\s*$")
+COMMAND_BLOCK_RE = re.compile(r"\[(?P<body>[^\]]+)\]")
 
 # Альтернативные заголовки секций: "Припев:", "Chorus:", "Verse 2:", "## Bridge", "# Outro" и т.п.
 SECTION_COLON_RE = re.compile(
@@ -71,6 +75,41 @@ def normalize_text_preserve_symbols(text: str) -> str:
             prev_blank = False
 
     return "\n".join(out_lines).strip()
+
+
+def extract_commands_and_tags(raw_text: str) -> Tuple[str, Dict[str, Any], List[str]]:
+    """Выделяет команды и сохраняет исходные теги до нормализации."""
+
+    if raw_text is None:
+        source = ""
+    else:
+        source = str(raw_text)
+    preserved_tags: List[str] = []
+    detected: List[Dict[str, Any]] = []
+    command_pattern = re.compile(r"^(?P<name>[A-Z_]+)\s*:?[\s]*(?P<value>.+)$")
+    for match in COMMAND_BLOCK_RE.finditer(source):
+        token = match.group(0)
+        preserved_tags.append(token)
+        body = (match.group("body") or "").strip()
+        command_match = command_pattern.match(body)
+        if command_match:
+            command_type = command_match.group("name").lower()
+            command_value = command_match.group("value").strip()
+            detected.append(
+                {
+                    "type": command_type,
+                    "value": command_value,
+                    "raw": token,
+                    "position": match.start(),
+                }
+            )
+    command_map: Dict[str, Any] = {}
+    for command in detected:
+        ctype = command.get("type")
+        if ctype and ctype not in command_map:
+            command_map[ctype] = command.get("value")
+    clean_text = normalize_text_preserve_symbols(source)
+    return clean_text, {"detected": detected, "map": command_map}, preserved_tags
 
 
 def extract_sections(text: str) -> List[Dict[str, Any]]:
@@ -172,4 +211,7 @@ def detect_language(text: str) -> Dict[str, Any]:
 def translate_text_for_analysis(text: str, language: str) -> str:
     """Placeholder translation hook for StudioCore v6."""
 
+    log.warning(
+        "translate_text_for_analysis is not configured; returning source text for language '%s'", language
+    )
     return text

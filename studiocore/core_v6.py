@@ -7,6 +7,7 @@ structured data so downstream tooling can evolve without breaking imports.
 """
 from __future__ import annotations
 
+import copy
 import re
 from typing import Any, Dict, Iterable, Sequence
 
@@ -36,7 +37,11 @@ from .instrument_dynamics import InstrumentalDynamicsEngine
 from .genre_matrix_extended import GenreMatrixExtended
 from .section_intelligence import SectionIntelligenceEngine
 from .suno_annotations import SunoAnnotationEngine
-from .text_utils import detect_language, translate_text_for_analysis
+from .text_utils import (
+    detect_language,
+    extract_commands_and_tags,
+    translate_text_for_analysis,
+)
 from .user_override_manager import UserOverrideManager, UserOverrides
 
 
@@ -75,31 +80,39 @@ class StudioCoreV6:
         self._legacy_core_cls = LegacyCore
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
+        incoming_text = text or ""
         params = self._merge_user_params(dict(kwargs))
         overrides: UserOverrides = params.get("user_overrides")
         override_manager = UserOverrideManager(overrides)
-        language_info = detect_language(text)
-        language_info["original_text_preview"] = text[:500]
-        translated_text = translate_text_for_analysis(text, language_info["language"])
-        language_info["was_translated"] = translated_text != text
-        auto_context = self._auto_generate_missing_params(
+        normalized_text, command_bundle, preserved_tags = extract_commands_and_tags(incoming_text)
+        commands = list(command_bundle.get("detected", []))
+        language_info = detect_language(normalized_text)
+        language_info["original_text_preview"] = normalized_text[:500]
+        translated_text = translate_text_for_analysis(normalized_text, language_info["language"])
+        language_info["was_translated"] = translated_text != normalized_text
+        structure_context = self._build_structure_context(
             translated_text,
             params.get("semantic_hints"),
-            overrides,
+            commands=commands,
+            preserved_tags=preserved_tags,
             language_info=language_info,
         )
-
-        semantic_hints = auto_context.get("semantic_hints", {})
+        structure_context = self._apply_overrides_to_context(
+            structure_context,
+            override_manager,
+            text=translated_text,
+        )
 
         backend_payload = self._backend_analyze(
             translated_text,
             preferred_gender=params.get("preferred_gender", "auto"),
             version=params.get("version"),
-            semantic_hints=semantic_hints,
-            auto_context=auto_context,
+            semantic_hints=structure_context.get("semantic_hints", {}),
+            structure_context=structure_context,
             override_manager=override_manager,
             language_info=language_info,
-            original_text=text,
+            original_text=normalized_text,
+            command_bundle=command_bundle,
         )
         return self._finalize_result(backend_payload)
 
@@ -131,65 +144,96 @@ class StudioCoreV6:
         merged.update(params)
         return merged
 
-    def _auto_generate_missing_params(
+    def _build_structure_context(
         self,
         text: str,
         existing_hints: Dict[str, Any] | None = None,
-        overrides: UserOverrides | None = None,
         *,
+        commands: Sequence[Dict[str, Any]] | None = None,
+        preserved_tags: Sequence[str] | None = None,
         language_info: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         existing_hints = dict(existing_hints or {})
-        if overrides and overrides.structure_hints:
-            existing_hints.setdefault("sections", overrides.structure_hints)
-        if overrides and overrides.semantic_hints:
-            existing_hints = self._merge_semantic_hints(existing_hints, overrides.semantic_hints)
-
         auto_sections = self.text_engine.auto_section_split(text)
         hinted_sections = existing_hints.get("sections")
         sections = self._resolve_sections_from_hints(text, hinted_sections, fallback_sections=auto_sections)
         section_result = self.section_parser.parse(text, sections=sections)
-        section_meta = section_result.metadata
-        commands = self.command_interpreter.detect_commands_in_text(text)
-        hinted_commands = existing_hints.get("commands") if isinstance(existing_hints, dict) else None
-        if hinted_commands:
-            commands = _merge_command_lists(commands, hinted_commands)
-
-        emotion_profile = self.emotion_engine.emotion_detection(text)
-        intensity_curve = self.emotion_engine.emotion_intensity_curve(text)
-
-        section_intel = self.section_intelligence.analyze(text, sections, intensity_curve)
-
+        metadata = [dict(item) for item in section_result.metadata]
         generated_hints = {
             "section_count": len(sections),
             "section_lengths": [len(_ensure_tokens(section)) for section in sections],
-            "dominant_emotion": max(emotion_profile, key=emotion_profile.get) if emotion_profile else None,
-            "command_count": len(commands),
-            "section_intelligence": section_intel,
-            "section_headers": section_meta,
+            "command_count": len(commands or []),
+            "section_headers": metadata,
             "annotations": section_result.annotations,
         }
-
-        if intensity_curve:
-            generated_hints["emotion_curve_max"] = max(intensity_curve)
         if hinted_sections:
             generated_hints["sections"] = hinted_sections
         if language_info:
             generated_hints["language"] = dict(language_info)
 
-        merged_hints = self._merge_semantic_hints(generated_hints, existing_hints)
+        semantic_hints = self._merge_semantic_hints(generated_hints, existing_hints)
+        detected_commands = list(commands or [])
+        hinted_commands = existing_hints.get("commands") if isinstance(existing_hints, dict) else None
+        if hinted_commands:
+            detected_commands = _merge_command_lists(detected_commands, hinted_commands)
 
         return {
-            "semantic_hints": merged_hints,
+            "semantic_hints": semantic_hints,
             "sections": sections,
-            "commands": commands,
-            "emotion_profile": self._merge_semantic_hints(dict(emotion_profile), existing_hints.get("emotion_profile", {})),
-            "emotion_curve": intensity_curve,
-            "section_intelligence": section_intel,
-            "section_metadata": section_meta,
-            "language": language_info,
+            "commands": detected_commands,
+            "section_metadata": metadata,
             "annotations": section_result.annotations,
+            "preserved_tags": list(preserved_tags or []),
         }
+
+    def _apply_overrides_to_context(
+        self,
+        context: Dict[str, Any],
+        manager: UserOverrideManager,
+        *,
+        text: str,
+    ) -> Dict[str, Any]:
+        updated = copy.deepcopy(context)
+        overrides = manager.overrides
+        semantic_hints = updated.get("semantic_hints", {})
+        if overrides.structure_hints:
+            sections = self._resolve_sections_from_hints(
+                text,
+                overrides.structure_hints,
+                fallback_sections=updated.get("sections"),
+            )
+            updated["sections"] = sections
+            semantic_hints = self._merge_semantic_hints(semantic_hints, {"sections": overrides.structure_hints})
+        if overrides.semantic_hints:
+            semantic_hints = self._merge_semantic_hints(semantic_hints, overrides.semantic_hints)
+        manual: Dict[str, Any] = {}
+        if overrides.bpm is not None:
+            manual["bpm"] = overrides.bpm
+            semantic_hints = self._merge_semantic_hints(
+                semantic_hints,
+                {"bpm": {"target": overrides.bpm}, "target_bpm": overrides.bpm},
+            )
+        if overrides.key:
+            manual["key"] = overrides.key
+            semantic_hints = self._merge_semantic_hints(semantic_hints, {"tonality": {"manual_key": overrides.key}})
+        if overrides.genre:
+            manual["genre"] = overrides.genre
+            semantic_hints = self._merge_semantic_hints(semantic_hints, {"style": {"genre": overrides.genre}})
+        if overrides.mood:
+            manual["mood"] = overrides.mood
+            semantic_hints = self._merge_semantic_hints(semantic_hints, {"style": {"mood": overrides.mood}})
+        if overrides.vocal_profile:
+            manual["vocal_profile"] = dict(overrides.vocal_profile)
+        if overrides.instrumentation:
+            manual["instrumentation"] = list(overrides.instrumentation)
+        if overrides.color_state:
+            manual["color_state"] = overrides.color_state
+        if overrides.structure_hints:
+            manual["structure_hints"] = [dict(item) for item in overrides.structure_hints]
+        if manual:
+            updated["manual_overrides"] = manual
+        updated["semantic_hints"] = semantic_hints
+        return updated
 
     def _backend_analyze(
         self,
@@ -198,27 +242,42 @@ class StudioCoreV6:
         preferred_gender: str,
         version: str | None,
         semantic_hints: Dict[str, Any],
-        auto_context: Dict[str, Any],
+        structure_context: Dict[str, Any],
         override_manager: UserOverrideManager,
         language_info: Dict[str, Any] | None = None,
         original_text: str | None = None,
+        command_bundle: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
-        sections = auto_context.get("sections", [])
+        sections = list(structure_context.get("sections", []))
         hinted_sections = semantic_hints.get("sections")
         if hinted_sections:
             sections = self._resolve_sections_from_hints(text, hinted_sections) or sections
-        section_intel_payload = auto_context.get("section_intelligence") or self.section_intelligence.analyze(
-            text, sections, auto_context.get("emotion_curve")
+        if not sections:
+            sections = self.text_engine.auto_section_split(text)
+        emotion_profile = self.emotion_engine.emotion_detection(text)
+        emotion_curve = self.emotion_engine.emotion_intensity_curve(text)
+        section_intel_payload = self.section_intelligence.analyze(text, sections, emotion_curve)
+        structure_context["section_intelligence"] = section_intel_payload
+        structure_context["emotion_profile"] = dict(emotion_profile)
+        structure_context["emotion_curve"] = list(emotion_curve)
+        if language_info:
+            structure_context["language"] = dict(language_info)
+
+        semantic_hints = self._merge_semantic_hints(
+            semantic_hints,
+            {
+                "dominant_emotion": max(emotion_profile, key=emotion_profile.get) if emotion_profile else None,
+                "emotion_curve_max": max(emotion_curve) if emotion_curve else None,
+                "section_intelligence": section_intel_payload,
+            },
         )
-        if section_intel_payload.get("structure_tension") is None:
-            section_intel_payload["structure_tension"] = self.section_intelligence.compute_structure_tension(sections)
+        structure_context["semantic_hints"] = semantic_hints
 
         emotion_profile = self._merge_semantic_hints(
-            auto_context.get("emotion_profile", {}),
+            dict(emotion_profile),
             semantic_hints.get("emotion_profile", {}),
         )
-        emotion_curve = auto_context.get("emotion_curve", [])
-        commands = auto_context.get("commands", [])
+        commands = list(structure_context.get("commands", []))
 
         # 1. Call the legacy core for full analysis.
         try:
@@ -227,7 +286,7 @@ class StudioCoreV6:
                 original_text or text,
                 preferred_gender=preferred_gender,
                 version=version,
-                semantic_hints=semantic_hints or None,
+                semantic_hints=copy.deepcopy(semantic_hints) if semantic_hints else None,
             )
         except Exception as exc:  # pragma: no cover - defensive guard
             legacy_result = {"error": str(exc)}
@@ -246,8 +305,10 @@ class StudioCoreV6:
         }
         if isinstance(semantic_hints.get("section_labels"), list):
             structure["labels"] = list(semantic_hints["section_labels"])
-        if auto_context.get("section_metadata"):
-            structure["headers"] = auto_context["section_metadata"]
+        if structure_context.get("section_metadata"):
+            structure["headers"] = structure_context["section_metadata"]
+        if structure_context.get("preserved_tags"):
+            structure["preserved_tags"] = list(structure_context.get("preserved_tags", []))
         if language_info:
             structure["language"] = dict(language_info)
 
@@ -324,7 +385,7 @@ class StudioCoreV6:
         bpm_payload = self._merge_semantic_hints(bpm_payload, semantic_hints.get("bpm", {}))
         bpm_payload = self.override_engine.apply_to_rhythm(bpm_payload, override_manager)
 
-        annotations_from_text = auto_context.get("annotations", [])
+        annotations_from_text = structure_context.get("annotations", [])
         if annotations_from_text:
             annotation_effects = self.section_parser.apply_annotation_effects(
                 emotions=emotion_profile,
@@ -413,6 +474,10 @@ class StudioCoreV6:
         }
         if isinstance(semantic_hints.get("commands"), list):
             command_payload["manual_overrides"] = list(semantic_hints["commands"])
+        if command_bundle and command_bundle.get("map"):
+            command_payload["map"] = dict(command_bundle["map"])
+        if structure_context.get("preserved_tags"):
+            command_payload["preserved_tags"] = list(structure_context.get("preserved_tags", []))
 
         # 12. REM synchronization
         rem_conflicts = self.rem_engine.detect_layer_conflicts(structure, bpm_curve, instrument_selection)
@@ -734,19 +799,6 @@ class StudioCoreV6:
         if semantic_hints.get("annotations"):
             annotations = self._merge_semantic_hints(annotations, semantic_hints["annotations"])
 
-        suno_annotations = self.suno_engine.build_suno_safe_annotations(
-            sections,
-            {
-                "bpm": bpm_payload,
-                "instrumentation": {
-                    "palette": instrumentation_payload.get("palette"),
-                    "fractures": instrument_dynamics_payload.get("fractures"),
-                },
-                "vocal": vocal_payload,
-                "commands": command_payload,
-            },
-        )
-
         result = {
             "legacy": legacy_result,
             "structure": structure,
@@ -768,14 +820,31 @@ class StudioCoreV6:
             "commands": command_payload,
             "annotations": annotations,
             "semantic_hints": semantic_hints,
-            "auto_context": auto_context,
+            "auto_context": structure_context,
             "instrument_dynamics": instrument_dynamics_payload,
-            "suno_annotations": suno_annotations,
             "override_debug": override_manager.debug_summary(),
             "rde_summary": rde_summary,
             "genre_analysis": genre_analysis,
         }
-        result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(override_manager, result)
+        applied_overrides = self._apply_user_overrides_once(result, override_manager)
+        result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(
+            override_manager,
+            result,
+            applied_overrides=applied_overrides,
+        )
+        suno_annotations = self.suno_engine.build_suno_safe_annotations(
+            sections,
+            {
+                "bpm": result.get("bpm", {}),
+                "instrumentation": {
+                    "palette": result.get("instrumentation", {}).get("palette"),
+                    "fractures": instrument_dynamics_payload.get("fractures"),
+                },
+                "vocal": result.get("vocal", {}),
+                "commands": command_payload,
+            },
+        )
+        result["suno_annotations"] = suno_annotations
         if language_info:
             result["language"] = dict(language_info)
         return result
@@ -961,6 +1030,39 @@ class StudioCoreV6:
                 else:
                     result[key] = value
         return result
+
+    def _apply_user_overrides_once(
+        self, payload: Dict[str, Any], manager: UserOverrideManager
+    ) -> Dict[str, Any]:
+        adjustments: Dict[str, Any] = {}
+        vocal_payload = payload.get("vocal", {})
+        if isinstance(vocal_payload, dict):
+            applied_vocal = self.override_engine.apply_to_vocals(vocal_payload, manager)
+            payload["vocal"] = applied_vocal
+            adjustments["vocal"] = copy.deepcopy(applied_vocal)
+
+        bpm_payload = payload.get("bpm", {})
+        if isinstance(bpm_payload, dict):
+            applied_bpm = self.override_engine.apply_to_rhythm(bpm_payload, manager)
+            sections = payload.get("structure", {}).get("sections", [])
+            if sections and applied_bpm.get("estimate") not in {None, bpm_payload.get("estimate")}:
+                applied_bpm["curve"] = self.bpm_engine.meaning_bpm_curve(
+                    sections,
+                    base_bpm=applied_bpm.get("estimate") or bpm_payload.get("estimate"),
+                )
+            payload["bpm"] = applied_bpm
+            adjustments["bpm"] = copy.deepcopy(applied_bpm)
+
+        style_payload = payload.get("style", {})
+        if isinstance(style_payload, dict):
+            applied_style = self.override_engine.apply_to_style(style_payload, manager)
+            payload["style"] = applied_style
+            adjustments["style"] = copy.deepcopy(applied_style)
+
+        override_debug = manager.debug_summary()
+        override_debug["applied_overrides"] = adjustments
+        payload["override_debug"] = override_debug
+        return adjustments
 
     def _resolve_sections_from_hints(
         self,
