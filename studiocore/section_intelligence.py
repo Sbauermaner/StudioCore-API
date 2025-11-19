@@ -8,19 +8,15 @@ from typing import Any, Dict, List, Sequence
 class SectionIntelligenceEngine:
     """Detect chorus/mantra/transition cues beyond naive splitting."""
 
-    def __init__(self) -> None:
-        self._last_sections: List[str] = []
-
-    def _ensure_sections(self, sections: Sequence[str] | None, text: str) -> List[str]:
+    def _prepare_sections(self, sections: Sequence[str] | None, text: str | None) -> List[str]:
         if sections:
-            cleaned = [section.strip() for section in sections if section]
-        else:
-            cleaned = [block.strip() for block in text.split("\n\n") if block.strip()]
-        self._last_sections = cleaned
-        return cleaned
+            return [section.strip() for section in sections if section and section.strip()]
+        if text:
+            return [block.strip() for block in text.split("\n\n") if block.strip()]
+        return []
 
     def detect_repeated_motif(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
-        sections = self._ensure_sections(sections, text)
+        sections = self._prepare_sections(sections, text)
         motif_counter: Counter[str] = Counter()
         for section in sections:
             for line in section.splitlines():
@@ -31,7 +27,7 @@ class SectionIntelligenceEngine:
         return {"motifs": repeated[:8], "count": len(repeated)}
 
     def detect_chorus_by_pattern(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
-        sections = self._ensure_sections(sections, text)
+        sections = self._prepare_sections(sections, text)
         candidate = None
         highest_repeat = -1
         for idx, section in enumerate(sections):
@@ -50,7 +46,7 @@ class SectionIntelligenceEngine:
         return {"index": max_idx, "intensity": round(float(emotion_curve[max_idx]), 3)}
 
     def detect_prechorus(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
-        sections = self._ensure_sections(sections, text)
+        sections = self._prepare_sections(sections, text)
         if not sections:
             return {"index": None, "confidence": 0.0}
         if len(sections) < 3:
@@ -58,7 +54,7 @@ class SectionIntelligenceEngine:
         return {"index": max(0, self.detect_chorus_by_pattern(sections, text)["index"] - 1), "confidence": 0.6}
 
     def detect_semantic_block_shift(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
-        sections = self._ensure_sections(sections, text)
+        sections = self._prepare_sections(sections, text)
         deltas: List[int] = []
         prev_len = None
         for section in sections:
@@ -70,7 +66,7 @@ class SectionIntelligenceEngine:
         return {"index": shift_index, "delta": max(deltas) if deltas else 0}
 
     def detect_mantra_section(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
-        sections = self._ensure_sections(sections, text)
+        sections = self._prepare_sections(sections, text)
         mantra_idx = None
         for idx, section in enumerate(sections):
             lines = section.splitlines()
@@ -89,7 +85,7 @@ class SectionIntelligenceEngine:
         return {"index": idx + 1, "delta": round(drops[idx], 3)}
 
     def detect_intro_ending(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
-        sections = self._ensure_sections(sections, text)
+        sections = self._prepare_sections(sections, text)
         if not sections:
             return {"index": None, "confidence": 0.0}
         intro_length = len(sections[0].split())
@@ -97,7 +93,7 @@ class SectionIntelligenceEngine:
         return {"index": 0, "confidence": confidence}
 
     def detect_outro_fade(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
-        sections = self._ensure_sections(sections, text)
+        sections = self._prepare_sections(sections, text)
         if not sections:
             return {"index": None, "confidence": 0.0}
         outro_length = len(sections[-1].split())
@@ -119,7 +115,7 @@ class SectionIntelligenceEngine:
         return outro
 
     def compute_structure_tension(self, sections: Sequence[str] | None) -> float:
-        segments = [section.strip() for section in (sections or self._last_sections) if section and section.strip()]
+        segments = [section.strip() for section in (sections or []) if section and section.strip()]
         if not segments:
             return 0.0
 
@@ -140,7 +136,7 @@ class SectionIntelligenceEngine:
         return round(min(1.0, tension), 3)
 
     def analyze(self, text: str, sections: Sequence[str] | None, emotion_curve: Sequence[float] | None = None) -> Dict[str, Any]:
-        sections = self._ensure_sections(sections, text)
+        sections = self._prepare_sections(sections, text)
         structure_tension = self.compute_structure_tension(sections)
         return {
             "motifs": self.detect_repeated_motif(sections, text),
