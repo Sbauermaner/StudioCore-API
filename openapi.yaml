@@ -1,0 +1,150 @@
+openapi: 3.1.0
+info:
+  title: StudioCore v6.4 MAXI API
+  description: StudioCore v6.4 MAXI — FastAPI/Gradio bridge by Сергей Бауэр (@Sbauermaner).
+    Stateless, безопасный и готовый к продакшену интерфейс.
+  contact:
+    name: Serhiy Bauer
+    url: https://github.com/Sbauermaner
+  license:
+    name: MIT License (with additional usage restrictions)
+    url: https://github.com/Sbauermaner/StudioCore/blob/main/LICENSE
+  version: v6.4-maxi
+paths:
+  /status:
+    get:
+      summary: Status
+      operationId: status_status_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /version:
+    get:
+      summary: Version
+      operationId: version_version_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /diagnostics:
+    get:
+      summary: Diagnostics
+      operationId: diagnostics_diagnostics_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /healthcheck:
+    post:
+      summary: Healthcheck
+      operationId: healthcheck_healthcheck_post
+      parameters:
+      - name: force_reload
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Force Reload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/predict:
+    post:
+      summary: Api Predict
+      description: 'Эндпоинт, который ищут ''test_all.py'' и ''auto_core_check''.
+
+        Он принимает JSON и возвращает JSON.'
+      operationId: api_predict_api_predict_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    PredictRequest:
+      properties:
+        text:
+          type: string
+          title: Text
+        gender:
+          type: string
+          title: Gender
+          default: auto
+        tlp:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Tlp
+        semantic_hints:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Semantic Hints
+      type: object
+      required:
+      - text
+      title: PredictRequest
+      description: 'Модель запроса для API '
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError

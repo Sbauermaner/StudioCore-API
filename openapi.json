@@ -1,39 +1,29 @@
 {
-  "openapi": "3.0.1",
+  "openapi": "3.1.0",
   "info": {
-    "title": "StudioCore API",
-    "version": "v5.2",
-    "description": "🎧 StudioCore — Expressive Adaptive Engine by Bauer Synesthetic Studio.\n\nAI ядро для анализа текста, эмоций и структуры. Возвращает жанр, BPM, философию, промты и аннотированный текст.\n\nFormula: Truth × Love × Pain = Conscious Frequency."
+    "title": "StudioCore v6.4 MAXI API",
+    "description": "StudioCore v6.4 MAXI — FastAPI/Gradio bridge by Сергей Бауэр (@Sbauermaner). Stateless, безопасный и готовый к продакшену интерфейс.",
+    "contact": {
+      "name": "Serhiy Bauer",
+      "url": "https://github.com/Sbauermaner"
+    },
+    "license": {
+      "name": "MIT License (with additional usage restrictions)",
+      "url": "https://github.com/Sbauermaner/StudioCore/blob/main/LICENSE"
+    },
+    "version": "v6.4-maxi"
   },
-  "servers": [
-    {
-      "url": "http://0.0.0.0:7860"
-    }
-  ],
   "paths": {
     "/status": {
       "get": {
-        "summary": "Healthcheck",
-        "operationId": "checkStatus",
-        "description": "Проверяет, что StudioCore API готов к работе.",
+        "summary": "Status",
+        "operationId": "status_status_get",
         "responses": {
           "200": {
-            "description": "API доступен.",
+            "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": { "type": "string" },
-                    "engine": { "type": "string" },
-                    "ready": { "type": "boolean" }
-                  }
-                },
-                "example": {
-                  "status": "ok",
-                  "engine": "StudioCore v5.2",
-                  "ready": true
-                }
+                "schema": {}
               }
             }
           }
@@ -42,28 +32,67 @@
     },
     "/version": {
       "get": {
-        "summary": "Version info",
-        "operationId": "getVersionInfo",
-        "description": "Возвращает текущую версию ядра StudioCore, подпись класса и статус готовности.",
+        "summary": "Version",
+        "operationId": "version_version_get",
         "responses": {
           "200": {
-            "description": "Информация о версии.",
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/diagnostics": {
+      "get": {
+        "summary": "Diagnostics",
+        "operationId": "diagnostics_diagnostics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthcheck": {
+      "post": {
+        "summary": "Healthcheck",
+        "operationId": "healthcheck_healthcheck_post",
+        "parameters": [
+          {
+            "name": "force_reload",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Force Reload"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": { "type": "string" },
-                    "engine": { "type": "string" },
-                    "version": { "type": "string" },
-                    "signature": { "type": "string" }
-                  }
-                },
-                "example": {
-                  "status": "ok",
-                  "engine": "StudioCore",
-                  "version": "v5.2",
-                  "signature": "StudioCore"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -73,66 +102,132 @@
     },
     "/api/predict": {
       "post": {
-        "summary": "Analyze text with StudioCore",
-        "operationId": "analyzeText",
-        "description": "Выполняет полный анализ текста через ядро StudioCore. Возвращает краткий результат, Full Prompt, Suno Prompt и аннотированный текст.",
+        "summary": "Api Predict",
+        "description": "Эндпоинт, который ищут 'test_all.py' и 'auto_core_check'.\nОн принимает JSON и возвращает JSON.",
+        "operationId": "api_predict_api_predict_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "text": {
-                    "type": "string",
-                    "format": "text",
-                    "description": "Полный текст песни, стихотворения или манифеста для анализа (до 100 000 символов).",
-                    "maxLength": 100000
-                  },
-                  "gender": {
-                    "type": "string",
-                    "enum": ["auto", "male", "female"],
-                    "default": "auto",
-                    "description": "Предпочтительный пол вокала (auto, male, female)."
-                  }
-                },
-                "required": ["text"]
-              },
-              "example": {
-                "text": "Вся моя жизнь — как быль или небыль, Вся моя жизнь — по краю скользить...",
-                "gender": "auto"
+                "$ref": "#/components/schemas/PredictRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "Успешный анализ текста.",
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "summary": { "type": "string" },
-                    "prompt_full": { "type": "string" },
-                    "prompt_suno": { "type": "string" },
-                    "annotated_text": { "type": "string" },
-                    "engine_version": { "type": "string" },
-                    "gender": { "type": "string" }
-                  }
-                },
-                "example": {
-                  "summary": "✅ Анализ завершён успешно. Жанр: lyrical adaptive, Стиль: melancholic minor...",
-                  "prompt_full": "Genre: lyrical adaptive | Style: melancholic minor | ...",
-                  "prompt_suno": "lyrical minor emotional soft tone ...",
-                  "annotated_text": "🎙️ Core Annotation + Vocal Layer ...",
-                  "engine_version": "v5.2",
-                  "gender": "auto"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
           }
         }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PredictRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "gender": {
+            "type": "string",
+            "title": "Gender",
+            "default": "auto"
+          },
+          "tlp": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tlp"
+          },
+          "semantic_hints": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic Hints"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "PredictRequest",
+        "description": "Модель запроса для API "
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       }
     }
   }

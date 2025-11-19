@@ -1,5 +1,29 @@
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 *.log
+*.pytest_cache/
+.pytest_cache/
+.env
+.venv/
+venv/
+.env.*
+*.sqlite3
+
+# IDE / editors
+.vscode/
+.idea/
+*.swp
+
+# Distribution / build
+build/
+dist/
+*.whl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local configs
 studio_config.json
