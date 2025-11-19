@@ -109,8 +109,14 @@ def extract_commands_and_tags(raw_text: str) -> Tuple[str, Dict[str, Any], List[
         ctype = command.get("type")
         if ctype and ctype not in command_map:
             command_map[ctype] = command.get("value")
+    unique_tags: List[str] = []
+    seen_tags = set()
+    for tag in preserved_tags:
+        if tag not in seen_tags:
+            unique_tags.append(tag)
+            seen_tags.add(tag)
     clean_text = normalize_text_preserve_symbols(source)
-    return clean_text, {"detected": detected, "map": command_map}, preserved_tags
+    return clean_text, {"detected": detected, "map": command_map}, unique_tags
 
 
 def extract_sections(text: str) -> List[Dict[str, Any]]:
