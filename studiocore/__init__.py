@@ -8,10 +8,13 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Tuple, Type
 
+FINGERPRINT = "StudioCore-FP-2025-SB-9fd72e27"
+
 from .core_v6 import StudioCoreV6
 from .fallback import StudioCoreFallback
 
-STUDIOCORE_VERSION = "v6.4-maxi"
+# Version fingerprint linked to FINGERPRINT: StudioCore-FP-2025-SB-9fd72e27
+STUDIOCORE_VERSION = "6.4.0-protected"
 DEFAULT_MONOLITH = "monolith_v4_3_1"
 DEFAULT_LOADER_ORDER = ("v6", "v5", "monolith", "fallback")
 
@@ -241,6 +244,7 @@ __all__ = [
     "StudioCoreFallback",
     "get_core",
     "loader_diagnostics",
+    "FINGERPRINT",
     "STUDIOCORE_VERSION",
     "MONOLITH_VERSION",
     "DEFAULT_LOADER_ORDER",

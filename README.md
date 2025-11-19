@@ -1,3 +1,12 @@
+# 🔒 StudioCore — Protected MIT-Licensed Codebase
+**Author: Сергей Бауэр (@Sbauermaner)**
+
+Using this software implies acceptance of the Enhanced MIT License and NOTICE.  
+Only the raw source code is licensed under MIT.  
+The StudioCore name, brand, project identity, algorithms, models, documentation style,  
+and musical/literary analysis frameworks are NOT licensed under MIT and remain the exclusive  
+intellectual property of the Author.
+
 # StudioCore v6.4 MAXI — Adaptive Music Intelligence / Адаптивный музыкальный интеллект
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -10,7 +19,7 @@
 ---
 
 ## 🇷🇺 Обзор
-StudioCore v6.4 MAXI — статлес-движок для анализа лирики и генерации музыкальных подсказок. FastAPI и Gradio оборачивают ядро StudioCoreV6, обеспечивая HTTP API, публичный UI и встроенные самопроверки. Все лишние файлы удалены, конфигурация готова к публичному релизу.
+StudioCore v6.4 MAXI — статлес-движок для анализа лирики и генерации музыкальных подсказок. FastAPI и Gradio оборачивают ядро StudioCoreV6, обеспечивая HTTP API, UI, доступный в рамках условий MIT, и встроенные самопроверки. Все лишние файлы удалены, конфигурация готова к релизу в рамках условий MIT.
 
 ### Возможности
 - Анализ текста: жанр, BPM, тональность, эмоции, вокал, структурные секции.
@@ -50,7 +59,7 @@ StudioCore v6.4 MAXI — статлес-движок для анализа ли�
 ---
 
 ## 🇬🇧 Overview
-StudioCore v6.4 MAXI is a stateless lyric-analysis engine wrapped by FastAPI and Gradio. It exposes StudioCoreV6 with clean diagnostics, reload controls, and a public UI. The repository has been cleaned for a production-ready GitHub release.
+StudioCore v6.4 MAXI is a stateless lyric-analysis engine wrapped by FastAPI and Gradio. It exposes StudioCoreV6 with clean diagnostics, reload controls, and a UI available under MIT licensing terms. The repository has been cleaned for a production-ready GitHub release.
 
 ### Features
 - Text analysis: genre, BPM, key, emotions, vocal profile, and structural sections.
