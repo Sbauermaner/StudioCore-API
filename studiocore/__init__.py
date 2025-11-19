@@ -11,7 +11,7 @@ from typing import Any, Dict, Iterable, List, Tuple, Type
 from .core_v6 import StudioCoreV6
 from .fallback import StudioCoreFallback
 
-STUDIOCORE_VERSION = "v6.3-maxi"
+STUDIOCORE_VERSION = "v6.4-maxi"
 DEFAULT_MONOLITH = "monolith_v4_3_1"
 DEFAULT_LOADER_ORDER = ("v6", "v5", "monolith", "fallback")
 

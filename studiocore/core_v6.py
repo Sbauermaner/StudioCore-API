@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import re
+from dataclasses import asdict
 from typing import Any, Dict, Iterable, Sequence
 
 from .bpm_engine import BPMEngine
@@ -781,12 +782,13 @@ class StudioCoreV6:
         style_payload = self._merge_semantic_hints(style_payload, semantic_hints.get("style", {}))
         style_payload = self.override_engine.apply_to_style(style_payload, override_manager)
 
-        rde_summary = self.rde_engine.compose(
+        rde_snapshot = self.rde_engine.compose(
             bpm_payload=bpm_payload,
             breathing_profile={**breathing_profile, "sync_score": breath_sync},
             emotion_profile=emotion_profile,
             instrumentation_payload=instrumentation_payload,
         )
+        rde_summary = asdict(rde_snapshot)
 
         # 15. Lyrics annotations
         annotations = {

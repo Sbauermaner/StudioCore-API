@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
-"""StudioCore v6.3 MAXI — FastAPI/Gradio bridge.
+"""StudioCore v6.4 MAXI — FastAPI/Gradio bridge by Сергей Бауэр (@Sbauermaner).
 
-The application historically shipped with a v5 loader description.  After the
-MAXI merge the runtime exposes StudioCoreV6 by default, plus legacy fallbacks
-and structured diagnostics.  The docstring now mirrors the real runtime so
-external tooling (Dashboards, GitHub Actions) immediately sees that the MAXI
-stack is active.
+Production-ready API gateway that mounts the StudioCore inference engine into a
+FastAPI + Gradio stack. The application favours stateless execution, clean
+diagnostics, and explicit reload controls so the runtime is safe for
+public-facing deployments.
 """
 
 import os
@@ -38,7 +37,7 @@ except ImportError:
     logging.basicConfig(level=logging.DEBUG) # Fallback
 
 log = logging.getLogger(__name__)
-log.info(f"Запуск app.py... (PID: {os.getpid()})")
+log.info(f"Запуск StudioCore v6.4 MAXI by @Sbauermaner... (PID: {os.getpid()})")
 # === Конец активации логгера ===
 
 import gradio as gr
@@ -57,7 +56,9 @@ try:
         LOADER_STATUS,
     )
     import studiocore.core_v6 as core_module
-    log.info(f"Ядро StudioCore {STUDIOCORE_VERSION} импортировано (статless режим).")
+    log.info(
+        f"Ядро StudioCore {STUDIOCORE_VERSION} импортировано (stateless режим)."
+    )
 except Exception as e:
     log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модуль ядра: {e}")
     log.critical(traceback.format_exc())
@@ -105,7 +106,19 @@ def _validate_input_length(text: str | None) -> tuple[bool, str | None]:
 
 # === 4. Инициализация FastAPI ===
 log.debug("Инициализация FastAPI...")
-app = FastAPI(title="StudioCore API")
+app = FastAPI(
+    title="StudioCore v6.4 MAXI by @Sbauermaner",
+    version=STUDIOCORE_VERSION,
+    description=(
+        "StudioCore v6.4 MAXI — FastAPI/Gradio bridge by Сергей Бауэр (@Sbauermaner)."
+        " Stateless, безопасный и готовый к продакшену интерфейс."
+    ),
+    contact={"name": "Serhiy Bauer", "url": "https://github.com/Sbauermaner"},
+    license_info={
+        "name": "MIT License (with additional usage restrictions)",
+        "url": "https://github.com/Sbauermaner/StudioCore/blob/main/LICENSE",
+    },
+)
 
 # ===============================================
 # NEW: /status endpoint
@@ -362,42 +375,54 @@ def run_inline_tests():
     buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
     buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
-    # --- Путь к скрипту test_all.py ---
-    test_script_path = os.path.join(ROOT, "studiocore", "tests", "test_all.py")
-    
-    if not os.path.exists(test_script_path):
-        log.error(f"Test runner: Файл не найден: {test_script_path}")
-        buffer.write(f"❌ ОШИБКА: Не найден скрипт test_all.py\n")
+    tests_path = os.path.join(ROOT, "tests")
+    pytest_missing = False
+
+    try:
+        import pytest  # type: ignore
+    except Exception:
+        pytest_missing = True
+
+    if pytest_missing:
+        message = (
+            "⚠️ Pytest не установлен. Установите pytest для запуска тестов "
+            "(pip install pytest) либо запустите их вручную."
+        )
+        log.warning(message)
+        buffer.write(message + "\n")
         return buffer.getvalue()
 
-    # --- Запуск test_all.py ---
+    if not os.path.isdir(tests_path):
+        log.warning(f"Каталог тестов не найден: {tests_path}")
+        buffer.write("ℹ️ Каталог tests/ отсутствует, тесты не запускались.\n")
+        return buffer.getvalue()
+
     try:
-        log.info(f"🚀 Running: {test_script_path}")
-        buffer.write(f"🚀 Running: {test_script_path}\n\n")
-        
-        # Используем subprocess для захвата STDOUT и STDERR
+        log.info(f"🚀 Running pytest in {tests_path}")
+        buffer.write(f"🚀 Running pytest in {tests_path}\n\n")
+
         process = subprocess.run(
-            [sys.executable, test_script_path],
+            [sys.executable, "-m", "pytest", "-q", tests_path],
             cwd=ROOT,
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="ignore",
-            timeout=180 # 3 минуты (на случай медленной загрузки ИИ)
+            timeout=300,
         )
-        
-        # Пишем STDOUT (логи)
+
         if process.stdout:
             buffer.write(process.stdout)
-            
-        # Пишем STDERR (ошибки)
+
         if process.stderr:
             buffer.write("\n--- STDERR ---\n")
             buffer.write(process.stderr)
 
     except subprocess.TimeoutExpired:
-        log.error("Test runner: ТЕСТЫ ПРЕВЫСИЛИ ТАЙМАУТ (180с)!")
-        buffer.write("\n❌ КРИТИЧЕСКАЯ ОШИБКА: Тесты заняли слишком много времени (Timeout 180s).\n")
+        log.error("Test runner: ТЕСТЫ ПРЕВЫСИЛИ ТАЙМАУТ (300с)!")
+        buffer.write(
+            "\n❌ КРИТИЧЕСКАЯ ОШИБКА: Тесты заняли слишком много времени (Timeout 300s).\n"
+        )
     except Exception as e:
         log.error(f"Test runner: КРИТИЧЕСКАЯ ОШИБКА: {e}")
         buffer.write(f"❌ ОШИБКА ПРИ ЗАПУСКЕ ТЕСТОВ: {e}\n{traceback.format_exc()}\n")
@@ -409,8 +434,13 @@ def run_inline_tests():
 
 # === 10. PUBLIC UI (Gradio) ===
 log.debug("Инициализация Gradio UI...")
-with gr.Blocks(title=f"🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface") as iface_public:
-    gr.Markdown(f"## 🎧 StudioCore {STUDIOCORE_VERSION}\nАдаптивный движок с тестами и логами.\n")
+with gr.Blocks(
+    title=f"🎧 StudioCore v6.4 MAXI — Public Interface by @Sbauermaner"
+) as iface_public:
+    gr.Markdown(
+        f"## 🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface by @Sbauermaner\n"
+        "Адаптивный движок с тестами и логами.\n"
+    )
 
     with gr.Tab("🎙️ Анализ текста"):
         with gr.Row():
@@ -459,5 +489,7 @@ app = gr.mount_gradio_app(app, iface_public, path="/")
 
 # === 12. RUN ===
 if __name__ == "__main__":
-    log.info(f"🚀 Запуск StudioCore {STUDIOCORE_VERSION} API (Inline Logs Mode)...")
+    log.info(
+        f"🚀 Запуск StudioCore v6.4 MAXI by @Sbauermaner (API + Gradio)..."
+    )
     uvicorn.run(app, host="0.0.0.0", port=7860)
