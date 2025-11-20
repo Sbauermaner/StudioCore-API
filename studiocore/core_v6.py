@@ -41,7 +41,13 @@ from .logical_engines import (
 from .instrument_dynamics import InstrumentalDynamicsEngine
 from .genre_matrix_extended import GenreMatrixExtended
 from .section_intelligence import SectionIntelligenceEngine
-from .suno_annotations import SunoAnnotationEngine
+from .suno_annotations import (
+    SunoAnnotationEngine,
+    _dominant_emotion,
+    emotion_to_instruments,
+    emotion_to_style,
+    emotion_to_vocal,
+)
 from .fanf_annotation import FANFAnnotationEngine
 from .text_utils import (
     detect_language,
@@ -908,6 +914,23 @@ class StudioCoreV6:
             visual=style_visual,
             tone=style_tone,
         )
+        emotion = _dominant_emotion(smoothed_vectors)
+        instrumentation_palette = emotion_to_instruments(emotion)
+        vocal_profile = emotion_to_vocal(emotion)
+        style_label = emotion_to_style(emotion)
+        color_global = result.get("_emotion_map", {}).get("global", "#888888")
+
+        suno_style_prompt = (
+            f"[STYLE: {style_label}]\n"
+            f"[EMOTION: {emotion}]\n"
+            f"[COLOR: {color_global}]\n"
+            f"[INSTRUMENTATION: {', '.join(instrumentation_palette)}]\n"
+            f"[VOCAL: {vocal_profile}]\n"
+            f"[BPM: {result.get('bpm', {}).get('estimate', 'auto')}]\n"
+            f"[KEY: {result.get('style', {}).get('key', 'auto')}]\n"
+        )
+
+        result["style_prompt"] = suno_style_prompt
         style_payload = {
             "genre": style_genre,
             "mood": style_mood,
@@ -1054,6 +1077,7 @@ class StudioCoreV6:
         merged["rde_summary"] = payload.get("rde_summary", {})
         merged["genre_analysis"] = payload.get("genre_analysis", {})
         merged["fanf"] = payload.get("fanf", {})
+        merged["style_prompt"] = payload.get("style_prompt")
         merged["summary"] = payload.get("style", {}).get("prompt") or payload.get("summary") or ""
         merged.pop("_overrides_applied", None)
         return merged
