@@ -9,6 +9,8 @@ import math
 from typing import Dict, Any
 import logging
 
+from studiocore.emotion_profile import EmotionVector, EmotionAggregator
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
@@ -102,6 +104,19 @@ class TruthLovePainEngine: # <-- v15: Оригинальное имя
         log.debug(f"TLP результат: {result}")
         return result
 
+    def export_emotion_vector(self, text: str) -> EmotionVector:
+        """
+        Passive hook. Returns a neutral EmotionVector until dynamic mode is enabled.
+        """
+        return EmotionVector(
+            truth=0.0,
+            love=0.0,
+            pain=0.0,
+            valence=0.0,
+            arousal=0.0,
+            weight=1.0,
+        )
+
 
 # =====================================================
 # 💫 AutoEmotionalAnalyzer (v3 Словари)
@@ -180,4 +195,17 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
         final_scores = {k: round(v, 3) for k, v in normalized.items() if k != "neutral" and v > 0.001}
         log.debug(f"Результат EMO (финал): {final_scores}")
         return final_scores
+
+    def export_emotion_vector(self, text: str) -> EmotionVector:
+        """
+        Passive hook. Returns a neutral EmotionVector until dynamic mode is enabled.
+        """
+        return EmotionVector(
+            truth=0.0,
+            love=0.0,
+            pain=0.0,
+            valence=0.0,
+            arousal=0.0,
+            weight=1.0,
+        )
 

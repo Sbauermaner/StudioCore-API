@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Sequence
 
+from studiocore.emotion_profile import EmotionVector, EmotionAggregator
+
 
 @dataclass(frozen=True)
 class RDESnapshot:
@@ -51,6 +53,19 @@ class RhythmDynamicsEmotionEngine:
             palette=palette,
         )
         return snapshot
+
+    def export_emotion_vector(self, text: str) -> EmotionVector:
+        """
+        Passive hook. Returns a neutral EmotionVector until dynamic mode is enabled.
+        """
+        return EmotionVector(
+            truth=0.0,
+            love=0.0,
+            pain=0.0,
+            valence=0.0,
+            arousal=0.0,
+            weight=1.0,
+        )
 
 
 __all__ = ["RDESnapshot", "RhythmDynamicsEmotionEngine"]
