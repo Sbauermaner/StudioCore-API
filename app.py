@@ -158,8 +158,14 @@ async def status():
 # ===============================================
 # NEW: stable JSON debug endpoint
 # ===============================================
+
+
+class DebugRequest(BaseModel):
+    text: str
+
+
 @app.post("/debug_json")
-async def debug_json(text: str):
+async def debug_json(req: DebugRequest):
     """
     Возвращает полный JSON-payload, минуя Gradio и консоль.
     Используется для диагностики: prompt_suno_style, annotated_text_suno,
@@ -167,7 +173,7 @@ async def debug_json(text: str):
     """
 
     core = create_core_instance(force_reload=False)
-    result = core.analyze(text, preferred_gender="auto")
+    result = core.analyze(req.text, preferred_gender="auto")
     return {"debug": True, "payload": result}
 
 
