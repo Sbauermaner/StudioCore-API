@@ -208,6 +208,7 @@ class StudioCoreV6:
             "sections": sections,
             "commands": detected_commands,
             "section_metadata": metadata,
+            "section_headers": metadata,
             "annotations": section_result.annotations,
             "preserved_tags": list(preserved_tags or []),
         }
@@ -343,6 +344,11 @@ class StudioCoreV6:
         zero_hint = self.text_engine.detect_zero_pulse(text, sections=sections)
 
         # 3. Emotional layers
+        dominant_emotion = self._resolve_dominant_emotion(text, emotion_profile)
+        tlp_profile = self.tlp_engine.analyze(text)
+        if dominant_emotion:
+            tlp_profile["dominant_name"] = dominant_emotion
+            tlp_profile["emotion"] = dominant_emotion
         emotion_payload = {
             "profile": emotion_profile,
             "curve": emotion_curve,
@@ -350,7 +356,6 @@ class StudioCoreV6:
             "secondary": self.emotion_engine.secondary_emotion_detection(emotion_profile),
             "conflict": self.emotion_engine.emotion_conflict_map(emotion_profile),
         }
-        tlp_profile = self.tlp_engine.analyze(text)
         emotion_payload = self._merge_semantic_hints(emotion_payload, semantic_hints.get("emotion", {}))
 
         # 4. Tonal colours and style hints
@@ -838,6 +843,16 @@ class StudioCoreV6:
             or domain_genre
             or self.style_engine.genre_selection(emotion_profile, tlp_profile)
         )
+        emotion_label = (tlp_profile.get("dominant_name") or tlp_profile.get("emotion") or "").lower()
+        forced_genres = {
+            "melancholy_dark": "gothic adaptive darkwave",
+            "rage_extreme": "ideological extreme adaptive rage",
+            "love_soft": "lyrical love adaptive classic",
+            "joy_bright": "pop adaptive light",
+            "confidence": "hiphop adaptive",
+        }
+        if not style_commands.get("genre") and emotion_label in forced_genres:
+            style_genre = forced_genres[emotion_label]
         style_mood = (
             style_commands.get("mood")
             or semantic_hints.get("style", {}).get("mood")
@@ -991,6 +1006,7 @@ class StudioCoreV6:
         merged["semantic_hints"] = payload.get("semantic_hints", {})
         merged["auto_context"] = payload.get("auto_context", {})
         merged["instrument_dynamics"] = payload.get("instrument_dynamics", {})
+        merged["tlp"] = payload.get("tlp", {})
         merged["suno_annotations"] = payload.get("suno_annotations", [])
         merged["symbiosis"] = payload.get("symbiosis", {})
         merged["override_debug"] = payload.get("override_debug", {})
@@ -998,6 +1014,7 @@ class StudioCoreV6:
         merged["rde_summary"] = payload.get("rde_summary", {})
         merged["genre_analysis"] = payload.get("genre_analysis", {})
         merged["fanf"] = payload.get("fanf", {})
+        merged["summary"] = payload.get("style", {}).get("prompt") or payload.get("summary") or ""
         merged.pop("_overrides_applied", None)
         return merged
 
@@ -1179,6 +1196,30 @@ class StudioCoreV6:
             "darkness_level": _value("darkness_level"),
             "lyric_form_weight": _value("lyric_form_weight"),
         }
+
+    def _resolve_dominant_emotion(self, text: str, emotion_profile: Dict[str, float]) -> str:
+        corpus = text.lower()
+        keyword_map = [
+            ("melancholy_dark", ["готик", "darkwave", "мрак", "тьма", "темн"]),
+            ("rage_extreme", ["убей", "уничтож", "ненавиж", "смерт", "rage"]),
+            ("love_soft", ["люб", "поцел", "неж", "ласк", "тепл"]),
+            ("joy_bright", ["солн", "чудо", "радост", "улыб", "свет"]),
+            ("confidence", ["бит", "улиц", "флоу", "правда", "силой", "hiphop", "рэп"]),
+        ]
+        for label, keywords in keyword_map:
+            if any(token in corpus for token in keywords):
+                return label
+        if emotion_profile:
+            dominant = max(emotion_profile.items(), key=lambda item: item[1])[0]
+            fallback_map = {
+                "joy": "joy_bright",
+                "peace": "confidence",
+                "anger": "rage_extreme",
+                "sadness": "melancholy_dark",
+                "awe": "love_soft",
+            }
+            return fallback_map.get(dominant, dominant)
+        return ""
 
     @staticmethod
     def _merge_semantic_hints(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:

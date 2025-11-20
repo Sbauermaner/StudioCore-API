@@ -38,7 +38,7 @@ class TruthLovePainEngine: # <-- v15: Оригинальное имя
         "truth", "honest", "real", "meaning", "wisdom", "soul", "mind", # en
         "see", "know", "understand", "realize", "reflect"
     ]
-    
+
     LOVE_WORDS = [
         "люб", "нежн", "сердц", "забот", "свет", "тепл", "солнц", "жизн", # ru
         "мир", "надежд", "вер", "добр", "друг", "вмест", "простит", "дом",
@@ -66,32 +66,32 @@ class TruthLovePainEngine: # <-- v15: Оригинальное имя
     def analyze(self, text: str) -> Dict[str, float]:
         log.debug(f"Вызов функции: TruthLovePainEngine.analyze")
         s = text.lower()
-        
+
         truth_hits = len(self.TRUTH.findall(s))
         love_hits = len(self.LOVE.findall(s))
         pain_hits = len(self.PAIN.findall(s))
 
         total = truth_hits + love_hits + pain_hits
-        
+
         log.debug(f"TLP хиты: T={truth_hits}, L={love_hits}, P={pain_hits}, Total={total}")
 
         if total == 0:
             # Если нет TLP слов, вычисляем "частоту" (CF)
             word_count = len(re.findall(r"[a-zа-яё]+", s))
-            cf = 1.0 - min(1.0, word_count / 100.0) * 0.5 
+            cf = 1.0 - min(1.0, word_count / 100.0) * 0.5
             truth, love, pain = 0.0, 0.0, 0.0
         else:
             # Нормализация
             truth = truth_hits / total
             love = love_hits / total
             pain = pain_hits / total
-            
+
             # Гармония (Love, Truth) против Диссонанса (Pain)
             harmony = (love + truth) / 2
             dissonance = pain
-            
+
             # CF = (Гармония - Диссонанс) + 0.5 (базовая линия)
-            cf = max(0.0, min(1.0, (harmony - dissonance * 0.5 + 0.5))) 
+            cf = max(0.0, min(1.0, (harmony - dissonance * 0.5 + 0.5)))
 
         result = {
             "truth": round(truth, 3),
@@ -129,7 +129,8 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
         log.debug(f"AutoEmotionalAnalyzer (v15) инициализирован.")
 
     def _softmax(self, scores: Dict[str, float]) -> Dict[str, float]:
-        if not scores: return {}
+        if not scores:
+            return {}
         max_score = max(scores.values()) if scores else 0
         try:
             exps = {k: math.exp(v - max_score) for k, v in scores.items()}
@@ -137,7 +138,7 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
             log.warning("Softmax Overflow. Используется линейная нормализация.")
             total = sum(v for v in scores.values() if v > 0) or 1.0
             return {k: max(0, v) / total for k, v in scores.items()}
-            
+
         total = sum(exps.values()) or 1.0
         return {k: exps[k] / total for k in scores}
 
@@ -158,7 +159,7 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
             hits = len(pattern.findall(s))
             scores[field] = float(hits)
             total_hits += hits
-        
+
         log.debug(f"Хиты по эмоциям (raw): {scores}")
 
         # 3️⃣ Усиление (Amplification)
@@ -174,8 +175,9 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
         if total_hits == 0 or all(v < 0.05 for v in normalized.values()):
             log.debug("Сигналы эмоций не найдены. Возврат 'peace'.")
             normalized = {"peace": 0.6, "joy": 0.3, "neutral": 0.1}
-        
+
         # 6. Очистка (убираем 'neutral' и нули)
         final_scores = {k: round(v, 3) for k, v in normalized.items() if k != "neutral" and v > 0.001}
         log.debug(f"Результат EMO (финал): {final_scores}")
         return final_scores
+
