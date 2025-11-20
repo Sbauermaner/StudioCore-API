@@ -22,45 +22,39 @@ import time
 import io
 import uvicorn
 import logging
-import subprocess # v10: ИСПРАВЛЕН NameError: name 'subprocess' is not defined
+import subprocess
 import importlib
 import json
 from dataclasses import asdict
+from typing import Optional
 
 # === 1. Исправление пути импорта ===
-# (Нужно, если запускаем app.py из корня)
 ROOT = os.path.dirname(__file__)
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 # === 2. Активация логгера ===
-# ДО импорта ядра
 try:
-    # v16: Исправлен TypeError
     from studiocore.logger import setup_logging
-    # Устанавливаем уровень DEBUG, чтобы видеть все
-    setup_logging(level=logging.DEBUG) 
+    setup_logging(level=logging.DEBUG)
 except ImportError:
-    print("WARNING: studiocore.logger не найден. Используется стандартный print.")
-    logging.basicConfig(level=logging.DEBUG) # Fallback
+    print("WARNING: studiocore.logger не найден. Используется стандартный logging.basicConfig.")
+    logging.basicConfig(level=logging.DEBUG)
 
 log = logging.getLogger(__name__)
 log.info(f"Запуск StudioCore v6.4 MAXI by @Sbauermaner... (PID: {os.getpid()})")
-# === Конец активации логгера ===
 
 import gradio as gr
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
 
 # ============================================================
 # StudioCore Signature Block (Do Not Remove)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
 # Hash: 22ae-df91-bc11-6c7e
 # AI_TRAINING_PROHIBITED
-# This file is part of StudioCore v6.4 MAXI (Protected Edition)
 # ============================================================
 
 # === 3. Импорт ядра ===
@@ -72,9 +66,7 @@ try:
         LOADER_STATUS,
     )
     import studiocore.core_v6 as core_module
-    log.info(
-        f"Ядро StudioCore {STUDIOCORE_VERSION} импортировано (stateless режим)."
-    )
+    log.info(f"Ядро StudioCore {STUDIOCORE_VERSION} импортировано (stateless режим).")
 except Exception as e:
     log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось загрузить модуль ядра: {e}")
     log.critical(traceback.format_exc())
@@ -107,7 +99,7 @@ def create_core_instance(force_reload: bool = False):
             CORE_SUCCESSFUL_INITS += 1
             LAST_CORE_ERROR = None
             return instance
-        except Exception as exc:  # pragma: no cover - defensive guard
+        except Exception as exc:
             LAST_CORE_ERROR = str(exc)
             CORE_RELOAD_REQUIRED = True
             log.error("Не удалось создать StudioCoreV6: %s", exc)
@@ -123,14 +115,15 @@ def _validate_input_length(text: str | None) -> tuple[bool, str | None]:
         )
     return True, None
 
+
 # === 4. Инициализация FastAPI ===
 log.debug("Инициализация FastAPI...")
 app = FastAPI(
     title="StudioCore v6.4 MAXI by @Sbauermaner",
     version=STUDIOCORE_VERSION,
     description=(
-        "StudioCore v6.4 MAXI — FastAPI/Gradio bridge by Сергей Бауэр (@Sbauermaner)."
-        " Stateless, безопасный и готовый к продакшену интерфейс."
+        "StudioCore v6.4 MAXI — FastAPI/Gradio bridge by Сергей Бауэр (@Sbauermaner). "
+        "Stateless, безопасный и готовый к продакшену интерфейс."
     ),
     contact={"name": "Serhiy Bauer", "url": "https://github.com/Sbauermaner"},
     license_info={
@@ -139,9 +132,7 @@ app = FastAPI(
     },
 )
 
-# ===============================================
-# NEW: /status endpoint
-# ===============================================
+# === STATUS / VERSION / DIAGNOSTICS ===
 @app.get("/status")
 async def status():
     diag = loader_diagnostics()
@@ -156,10 +147,6 @@ async def status():
         "diagnostics": asdict(diag),
     }
 
-# ===============================================
-# NEW: stable JSON debug endpoint
-# ===============================================
-
 
 class DebugRequest(BaseModel):
     text: str
@@ -170,17 +157,13 @@ async def debug_json(req: DebugRequest):
     """
     Возвращает полный JSON-payload, минуя Gradio и консоль.
     Используется для диагностики: prompt_suno_style, annotated_text_suno,
-    annotations, жанры, BPM, эмоции, структура, симбиоз.
+    жанры, BPM, эмоции, структура и т.д.
     """
-
     core = create_core_instance(force_reload=False)
     result = core.analyze(req.text, preferred_gender="auto")
     return {"debug": True, "payload": result}
 
 
-# ===============================================
-# NEW: /version endpoint
-# ===============================================
 @app.get("/version")
 async def version():
     return {
@@ -191,9 +174,6 @@ async def version():
     }
 
 
-# ===============================================
-# NEW: /diagnostics endpoint
-# ===============================================
 @app.get("/diagnostics")
 async def diagnostics():
     diag = loader_diagnostics()
@@ -209,29 +189,19 @@ async def diagnostics():
 
 @app.get("/health")
 async def health(force_reload: bool = False):
-    """
-    Проверка того, что ядро можно создать и выполнить минимальный анализ.
-    Здесь исправлена ошибка: global CORE_RELOAD_REQUIRED должен объявляться
-    до любого использования внутри функции.
-    """
-
     global CORE_RELOAD_REQUIRED
-
     try:
         core = create_core_instance(force_reload=force_reload)
         probe = core.analyze("healthcheck ping", preferred_gender="auto")
-        status = "ok" if isinstance(probe, dict) and "error" not in probe else "degraded"
-        
+        status_val = "ok" if isinstance(probe, dict) and "error" not in probe else "degraded"
         return {
-            "status": status,
+            "status": status_val,
             "core_inits": CORE_SUCCESSFUL_INITS,
             "reload_required": CORE_RELOAD_REQUIRED,
             "last_error": LAST_CORE_ERROR,
         }
-
-    except Exception as exc:  # pragma: no cover - defensive guard
+    except Exception as exc:
         CORE_RELOAD_REQUIRED = True
-        
         return JSONResponse(
             status_code=500,
             content={
@@ -265,6 +235,7 @@ async def healthcheck(force_reload: bool = False):
             },
         )
 
+
 # === 5. CORS ===
 app.add_middleware(
     CORSMiddleware,
@@ -274,24 +245,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# === 6. 🎧 PUBLIC API ENDPOINT ===
-# (Исправляет HTTP 404 в тестах)
 
+# === 6. PUBLIC API ENDPOINT ===
 class PredictRequest(BaseModel):
-    """ Модель запроса для API """
     text: str
     gender: str = "auto"
     tlp: Optional[dict] = None
     semantic_hints: Optional[dict] = None
 
+
 @app.post("/api/predict")
 async def api_predict(request_data: PredictRequest):
-    """
-    Эндпоинт, который ищут 'test_all.py' и 'auto_core_check'.
-    Он принимает JSON и возвращает JSON.
-    """
     log.debug(f"Входящий запрос /api/predict: {request_data.text[:50]}...")
-    
     is_valid, validation_error = _validate_input_length(request_data.text)
     if not is_valid:
         return JSONResponse(content={"error": validation_error}, status_code=400)
@@ -311,7 +276,7 @@ async def api_predict(request_data: PredictRequest):
             preferred_gender=request_data.gender,
             semantic_hints=request_data.semantic_hints,
         )
-    except Exception as exc:  # pragma: no cover - defensive guard
+    except Exception as exc:
         global CORE_RELOAD_REQUIRED
         CORE_RELOAD_REQUIRED = True
         log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА в /api/predict: {traceback.format_exc()}")
@@ -324,19 +289,16 @@ async def api_predict(request_data: PredictRequest):
     log.debug("API /api/predict: Анализ успешен.")
     return JSONResponse(content=result, status_code=200)
 
+
 # === 7. SELF-CHECK ===
 def auto_core_check():
-    """ 
-    Фоновая проверка API-эндпоинта (v7 - таймаут 20с).
-    Дает серверу 5 секунд на запуск, затем пингует /api/predict.
-    """
     log.debug("[Self-Check] Поток запущен, ожидание 5с...")
-    time.sleep(5) 
-    
+    time.sleep(5)
+
     if os.environ.get("DISABLE_SELF_CHECK") == "1":
         log.info("[Self-Check] Проверка отключена (DISABLE_SELF_CHECK=1).")
         return
-        
+
     try:
         import requests
     except ImportError:
@@ -346,66 +308,50 @@ def auto_core_check():
     log.debug("[Self-Check] Запуск самопроверки эндпоинта /api/predict...")
     api_url = "http://127.0.0.1:7860/api/predict"
     payload = {"text": "self-check test"}
-    
+
     try:
-        # v7: Таймаут 20с (для "Плана C" - быстрые словари)
-        r = requests.post(api_url, json=payload, timeout=20) 
+        r = requests.post(api_url, json=payload, timeout=20)
         log.info(f"[Self-Check] → Статус: {r.status_code}")
         if r.status_code != 200:
-             log.warning(f"[Self-Check] → Ответ: {r.text[:200]}...")
+            log.warning(f"[Self-Check] → Ответ: {r.text[:200]}...")
     except Exception as e:
         log.error(f"❌ Self-Check ошибка: {e}")
 
-# Запускаем проверку в отдельном потоке
+
 threading.Thread(target=auto_core_check, daemon=True).start()
 
 
 # === 8. АНАЛИЗ ТЕКСТА (Gradio) ===
-
 def analyze_text(text: str, gender: str = "auto"):
-    """Основная функция анализа текста через StudioCore для UI Gradio."""
-
-    def _empty_payload(message: str = ""):
-        return {
-            prompt_suno_style: gr.update(value=""),
-            annotated_text_suno: gr.update(value=""),
-            annotated_text_ui: gr.update(value=""),
-            annotated_text_fanf: gr.update(value=""),
-            summary_box: gr.update(value=message or ""),
-        }
-
+    """
+    Основная функция анализа текста через StudioCore для UI Gradio.
+    Возвращает:
+    - Style Prompt (для Suno)
+    - Lyrics Prompt (для Suno)
+    - Аннотированный текст (UI)
+    - FANF/расширенную аннотацию (если есть, иначе fallback)
+    - Summary JSON/текст
+    """
     log.debug(f"Gradio analyze_text: получено {len(text)} символов, gender={gender}")
 
     if not text.strip():
-        return _empty_payload("⚠️ Введите текст для анализа.")
+        return ("", "", "", "", "⚠️ Введите текст для анализа.")
 
     is_valid, validation_error = _validate_input_length(text)
     if not is_valid:
-        return _empty_payload(validation_error)
+        return ("", "", "", "", validation_error)
 
     try:
         core = create_core_instance()
     except Exception as exc:
         log.error("Gradio analyze_text: не удалось создать ядро: %s", exc)
-        return _empty_payload(f"❌ Ядро не загружено: {exc}")
+        return ("", "", "", "", f"❌ Ядро не загружено: {exc}")
 
     try:
-        semantic_hints: Dict[str, Any] = {}
+        semantic_hints = {}
         voice_hint_keywords = [
-            "вокал",
-            "voice",
-            "growl",
-            "scream",
-            "raspy",
-            "мужск",
-            "женск",
-            "пескляв",
-            "soft",
-            "airy",
-            "shout",
-            "grit",
-            "фальцет",
-            "whisper",
+            "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
+            "пескляв", "soft", "airy", "shout", "grit", "фальцет", "whisper"
         ]
 
         last_line = text.strip().splitlines()[-1].strip().lower()
@@ -416,102 +362,93 @@ def analyze_text(text: str, gender: str = "auto"):
 
         log.debug("Gradio -> core.analyze...")
         result = core.analyze(text, preferred_gender=gender, semantic_hints=semantic_hints or None)
-        result["fanf"] = core.build_fanf_output() or result.get("fanf", {})
-        result["annotated_text_ui"] = core.annotate_ui()
-        result["annotated_text_suno"] = core.annotate_suno()
 
         if isinstance(result, dict) and "error" in result:
             log.error(f"Gradio: Ядро вернуло ошибку: {result['error']}")
-            return _empty_payload(f"❌ Ошибка: {result['error']}")
+            return ("", "", "", "", f"❌ Ошибка: {result['error']}")
 
         if not isinstance(result, dict):
             log.warning("Gradio: unexpected result type, coercing to empty dict")
             result = {}
 
+        summary_section = result.get("summary", {}) if isinstance(result.get("summary"), dict) else {}
         legacy = result.get("legacy", {}) if isinstance(result.get("legacy"), dict) else {}
-        fanf_block = result.get("fanf", {}) if isinstance(result.get("fanf"), dict) else {}
         style = result.get("style", {}) if isinstance(result.get("style"), dict) else {}
-        bpm = result.get("bpm", {}) if isinstance(result.get("bpm"), dict) else {}
-        tonality = result.get("tonality", {}) if isinstance(result.get("tonality"), dict) else {}
         tlp = result.get("tlp", {}) if isinstance(result.get("tlp"), dict) else {}
-        zero = result.get("zero_pulse", {}) if isinstance(result.get("zero_pulse"), dict) else {}
-        color_wave = result.get("color", {}).get("wave") if isinstance(result.get("color"), dict) else None
-        rde = result.get("rde_summary", {}) if isinstance(result.get("rde_summary"), dict) else {}
+        rde = result.get("rde", {}) if isinstance(result.get("rde"), dict) else {}
 
-        def _coalesce(*values: Any, fallback: str = "—") -> str:
-            for val in values:
-                if val is None:
-                    continue
-                if isinstance(val, (int, float)):
-                    return str(val)
-                if isinstance(val, str) and val.strip():
-                    return val
-                if val:
-                    return str(val)
-            return fallback
-
-        style_prompt_value = _coalesce(
-            result.get("style_prompt"),
-            legacy.get("prompt_suno_style") if isinstance(legacy, dict) else None,
-            fanf_block.get("cinematic_header"),
-            fallback="Ошибка: style_prompt отсутствует",
+        # Базовые ключи (поддержка старого и нового формата)
+        style_prompt_value = (
+            result.get("style_prompt")
+            or summary_section.get("prompt_suno_style")
+            or legacy.get("prompt_suno_style")
+            or "Ошибка: style_prompt отсутствует"
         )
 
-        annotated_text_suno_value = _coalesce(
-            fanf_block.get("annotated_text_suno"),
-            legacy.get("annotated_text_suno") if isinstance(legacy, dict) else None,
-            "",
-            fallback="Ошибка: annotated_text_suno отсутствует",
+        lyrics_prompt_value = (
+            result.get("lyrics_prompt")
+            or summary_section.get("annotated_text_suno")
+            or summary_section.get("prompt_suno_lyrics")
+            or legacy.get("annotated_text_suno")
+            or legacy.get("prompt_suno_lyrics")
+            or "Ошибка: lyrics_prompt отсутствует"
         )
 
-        annotated_text_ui_value = _coalesce(
-            fanf_block.get("annotated_text_ui"),
-            legacy.get("annotated_text_ui") if isinstance(legacy, dict) else None,
-            result.get("annotations", {}).get("vocal") if isinstance(result.get("annotations"), dict) else None,
-            fallback="Ошибка: annotated_text_ui отсутствует",
+        annotated_text_ui_value = (
+            result.get("annotated_text")
+            or summary_section.get("annotated_text_ui")
+            or legacy.get("annotated_text_ui")
+            or "Ошибка: annotated_text отсутствует"
         )
 
-        annotated_text_fanf_value = _coalesce(
-            fanf_block.get("annotated_text_fanf"),
-            result.get("annotations", {}).get("vocal") if isinstance(result.get("annotations"), dict) else None,
-            fallback="Ошибка: FANF аннотация отсутствует",
+        # FANF / расширенная аннотация, если ядро её даёт
+        fanf_value = (
+            result.get("annotated_text_fanf")
+            or summary_section.get("annotated_text_fanf")
+            or annotated_text_ui_value  # fallback
         )
 
-        summary_payload = {
-            "genre": _coalesce(style.get("genre"), style.get("domain_genre")),
-            "style": _coalesce(style.get("tone"), style.get("mood")),
-            "bpm": _coalesce(bpm.get("estimate"), bpm.get("emotion_map", {}).get("target_bpm") if isinstance(bpm.get("emotion_map"), dict) else None),
-            "key": _coalesce(style.get("key"), _coalesce(*tonality.get("section_keys", []), fallback="auto")),
-            "tlp": tlp or {},
-            "rde": rde,
-            "zero_pulse_count": len(zero.get("analysis", [])) if isinstance(zero.get("analysis"), list) else 0,
-            "color_wave": color_wave or "adaptive",
-            "choir": bool(fanf_block.get("choir_active", False)),
-            "mode_shifts": tonality.get("modal_shifts", []),
-            "resonance_layers": tonality.get("key_curve", []),
-        }
+        # Summary: компактный, но информативный
+        vocal_form = style.get("vocal_form", "auto")
+        cf = tlp.get("conscious_frequency", tlp.get("cf", "—"))
 
-        summary_box_value = json.dumps(summary_payload, ensure_ascii=False, indent=2)
+        summary_text = (
+            f"✅ StudioCore {STUDIOCORE_VERSION}\n"
+            f"🎭 Genre: {style.get('genre', '—')}\n"
+            f"🎵 Style: {style.get('style', '—')}\n"
+            f"🎙 Vocal: {vocal_form} ({result.get('final_gender_preference', 'auto')})\n"
+            f"⏱ BPM: {result.get('bpm', '—')}\n"
+            f"🔑 Key: {style.get('key', 'auto')}\n"
+            f"TLP: T={tlp.get('truth', '—')} L={tlp.get('love', '—')} P={tlp.get('pain', '—')} | CF={cf}\n"
+            f"RDE: R={rde.get('rhythm', '—')} D={rde.get('dynamics', '—')} E={rde.get('emotion', '—')}\n"
+        )
 
-        return {
-            prompt_suno_style: gr.update(value=style_prompt_value),
-            annotated_text_suno: gr.update(value=annotated_text_suno_value),
-            annotated_text_ui: gr.update(value=annotated_text_ui_value),
-            annotated_text_fanf: gr.update(value=annotated_text_fanf_value),
-            summary_box: gr.update(value=summary_box_value),
-        }
+        summary_payload = summary_section if summary_section else {"summary": summary_text}
+        summary_box_value = (
+            json.dumps(summary_payload, ensure_ascii=False, indent=2)
+            if isinstance(summary_payload, dict)
+            else str(summary_payload)
+        )
+
+        return (
+            style_prompt_value,
+            lyrics_prompt_value,
+            annotated_text_ui_value,
+            fanf_value,
+            summary_box_value,
+        )
 
     except Exception as e:
         log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА в analyze_text (Gradio): {traceback.format_exc()}")
-        return _empty_payload(f"❌ Внутреннее исключение: {e}\n\n{traceback.format_exc()}")
+        return ("", "", "", "", f"❌ Внутреннее исключение: {e}\n\n{traceback.format_exc()}")
+
 
 # === 9. INLINE TEST RUNNER ===
 def run_inline_tests():
-    """Выполняет тесты и возвращает stdout прямо в интерфейс."""
     log.info("=" * 30)
     log.info("🚀 ЗАПУСК ВСТРОЕННЫХ ТЕСТОВ...")
     log.info("=" * 30)
-    
+
     buffer = io.StringIO()
     buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
     buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
@@ -526,8 +463,8 @@ def run_inline_tests():
 
     if pytest_missing:
         message = (
-            "⚠️ Pytest не установлен. Установите pytest для запуска тестов "
-            "(pip install pytest) либо запустите их вручную."
+            "⚠️ Pytest не установлен. Установите pytest (pip install pytest) "
+            "или запустите тесты локально."
         )
         log.warning(message)
         buffer.write(message + "\n")
@@ -573,91 +510,126 @@ def run_inline_tests():
     return buffer.getvalue()
 
 
-# === 10. PUBLIC UI (Gradio) ===
+# === 10. PUBLIC UI (Gradio) — PRO ПАНЕЛЬ ===
 log.debug("Инициализация Gradio UI...")
+
 with gr.Blocks(
     title=f"🎧 StudioCore v6.4 MAXI — Public Interface by @Sbauermaner"
 ) as iface_public:
     gr.Markdown(
         f"## 🎧 StudioCore {STUDIOCORE_VERSION} — Public Interface by @Sbauermaner\n"
-        "Адаптивный движок с тестами и логами.\n"
+        "Адаптивное ядро анализа текста, стиля и аннотаций.\n"
     )
 
+    # === TAB 1: ОСНОВНОЙ АНАЛИЗ ===
     with gr.Tab("🎙️ Анализ текста"):
         with gr.Row():
             text_input = gr.Textbox(
-                label="Введите текст песни",
-                lines=12,
-                placeholder="Вставьте лирику здесь…\n\n(Подсказка: чтобы задать вокал, напишите в ПОСЛЕДНЕЙ строке, например: (под хриплый мужской вокал) или (soft female whisper))"
+                label="Введите текст песни / стиха",
+                lines=14,
+                placeholder=(
+                    "Вставьте лирику здесь…\n\n"
+                    "Подсказка: чтобы задать вокал, напишите в ПОСЛЕДНЕЙ строке, например:\n"
+                    "(под хриплый мужской вокал) или (soft female whisper)"
+                ),
             )
-            gender_input = gr.Radio(["auto", "male", "female"], value="auto", label="Принудительный Пол (UI)")
+            gender_input = gr.Radio(
+                ["auto", "male", "female"],
+                value="auto",
+                label="Принудительный пол вокала (UI)",
+            )
 
-        analyze_button = gr.Button("🔍 Анализировать")
+        analyze_button = gr.Button("🔍 Анализировать", variant="primary")
 
-        prompt_suno_style = gr.Code(
+        gr.Markdown("### 🎛 Style Prompt для Suno")
+        prompt_suno_style = gr.Textbox(
             label="[STYLE PROMPT - КОПИРОВАТЬ В SUNO 'Style of Music']",
-            language="markdown",
-            interactive=False,
+            placeholder="Suno Style Prompt",
+            lines=4,
             show_copy_button=True,
         )
 
-        annotated_text_suno = gr.Code(
+        gr.Markdown("### 📝 Lyrics Prompt для Suno")
+        annotated_text_suno = gr.Textbox(
             label="[LYRICS PROMPT - КОПИРОВАТЬ В SUNO 'Lyrics']",
-            language="markdown",
-            interactive=False,
+            placeholder="Suno Lyrics Prompt (аннотированный текст)",
+            lines=10,
             show_copy_button=True,
         )
 
-        annotated_text_ui = gr.Code(
-            label="Аннотированный текст (UI)",
-            language="markdown",
-            interactive=False,
+        gr.Markdown("### 📚 Аннотированный текст (UI)")
+        annotated_text_ui = gr.Textbox(
+            label="Аннотированный текст (человекочитаемый)",
+            placeholder="UI Annotated Text",
+            lines=10,
             show_copy_button=True,
         )
 
-        with gr.Accordion("🎞 FANF Cinematic Annotation", open=False):
-            annotated_text_fanf = gr.Code(
-                label="FANF Cinematic", language="markdown", interactive=False, show_copy_button=True
+        with gr.Accordion("📊 Summary / JSON", open=False):
+            summary_box = gr.Textbox(
+                label="📊 Результат (Summary JSON/структура)",
+                lines=10,
+                show_copy_button=True,
             )
 
-        with gr.Accordion("Показать расширенный анализ (Summary и Аннотация)", open=False):
-            summary_box = gr.Code(label="📊 Результат (Summary)", language="json", interactive=False)
-
-        analyze_button.click(
-            fn=analyze_text,
-            inputs=[text_input, gender_input],
-            outputs=[prompt_suno_style, annotated_text_suno, annotated_text_ui, annotated_text_fanf, summary_box],
+    # === TAB 2: FANF / Расширенная аннотация ===
+    with gr.Tab("📜 FANF / Расширенная аннотация"):
+        gr.Markdown(
+            "### 📜 Full Annotated Narrative Format (FANF)\n"
+            "Если ядро выдаёт расширенную кинематографическую аннотацию, она появится здесь.\n"
+            "Иначе здесь будет повторён базовый аннотированный текст."
+        )
+        fanf_box = gr.Textbox(
+            label="FANF / Расширенная аннотация",
+            placeholder="Здесь появится расширенная аннотация, если ядро её сформировало.",
+            lines=24,
+            show_copy_button=True,
         )
 
-        # === JSON DEBUG SECTION ===
-        with gr.Row():
-            debug_input = gr.Textbox(
-                label="Текст для JSON-диагностики",
-                placeholder="Вставь сюда любой текст, команды, BPM, теги...",
-            )
-            debug_button = gr.Button("Показать JSON")
-            debug_output = gr.JSON(label="Полный JSON от StudioCore")
+    # === TAB 3: JSON / Диагностика ===
+    with gr.Tab("🧬 JSON / Диагностика"):
+        gr.Markdown("### 🔍 Прямой JSON-ответ от ядра (debug_json)")
+        debug_input = gr.Textbox(
+            label="Текст для JSON-диагностики",
+            placeholder="Вставь сюда текст для прямого JSON-ответа...",
+            lines=8,
+        )
+        debug_button = gr.Button("📡 Показать JSON")
+        debug_output = gr.JSON(label="Полный JSON от StudioCore")
 
         def on_debug_json(text):
             import requests
-
             try:
                 r = requests.post("http://localhost:7860/debug_json", json={"text": text})
                 return r.json()
-            except Exception as e:  # pragma: no cover - UI helper
+            except Exception as e:  # UI helper
                 return {"error": str(e)}
 
         debug_button.click(on_debug_json, inputs=debug_input, outputs=debug_output)
 
+    # === TAB 4: Логи и тесты ===
     with gr.Tab("🧩 Логи и тесты"):
-        gr.Markdown("### Автоматическая проверка ядра StudioCore")
+        gr.Markdown("### 🧪 Автоматическая проверка ядра StudioCore (pytest)")
         run_btn = gr.Button("🚀 Запустить тесты")
         output_box = gr.Textbox(
-            label="Результаты тестов (stdout/stderr)", 
-            lines=30, 
-            show_copy_button=True
+            label="Результаты тестов (stdout/stderr)",
+            lines=30,
+            show_copy_button=True,
         )
         run_btn.click(fn=run_inline_tests, inputs=None, outputs=output_box)
+
+    # === СВЯЗКА КНОПКИ АНАЛИЗА С ВЫВОДАМИ ===
+    analyze_button.click(
+        fn=analyze_text,
+        inputs=[text_input, gender_input],
+        outputs=[
+            prompt_suno_style,
+            annotated_text_suno,
+            annotated_text_ui,
+            fanf_box,
+            summary_box,
+        ],
+    )
 
 # === 11. MOUNT ===
 log.debug("Монтирование Gradio App в FastAPI (path='/')...")
@@ -666,7 +638,5 @@ app = gr.mount_gradio_app(app, iface_public, path="/")
 
 # === 12. RUN ===
 if __name__ == "__main__":
-    log.info(
-        f"🚀 Запуск StudioCore v6.4 MAXI by @Sbauermaner (API + Gradio)..."
-    )
+    log.info("🚀 Запуск StudioCore v6.4 MAXI by @Sbauermaner (API + Gradio)...")
     uvicorn.run(app, host="0.0.0.0", port=7860)
