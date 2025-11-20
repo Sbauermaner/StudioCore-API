@@ -27,6 +27,7 @@ from __future__ import annotations
 from typing import Dict, Any
 
 from .genre_registry import GlobalGenreRegistry
+from .genre_universe_loader import load_genre_universe
 
 
 class GenreWeightsEngine:
@@ -34,6 +35,7 @@ class GenreWeightsEngine:
 
     def __init__(self) -> None:
         self.registry = GlobalGenreRegistry()
+        self.universe = load_genre_universe()
 
         # === 1. Домен → веса признаков ===
         self.domain_feature_weights: Dict[str, Dict[str, float]] = {
@@ -117,6 +119,8 @@ class GenreWeightsEngine:
             "soft": "folk",
         }
 
+        self._universe_domain_cache: Dict[str, List[str]] = {}
+
     # ---------- Внутренняя логика ----------
 
     def _domain_for_genre(self, genre: str) -> str | None:
@@ -124,6 +128,53 @@ class GenreWeightsEngine:
             if genre in genres:
                 return domain
         return None
+
+    def _genres_for_domain(self, domain: str) -> List[str]:
+        """Возвращает жанры для домена из GLOBAL GENRE UNIVERSE."""
+
+        if domain in self._universe_domain_cache:
+            return self._universe_domain_cache[domain]
+
+        u = self.universe
+        if domain == "electronic":
+            base = u.edm_genres + [
+                g for g in u.music_genres
+                if any(k in g for k in (
+                    "edm", "techno", "trance", "dnb", "drum_and_bass",
+                    "dubstep", "house", "bass", "synth", "wave", "electro",
+                    "idm", "break", "rave",
+                ))
+            ]
+        elif domain == "hard":
+            base = [
+                g for g in u.music_genres
+                if any(k in g for k in (
+                    "rock", "metal", "punk", "core", "rap", "hip_hop",
+                    "drill", "trap", "hard",
+                ))
+            ]
+        elif domain == "jazz":
+            base = [g for g in u.music_genres if any(k in g for k in ("jazz", "swing", "bop"))]
+        elif domain == "lyrical":
+            base = u.lyric_forms + u.literature_styles
+        elif domain == "comedy":
+            base = u.comedy_genres
+        elif domain == "cinematic":
+            base = [g for g in u.hybrids if "cinematic" in g or "orchestral" in g]
+            base += [g for g in u.music_genres if "cinematic" in g or "score" in g]
+        elif domain == "soft":
+            base = [
+                g for g in u.music_genres
+                if any(k in g for k in (
+                    "folk", "ambient", "lofi", "chill", "dream", "soft", "ballad"
+                ))
+            ]
+        else:
+            base = []
+
+        normalized = list(dict.fromkeys(base))  # сохраняем порядок
+        self._universe_domain_cache[domain] = normalized or self.registry.domains.get(domain, [])
+        return self._universe_domain_cache[domain]
 
     def score_domains(self, features: Dict[str, float]) -> Dict[str, float]:
         """Сырые веса по доменам."""
@@ -158,7 +209,7 @@ class GenreWeightsEngine:
         - если ничего не набрало порога — fallback
         """
         domain = self.infer_domain(features)
-        domain_genres = self.registry.domains.get(domain, [])
+        domain_genres = self._genres_for_domain(domain) or self.registry.domains.get(domain, [])
 
         # Если домен пустой — fallback
         if not domain_genres:
