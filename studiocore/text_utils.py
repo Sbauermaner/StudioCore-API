@@ -31,6 +31,7 @@ ZERO_WIDTH_RE = re.compile(r"[\u200B\u200C\u200D\u2060\uFEFF]")
 # Многоточие и тире → к единому виду
 ELLIPSIS_RE = re.compile(r"\.{3,}")
 DASH_RE = re.compile(r"[–—-]{2,}")  # цепочки тире/дефисов
+PHRASE_BOUNDARY_RE = re.compile(r"[.!?…]+|\n")
 
 
 def _normalize_typography(line: str) -> str:
@@ -180,6 +181,20 @@ def flatten_sections_to_lines(sections: List[Dict[str, Any]]) -> List[str]:
     for s in sections:
         out.extend(s.get("lines", []))
     return out
+
+
+def extract_phrases_from_section(section_text: str) -> List[str]:
+    """Simple heuristic phrase splitter for a section payload."""
+
+    if not section_text:
+        return []
+
+    phrases: List[str] = []
+    for raw in PHRASE_BOUNDARY_RE.split(section_text):
+        phrase = raw.strip()
+        if phrase:
+            phrases.append(phrase)
+    return phrases
 
 # === v16: ИСПРАВЛЕНИЕ ImportError ===
 # Эта функция была в monolith_v4_3_1.py, но monolith v6 вызывает ее отсюда.

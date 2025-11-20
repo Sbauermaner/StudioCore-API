@@ -308,7 +308,10 @@ class StudioCoreV6:
         emotion_profile = self.emotion_engine.emotion_detection(text)
         emotion_curve = self.emotion_engine.emotion_intensity_curve(text)
         dynamic_emotion_profile = self.dynamic_emotion_engine.emotion_profile(text)
-        section_intel_payload = self.section_intelligence.analyze(text, sections, emotion_curve)
+        self._emotion_engine.reset_phrase_packets()
+        section_intel_payload = self.section_intelligence.analyze(
+            text, sections, emotion_curve, emotion_engine=self._emotion_engine
+        )
         structure_context["section_intelligence"] = section_intel_payload
         structure_context["emotion_profile"] = dict(emotion_profile)
         structure_context["emotion_profile_axes7"] = dict(dynamic_emotion_profile)
@@ -1089,6 +1092,7 @@ class StudioCoreV6:
                 "style": style_payload,
                 "commands": command_payload,
                 "annotations": annotations,
+                "phrase_packets": section_intel_payload.get("phrase_packets", []),
                 "semantic_hints": semantic_hints,
                 "auto_context": structure_context,
                 "instrument_dynamics": instrument_dynamics_payload,
@@ -1180,6 +1184,7 @@ class StudioCoreV6:
         merged["zero_pulse"] = payload.get("zero_pulse", {})
         merged["bpm"] = payload.get("bpm", {})
         merged["semantic_hints"] = payload.get("semantic_hints", {})
+        merged["phrase_packets"] = payload.get("phrase_packets", [])
         merged["auto_context"] = payload.get("auto_context", {})
         merged["instrument_dynamics"] = payload.get("instrument_dynamics", {})
         merged["tlp"] = payload.get("tlp", {})
