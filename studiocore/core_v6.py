@@ -14,6 +14,7 @@ from dataclasses import asdict
 from typing import Any, Dict, Iterable, List, Sequence
 
 from .bpm_engine import BPMEngine
+from .color_engine_adapter import ColorEngineAdapter
 from .emotion_field import EmotionFieldEngine
 from .emotion_profile import EmotionVector
 from .rde_engine import RhythmDynamicsEmotionEngine
@@ -78,6 +79,7 @@ class StudioCoreV6:
         self.section_parser = SectionParser(self.text_engine)
         self.emotion_engine = EmotionEngine()
         self.color_engine = ColorEmotionEngine()
+        self.color_adapter = ColorEngineAdapter()
         self.vocal_engine = VocalEngine()
         self.breathing_engine = BreathingEngine()
         self.bpm_engine = BPMEngine()
@@ -1062,6 +1064,19 @@ class StudioCoreV6:
             result,
             applied_overrides=applied_overrides,
         )
+
+        # --- COLOR ENGINE ADAPTER ---
+        color_res = self.color_adapter.resolve_color_wave(result)
+
+        style_block = result.get("style") or {}
+        if not isinstance(style_block, dict):
+            style_block = {}
+
+        style_block.setdefault("color_wave", color_res.colors)
+        style_block.setdefault("color_source", color_res.source)
+
+        result["style"] = style_block
+
         suno_annotations = self.suno_engine.build_suno_safe_annotations(
             sections,
             {
