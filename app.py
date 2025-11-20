@@ -156,6 +156,22 @@ async def status():
     }
 
 # ===============================================
+# NEW: stable JSON debug endpoint
+# ===============================================
+@app.post("/debug_json")
+async def debug_json(text: str):
+    """
+    Возвращает полный JSON-payload, минуя Gradio и консоль.
+    Используется для диагностики: prompt_suno_style, annotated_text_suno,
+    annotations, жанры, BPM, эмоции, структура, симбиоз.
+    """
+
+    core = create_core_instance(force_reload=False)
+    result = core.analyze(text, preferred_gender="auto")
+    return {"debug": True, "payload": result}
+
+
+# ===============================================
 # NEW: /version endpoint
 # ===============================================
 @app.get("/version")
@@ -526,6 +542,26 @@ with gr.Blocks(
             inputs=[text_input, gender_input],
             outputs=[result_box, suno_box, annotated_box],
         )
+
+        # === JSON DEBUG SECTION ===
+        with gr.Row():
+            debug_input = gr.Textbox(
+                label="Текст для JSON-диагностики",
+                placeholder="Вставь сюда любой текст, команды, BPM, теги...",
+            )
+            debug_button = gr.Button("Показать JSON")
+            debug_output = gr.JSON(label="Полный JSON от StudioCore")
+
+        def on_debug_json(text):
+            import requests
+
+            try:
+                r = requests.post("http://localhost:7860/debug_json", json={"text": text})
+                return r.json()
+            except Exception as e:  # pragma: no cover - UI helper
+                return {"error": str(e)}
+
+        debug_button.click(on_debug_json, inputs=debug_input, outputs=debug_output)
 
     with gr.Tab("🧩 Логи и тесты"):
         gr.Markdown("### Автоматическая проверка ядра StudioCore")
