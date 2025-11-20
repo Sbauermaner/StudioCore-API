@@ -50,6 +50,7 @@ from .section_intelligence import SectionIntelligenceEngine
 from .suno_annotations import (
     SunoAnnotationEngine,
     _dominant_emotion,
+    build_suno_annotations,
     emotion_to_instruments,
     emotion_to_style,
     emotion_to_vocal,
@@ -1109,6 +1110,11 @@ class StudioCoreV6:
                 "genre_analysis": genre_analysis,
             }
         )
+        result["suno_annotation"] = build_suno_annotations(
+            text=text,
+            sections=section_intel_payload.get("section_emotions", []),
+            emotion_curve=curve_dict,
+        )
         fanf_analysis_payload = {
             "emotion": {"profile": emotion_profile, "curve": emotion_curve},
             "bpm": bpm_payload,
@@ -1197,6 +1203,7 @@ class StudioCoreV6:
         merged["instrument_dynamics"] = payload.get("instrument_dynamics", {})
         merged["tlp"] = payload.get("tlp", {})
         merged["suno_annotations"] = payload.get("suno_annotations", [])
+        merged["suno_annotation"] = payload.get("suno_annotation")
         merged["symbiosis"] = payload.get("symbiosis", {})
         merged["override_debug"] = payload.get("override_debug", {})
         merged["language"] = payload.get("language", payload.get("auto_context", {}).get("language"))

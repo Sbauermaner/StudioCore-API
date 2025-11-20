@@ -9,6 +9,111 @@ from __future__ import annotations
 from typing import Any, Dict, List, Sequence
 
 
+class EmotionDrivenSunoAdapter:
+    """
+    Converts global_emotion_curve + section_emotions into dynamic Suno-style annotations.
+    Does NOT pick genre/BPM/key — only musical behavior (intensity, instruments, vocals).
+    """
+
+    def __init__(self, text: str, sections: Sequence[Dict[str, Any]], emotion_curve: Dict[str, Any]):
+        self.text = text
+        self.sections = list(sections or [])
+        self.emotion_curve = emotion_curve or {}
+
+    def build(self) -> Dict[str, Any]:
+        style = self._resolve_style()
+        vocal_profile = self._resolve_vocal_profile()
+        instrumentation = self._resolve_instrumentation()
+        section_annotations = self._build_section_annotations()
+
+        return {
+            "style": style,
+            "vocal_profile": vocal_profile,
+            "instrumentation": instrumentation,
+            "section_annotations": section_annotations,
+        }
+
+    # --- Internal helpers ---
+    def _resolve_style(self) -> str:
+        cluster = (self.emotion_curve or {}).get("dominant_cluster") or ""
+        table = {
+            "rage": "dark metal / industrial adaptive",
+            "despair": "darkwave / gothic cinematic",
+            "tender": "lyrical ballad / neoclassical",
+            "hope": "ambient uplifting / orchestral light",
+            "narrative": "poetic acoustic / indie narrative",
+        }
+        return table.get(cluster, "adaptive hybrid")
+
+    def _resolve_vocal_profile(self) -> str:
+        tlp = (self.emotion_curve or {}).get("global_tlp") or {}
+        truth = float(tlp.get("truth") or 0.0)
+        love = float(tlp.get("love") or 0.0)
+        pain = float(tlp.get("pain") or 0.0)
+        profiles = []
+        threshold = 0.6
+        if pain >= threshold:
+            profiles.append("distorted male low + aggressive fry")
+        if love >= threshold:
+            profiles.append("soft female airy + close mic")
+        if truth >= threshold:
+            profiles.append("spoken male baritone + clean harmonics")
+
+        if not profiles:
+            # choose the strongest axis as a fallback
+            dominant_axis = max(("truth", truth), ("love", love), ("pain", pain), key=lambda item: item[1])
+            axis_map = {
+                "pain": "distorted male low + aggressive fry",
+                "love": "soft female airy + close mic",
+                "truth": "spoken male baritone + clean harmonics",
+            }
+            profiles.append(axis_map.get(dominant_axis[0], "adaptive vocal blend"))
+
+        return " / ".join(profiles)
+
+    def _resolve_instrumentation(self) -> str:
+        cluster = (self.emotion_curve or {}).get("dominant_cluster") or ""
+        mapping = {
+            "rage": "distorted guitars, hard drums, sub-bass pulses",
+            "despair": "distorted guitars, hard drums, sub-bass pulses",
+            "tender": "piano, cello, warm pads",
+            "hope": "high strings, bells, shimmer layers",
+            "narrative": "acoustic guitar, soft percussion",
+        }
+        return mapping.get(cluster, "hybrid adaptive instrumentation")
+
+    def _build_section_annotations(self) -> Dict[str, str]:
+        annotations: Dict[str, str] = {}
+        for entry in self.sections:
+            section_name = entry.get("section") or entry.get("name") or "section"
+            intensity = self._safe_float(entry.get("intensity"))
+            intensity_label = self._intensity_label(intensity)
+            hot_phrases = [
+                f'hot phrase: "{phrase}" → emphasize with vocal stress / pause'
+                for phrase in (entry.get("hot_phrases") or [])
+                if phrase
+            ]
+            annotation = intensity_label
+            if hot_phrases:
+                annotation = f"{annotation}; " + " | ".join(hot_phrases)
+            annotations[str(section_name)] = annotation
+        return annotations
+
+    def _intensity_label(self, intensity: float) -> str:
+        if intensity > 0.8:
+            return "MAX intensity: full instruments, wide reverb"
+        if 0.5 <= intensity <= 0.8:
+            return "MID intensity: moderate build"
+        return "LOW intensity: minimal instruments"
+
+    @staticmethod
+    def _safe_float(value: Any) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+
 def _dominant_emotion(vectors):
     """
     Определяет доминирующую эмоцию по сглаженным векторам.
@@ -85,6 +190,11 @@ def emotion_to_style(emotion: str) -> str:
         "neutral": "cinematic narrative",
     }
     return table.get(emotion, "cinematic narrative")
+
+
+def build_suno_annotations(text: str, sections: Sequence[Dict[str, Any]], emotion_curve: Dict[str, Any]) -> Dict[str, Any]:
+    adapter = EmotionDrivenSunoAdapter(text, sections, emotion_curve)
+    return adapter.build()
 
 
 class SunoAnnotationEngine:
