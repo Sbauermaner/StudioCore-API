@@ -1,0 +1,247 @@
+{
+  "version": "1.0",
+  "clusters": {
+    "rage": {
+      "label": "rage / anger / hatred",
+      "emotions": [
+        "rage",
+        "fury",
+        "anger",
+        "hatred",
+        "resentment"
+      ],
+      "genre_bias": {
+        "metal": 0.90,
+        "hardcore": 0.80,
+        "industrial": 0.70,
+        "rap_aggressive": 0.65,
+        "orchestral_drama": 0.40
+      },
+      "bpm_delta": 30,
+      "tonality_bias": "minor_dark",
+      "vocal_hint": "male_growl_or_aggresive_rap",
+      "structure_hint": ["pre_chorus", "breakdown", "double_chorus"]
+    },
+    "pain": {
+      "label": "pain / suffering / burnout",
+      "emotions": [
+        "pain",
+        "suffering",
+        "burnout",
+        "exhaustion",
+        "despair"
+      ],
+      "genre_bias": {
+        "dark_ballad": 0.85,
+        "post_rock": 0.70,
+        "doom": 0.60,
+        "slow_rap": 0.50
+      },
+      "bpm_delta": -20,
+      "tonality_bias": "minor",
+      "vocal_hint": "low_baritone_or_soft_female",
+      "structure_hint": ["long_verses", "slow_build", "sparse_chorus"]
+    },
+    "sadness": {
+      "label": "sadness / grief",
+      "emotions": [
+        "sadness",
+        "melancholy",
+        "grief",
+        "loneliness",
+        "nostalgia"
+      ],
+      "genre_bias": {
+        "lyrical_ballad": 0.85,
+        "indie_sad": 0.70,
+        "acoustic": 0.60
+      },
+      "bpm_delta": -15,
+      "tonality_bias": "minor",
+      "vocal_hint": "soft_vocal_male_or_female",
+      "structure_hint": ["verse_verse_chorus", "bridge_low_energy"]
+    },
+    "disappointment": {
+      "label": "disappointment / frustration",
+      "emotions": [
+        "disappointment",
+        "frustration",
+        "fatigue",
+        "emptiness",
+        "apathy"
+      ],
+      "genre_bias": {
+        "alt_rock": 0.70,
+        "indie_rock": 0.60,
+        "lofi": 0.50
+      },
+      "bpm_delta": -5,
+      "tonality_bias": "minor_neutral",
+      "vocal_hint": "talk_sing_or_rap",
+      "structure_hint": ["standard_pop_form"]
+    },
+    "love": {
+      "label": "love / passion / warmth",
+      "emotions": [
+        "love",
+        "tenderness",
+        "affection",
+        "care",
+        "devotion"
+      ],
+      "genre_bias": {
+        "pop_ballad": 0.85,
+        "soul": 0.80,
+        "rnb": 0.70,
+        "soft_rock": 0.60
+      },
+      "bpm_delta": 5,
+      "tonality_bias": "major",
+      "vocal_hint": "duet_or_warm_solo",
+      "structure_hint": ["strong_chorus", "lift_pre_chorus"]
+    },
+    "hope": {
+      "label": "hope / light / renewal",
+      "emotions": [
+        "hope",
+        "relief",
+        "faith",
+        "recovery",
+        "rebirth"
+      ],
+      "genre_bias": {
+        "uplifting_pop": 0.80,
+        "epic_cinematic": 0.75,
+        "indie_pop": 0.60
+      },
+      "bpm_delta": 10,
+      "tonality_bias": "major_bright",
+      "vocal_hint": "open_and_uplifting",
+      "structure_hint": ["build_up", "anthemic_chorus"]
+    },
+    "awe": {
+      "label": "awe / cosmic / sacred",
+      "emotions": [
+        "awe",
+        "reverence",
+        "cosmic_wonder",
+        "transcendence",
+        "sacred_fear"
+      ],
+      "genre_bias": {
+        "choir_cinematic": 0.90,
+        "ambient": 0.70,
+        "post_rock_epic": 0.60
+      },
+      "bpm_delta": 0,
+      "tonality_bias": "modal_phrygian_lydian",
+      "vocal_hint": "choir_or_layered_vox",
+      "structure_hint": ["long_intro", "slow_build", "extended_outro"]
+    },
+    "fear": {
+      "label": "fear / terror / dread",
+      "emotions": [
+        "fear",
+        "terror",
+        "dread",
+        "panic",
+        "nightmare",
+        "horror"
+      ],
+      "genre_bias": {
+        "dark_ambient": 0.80,
+        "cinematic_horror": 0.75,
+        "industrial": 0.55,
+        "trap_dark": 0.50
+      },
+      "bpm_delta": 5,
+      "tonality_bias": "minor_dark",
+      "vocal_hint": "whisper_or_distressed",
+      "structure_hint": ["suspense_build", "drop"]
+    },
+    "anxiety": {
+      "label": "anxiety / worry / stress",
+      "emotions": [
+        "anxiety",
+        "worry",
+        "stress",
+        "nervousness",
+        "unease",
+        "restlessness"
+      ],
+      "genre_bias": {
+        "lofi": 0.70,
+        "indie_electronic": 0.60,
+        "triphop": 0.55,
+        "minimal": 0.45
+      },
+      "bpm_delta": -5,
+      "tonality_bias": "minor_neutral",
+      "vocal_hint": "soft_spoken_or_breathy",
+      "structure_hint": ["looped_progression", "minimal_break"]
+    },
+    "joy": {
+      "label": "joy / happiness / celebration",
+      "emotions": [
+        "joy",
+        "happiness",
+        "delight",
+        "celebration",
+        "cheerfulness",
+        "glee"
+      ],
+      "genre_bias": {
+        "uplifting_pop": 0.85,
+        "dance_pop": 0.75,
+        "funk": 0.65,
+        "indie_pop": 0.55
+      },
+      "bpm_delta": 15,
+      "tonality_bias": "major",
+      "vocal_hint": "bright_and_smiling",
+      "structure_hint": ["anthemic_chorus", "call_and_response"]
+    },
+    "playfulness": {
+      "label": "playfulness / fun / mischief",
+      "emotions": [
+        "playfulness",
+        "fun",
+        "humor",
+        "mischief",
+        "curiosity",
+        "whimsy"
+      ],
+      "genre_bias": {
+        "indie_pop": 0.70,
+        "pop_punk": 0.60,
+        "electro_swing": 0.55,
+        "kawaii_futurebass": 0.50
+      },
+      "bpm_delta": 12,
+      "tonality_bias": "major_bright",
+      "vocal_hint": "energetic_or_playful",
+      "structure_hint": ["short_verses", "hooky_chorus"]
+    },
+    "irony": {
+      "label": "irony / sarcasm / satire",
+      "emotions": [
+        "irony",
+        "sarcasm",
+        "satire",
+        "wit",
+        "mockery",
+        "parody"
+      ],
+      "genre_bias": {
+        "art_pop": 0.70,
+        "alt_rock": 0.65,
+        "experimental": 0.55,
+        "spoken_word": 0.50
+      },
+      "bpm_delta": 0,
+      "tonality_bias": "mixed_modal",
+      "vocal_hint": "deadpan_or_theatrical",
+      "structure_hint": ["standard_pop_form", "narrative_bridge"]
+    }
+  }
+}

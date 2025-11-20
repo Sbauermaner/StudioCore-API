@@ -4,12 +4,15 @@ StudioCore Emotion Engines (v15 - Имена ИСПРАВЛЕНЫ)
 Быстрый эвристический анализ (не ИИ) + Расширенные словари v3.
 """
 
+import json
+import os
 import re
 import math
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import logging
 
 from studiocore.emotion_profile import EmotionVector, EmotionAggregator
+from studiocore.emotion_dictionary_extended import EmotionLexiconExtended
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
@@ -208,4 +211,173 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
             arousal=0.0,
             weight=1.0,
         )
+
+
+# =====================================================
+# 🎼 EmotionModel v1 (66 → 12 → GENRE/BPM/KEY)
+# =====================================================
+_EMOTION_MODEL_CACHE: Optional[Dict[str, Any]] = None
+
+
+def load_emotion_model() -> Dict[str, Any]:
+    """Load and cache emotion_model_v1.json."""
+
+    global _EMOTION_MODEL_CACHE
+    if _EMOTION_MODEL_CACHE is not None:
+        return _EMOTION_MODEL_CACHE
+
+    model_path = os.path.join(os.path.dirname(__file__), "emotion_model_v1.json")
+    try:
+        with open(model_path, "r", encoding="utf-8") as fp:
+            _EMOTION_MODEL_CACHE = json.load(fp)
+    except FileNotFoundError:
+        log.warning("emotion_model_v1.json not found; using empty model")
+        _EMOTION_MODEL_CACHE = {"version": "0.0", "clusters": {}}
+    return _EMOTION_MODEL_CACHE
+
+
+class EmotionEngine:
+    """Emotion inference pipeline that maps raw cues → clusters → genre/BPM/key."""
+
+    def __init__(self) -> None:
+        self.lexicon = EmotionLexiconExtended()
+        self.auto_analyzer = AutoEmotionalAnalyzer()
+        self._model = load_emotion_model()
+        self._base_emotions = self._collect_base_emotions()
+
+    def _collect_base_emotions(self) -> list[str]:
+        clusters = self._model.get("clusters", {})
+        emotions: list[str] = []
+        for cluster in clusters.values():
+            emotions.extend(cluster.get("emotions", []))
+        return sorted(set(emotions))
+
+    def build_raw_emotion_vector(self, text: str) -> Dict[str, float]:
+        """Build normalized raw emotion scores (0..1) for atomic emotions."""
+
+        lowered = text.lower()
+        raw_scores: Dict[str, float] = {emotion: 0.0 for emotion in self._base_emotions}
+
+        # Direct keyword matching against the model emotions
+        for emotion in self._base_emotions:
+            token = emotion.replace("_", " ")
+            pattern = re.escape(token)
+            hits = len(re.findall(pattern, lowered))
+            raw_scores[emotion] += float(hits)
+
+        # Lexicon-driven boosts
+        lexicon_result = self.lexicon.get_emotion(text)
+        for bucket, active in lexicon_result.get("emotions", {}).items():
+            if not active:
+                continue
+            for emotion in self._base_emotions:
+                if bucket in emotion:
+                    raw_scores[emotion] += 1.0
+
+        # Heuristic analyzer (joy/sadness/etc.) mapped onto similar tokens
+        auto_scores = self.auto_analyzer.analyze(text)
+        for bucket, value in auto_scores.items():
+            for emotion in self._base_emotions:
+                if bucket in emotion:
+                    raw_scores[emotion] += float(value) * 2.0
+
+        max_score = max(raw_scores.values()) if raw_scores else 0.0
+        if max_score <= 0:
+            return raw_scores
+        return {emotion: round(score / max_score, 3) for emotion, score in raw_scores.items()}
+
+    def project_to_clusters(self, raw: Dict[str, float]) -> Dict[str, float]:
+        clusters = self._model.get("clusters", {})
+        projected: Dict[str, float] = {}
+        for cluster_name, cluster_model in clusters.items():
+            emotions = cluster_model.get("emotions", [])
+            if not emotions:
+                projected[cluster_name] = 0.0
+                continue
+            total = sum(raw.get(emotion, 0.0) for emotion in emotions)
+            projected[cluster_name] = round(total / max(1, len(emotions)), 3)
+        return projected
+
+    def compute_genre_scores(self, clusters: Dict[str, float]) -> Dict[str, float]:
+        genre_scores: Dict[str, float] = {}
+        model_clusters = self._model.get("clusters", {})
+        for cluster_name, value in clusters.items():
+            cluster_model = model_clusters.get(cluster_name, {})
+            for genre, bias in cluster_model.get("genre_bias", {}).items():
+                genre_scores[genre] = genre_scores.get(genre, 0.0) + value * float(bias)
+
+        max_score = max(genre_scores.values()) if genre_scores else 0.0
+        if max_score <= 0:
+            return {genre: 0.0 for genre in genre_scores}
+        return {genre: round(score / max_score, 3) for genre, score in genre_scores.items()}
+
+    def pick_final_genre(self, genre_scores: Dict[str, float], legacy_genre: Optional[str] = None) -> str:
+        if not genre_scores:
+            return legacy_genre or "unknown"
+
+        sorted_genres = sorted(genre_scores.items(), key=lambda item: item[1], reverse=True)
+        top_genres = [item[0] for item in sorted_genres[:3]]
+        if legacy_genre and genre_scores.get(legacy_genre, 0.0) > 0 and legacy_genre in top_genres:
+            return legacy_genre
+        return sorted_genres[0][0]
+
+    def compute_bpm_base(self, clusters: Dict[str, float]) -> float:
+        aggression = clusters.get("rage", 0.0)
+        sadness = clusters.get("sadness", 0.0)
+        hope = clusters.get("hope", 0.0)
+        awe = clusters.get("awe", 0.0)
+
+        bpm = 92.0
+        bpm += aggression * 40.0
+        bpm -= sadness * 20.0
+        bpm += hope * 15.0
+        bpm += awe * 10.0
+
+        model_clusters = self._model.get("clusters", {})
+        delta = 0.0
+        for cluster_name, value in clusters.items():
+            cluster_model = model_clusters.get(cluster_name, {})
+            delta += value * float(cluster_model.get("bpm_delta", 0.0))
+        bpm += delta * 0.25
+
+        bpm = max(60.0, min(190.0, bpm))
+        return round(bpm, 2)
+
+    def compute_key_and_mode(self, clusters: Dict[str, float]) -> Dict[str, str]:
+        sadness = clusters.get("sadness", 0.0) + clusters.get("pain", 0.0) + clusters.get("disappointment", 0.0)
+        love = clusters.get("love", 0.0)
+        hope = clusters.get("hope", 0.0)
+        tenderness = love  # tenderness nested in love cluster
+        awe = clusters.get("awe", 0.0)
+        rage = clusters.get("rage", 0.0)
+
+        key_info: Dict[str, str] = {"scale": "minor" if sadness > 0.55 else "major"}
+        if love + hope + tenderness > 0.55:
+            key_info["scale"] = "major"
+        if awe > 0.7:
+            key_info["scale"] = "modal_phrygian_lydian"
+            key_info["mode_hint"] = "phrygian"
+        if rage > 0.7:
+            key_info["scale"] = "minor_dark"
+            key_info["mode_hint"] = "dark_minor"
+        return key_info
+
+    def build_emotion_profile(self, text: str, legacy_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        raw = self.build_raw_emotion_vector(text)
+        clusters = self.project_to_clusters(raw)
+        genre_scores = self.compute_genre_scores(clusters)
+        bpm = self.compute_bpm_base(clusters)
+        key_info = self.compute_key_and_mode(clusters)
+
+        profile = {
+            "raw": raw,
+            "clusters": clusters,
+            "genre_scores": genre_scores,
+            "bpm": bpm,
+            "key": key_info,
+        }
+
+        if legacy_context:
+            profile["legacy"] = legacy_context
+        return profile
 

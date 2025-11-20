@@ -29,7 +29,7 @@ from .logical_engines import (
     BreathingEngine,
     ColorEmotionEngine,
     CommandInterpreter,
-    EmotionEngine,
+    EmotionEngine as LegacyEmotionEngine,
     FinalCompiler,
     InstrumentationEngine,
     LyricsAnnotationEngine,
@@ -43,6 +43,7 @@ from .logical_engines import (
     VocalEngine,
     ZeroPulseEngine,
 )
+from .emotion import EmotionEngine
 from .instrument_dynamics import InstrumentalDynamicsEngine
 from .genre_matrix_extended import GenreMatrixExtended
 from .section_intelligence import SectionIntelligenceEngine
@@ -84,7 +85,8 @@ class StudioCoreV6:
     def __init__(self) -> None:
         self.text_engine = TextStructureEngine()
         self.section_parser = SectionParser(self.text_engine)
-        self.emotion_engine = EmotionEngine()
+        self.emotion_engine = LegacyEmotionEngine()
+        self._emotion_engine = EmotionEngine()
         self.color_engine = ColorEmotionEngine()
         self.color_adapter = ColorEngineAdapter()
         self.vocal_engine = VocalEngine()
@@ -1007,6 +1009,44 @@ class StudioCoreV6:
             style_block.setdefault("universe_source", resolution.source)
 
         style_payload = style_block
+
+        emotion_profile_v1 = self._emotion_engine.build_emotion_profile(
+            text,
+            legacy_context={
+                "style": style_payload,
+                "bpm": bpm_payload,
+                "tone": tonality_payload,
+                "commands": command_payload,
+            },
+        )
+
+        commands_block = command_payload if isinstance(command_payload, dict) else {}
+        overrides_block = commands_block.get("overrides", {}) if isinstance(commands_block, dict) else {}
+
+        legacy_genre = style_payload.get("genre") if isinstance(style_payload, dict) else None
+        final_genre = self._emotion_engine.pick_final_genre(
+            emotion_profile_v1.get("genre_scores", {}),
+            legacy_genre=legacy_genre,
+        )
+
+        legacy_bpm = bpm_payload.get("estimate") if isinstance(bpm_payload, dict) else None
+        final_bpm = legacy_bpm or emotion_profile_v1.get("bpm")
+
+        legacy_key = None
+        if isinstance(tonality_payload, dict):
+            legacy_key = tonality_payload.get("key") or tonality_payload.get("mode")
+        final_key = legacy_key or (emotion_profile_v1.get("key") or {}).get("scale")
+
+        if "bpm" not in overrides_block:
+            bpm_payload["estimate"] = final_bpm
+
+        if "genre" not in overrides_block and isinstance(style_payload, dict):
+            style_payload.setdefault("genre", final_genre)
+
+        if "key" not in overrides_block and isinstance(tonality_payload, dict):
+            tonality_payload.setdefault("key", final_key)
+
+        result.setdefault("emotions", {})["profile_v1"] = emotion_profile_v1
 
         rde_snapshot = self.rde_engine.compose(
             bpm_payload=bpm_payload,
