@@ -411,6 +411,7 @@ def analyze_text(text: str, gender: str = "auto"):
             result = {}
 
         summary_section = result.get("summary", {}) if isinstance(result.get("summary"), dict) else {}
+        legacy = result.get("legacy", {}) if isinstance(result.get("legacy"), dict) else {}
 
         # --- Обеспечиваем наличие ключей в результате ---
         result.setdefault("style_prompt", summary_section.get("prompt_suno_style"))
@@ -438,19 +439,42 @@ def analyze_text(text: str, gender: str = "auto"):
         )
 
         # --- 2. Style Prompt ---
-        style_prompt = result.get("style_prompt") or "Ошибка: style_prompt отсутствует"
+        style_prompt_value = (
+            result.get("style_prompt")
+            or legacy.get("prompt_suno_style")
+            or summary_section.get("prompt_suno_style")
+            or "Ошибка: style_prompt отсутствует"
+        )
 
         # --- 3. Lyrics Prompt ---
-        lyrics_prompt = result.get("lyrics_prompt") or "Ошибка: lyrics_prompt отсутствует"
+        lyrics_prompt_value = (
+            result.get("lyrics_prompt")
+            or legacy.get("prompt_suno_lyrics")
+            or legacy.get("annotated_text_suno")
+            or summary_section.get("prompt_suno_lyrics")
+            or summary_section.get("annotated_text_suno")
+            or "Ошибка: lyrics_prompt отсутствует"
+        )
 
         # --- 4. Аннотированный текст (для UI) ---
-        annotated_text_ui = result.get("annotated_text") or "Ошибка: annotated_text отсутствует"
+        annotated_text_ui_value = (
+            result.get("annotated_text")
+            or legacy.get("annotated_text_ui")
+            or summary_section.get("annotated_text_ui")
+            or "Ошибка: annotated_text отсутствует"
+        )
+
+        annotated_text_suno_value = (
+            legacy.get("annotated_text_suno")
+            or summary_section.get("annotated_text_suno")
+            or lyrics_prompt_value
+        )
 
         return (
-            style_prompt,
-            lyrics_prompt,
-            annotated_text_ui,
-            summary_box_value,
+            gr.Textbox.update(value=style_prompt_value),
+            gr.Textbox.update(value=annotated_text_suno_value),
+            gr.Textbox.update(value=annotated_text_ui_value),
+            gr.Textbox.update(value=summary_box_value),
         )
 
     except Exception as e:
