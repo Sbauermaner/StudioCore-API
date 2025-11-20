@@ -201,6 +201,7 @@ class SunoAnnotationEngine:
     """Wrap annotations with English parenthesised commands."""
 
     def build_suno_safe_annotations(self, sections: Sequence[str], diagnostics: Dict[str, Any]) -> List[str]:
+        diagnostics = self._prepare_diagnostics(diagnostics)
         headers = self.generate_section_headers(sections, diagnostics)
         annotations = []
         payload = {
@@ -216,14 +217,23 @@ class SunoAnnotationEngine:
         out = payload.get("out", {}) if isinstance(payload.get("out"), dict) else {}
         style = legacy.get("style", {}) if isinstance(legacy.get("style"), dict) else {}
 
+        emotion_matrix = out.get("emotion_matrix") if isinstance(out.get("emotion_matrix"), dict) else {}
+
         genre = style.get("genre") or "auto"
+        if genre in (None, "auto") and emotion_matrix:
+            genre = emotion_matrix.get("genre", {}).get("primary") or genre
         mood = style.get("mood") or "auto"
         energy = style.get("energy") or "auto"
         arrangement = style.get("arrangement") or "auto"
         bpm_source = legacy.get("bpm") if isinstance(legacy, dict) else None
         if bpm_source is None:
             bpm_source = out.get("bpm", {}).get("estimate") if isinstance(out.get("bpm"), dict) else None
+        if bpm_source is None and emotion_matrix:
+            bpm_source = emotion_matrix.get("bpm", {}).get("recommended")
+
         key = style.get("key") or "auto"
+        if key in (None, "auto") and emotion_matrix:
+            key = emotion_matrix.get("key", {}).get("mode") or key
 
         bpm_label = bpm_source if bpm_source is not None else "auto"
         try:
@@ -235,6 +245,40 @@ class SunoAnnotationEngine:
 
     def protect_annotations_from_lyrics(self, annotations: Sequence[str]) -> List[str]:
         return [f"({item})" if not item.startswith("(") else item for item in annotations]
+
+    def _prepare_diagnostics(self, diagnostics: Dict[str, Any] | None) -> Dict[str, Any]:
+        prepared = dict(diagnostics or {})
+        emotion_matrix = prepared.get("emotion_matrix") if isinstance(prepared.get("emotion_matrix"), dict) else None
+
+        if emotion_matrix:
+            bpm_block = prepared.get("bpm") if isinstance(prepared.get("bpm"), dict) else {}
+            if bpm_block.get("estimate") is None and emotion_matrix.get("bpm"):
+                bpm_block = {**bpm_block, "estimate": emotion_matrix["bpm"].get("recommended")}
+            prepared["bpm"] = bpm_block
+
+            tonality_block = prepared.get("tonality") if isinstance(prepared.get("tonality"), dict) else {}
+            if tonality_block.get("key") is None and emotion_matrix.get("key"):
+                tonality_block = {**tonality_block, "key": emotion_matrix["key"].get("mode")}
+            prepared["tonality"] = tonality_block
+
+            vocal_block = prepared.get("vocal") if isinstance(prepared.get("vocal"), dict) else {}
+            if not vocal_block.get("style") and emotion_matrix.get("vocals"):
+                notes = emotion_matrix["vocals"].get("notes")
+                if notes:
+                    vocal_block = {**vocal_block, "style": notes}
+            prepared["vocal"] = vocal_block
+
+            inst_block = prepared.get("instrumentation") if isinstance(prepared.get("instrumentation"), dict) else {}
+            palette = inst_block.get("palette")
+            if not palette and emotion_matrix.get("instruments"):
+                core = emotion_matrix["instruments"].get("core") or []
+                accent = emotion_matrix["instruments"].get("accent") or []
+                palette = list(core) + list(accent)
+                if palette:
+                    inst_block = {**inst_block, "palette": palette}
+            prepared["instrumentation"] = inst_block
+
+        return prepared
 
     def insert_parenthesized_commands(self, command_payload: Dict[str, Any], index: int) -> List[str]:
         detected = command_payload.get("detected", []) if isinstance(command_payload, dict) else []
@@ -298,3 +342,9 @@ class SunoAnnotationEngine:
         if instrumentation:
             result.append(f"(Instruments IN: {instrumentation[index % len(instrumentation)]})")
         return result
+
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
