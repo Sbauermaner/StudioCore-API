@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from typing import Any, Dict, List, Sequence
+import re
 
 from .emotion import EmotionEngine
 from .structures import PhraseEmotionPacket
@@ -176,9 +177,35 @@ class SectionIntelligenceEngine:
         structure_tension = self.compute_structure_tension(sections)
         phrase_packets: List[Dict[str, Any]] = []
         for section in sections:
-            phrases = extract_phrases_from_section(section)
+            raw_lines = [ln for ln in section.splitlines() if ln and ln.strip()]
+            cleaned_lines: List[str] = []
+            for ln in raw_lines:
+                stripped = ln.strip()
+                if stripped.startswith("[") and stripped.endswith("]"):
+                    continue
+                if stripped.startswith("#"):
+                    continue
+                cleaned_lines.append(stripped)
+
+            if not cleaned_lines:
+                continue
+
+            merged = " \n ".join(cleaned_lines)
+            split_phrases = []
+            for chunk in re.split(r"[.!?…]+", merged):
+                chunk = chunk.strip()
+                if chunk:
+                    split_phrases.extend(extract_phrases_from_section(chunk))
+
+            unique_phrases = []
+            seen = set()
+            for phrase in split_phrases:
+                if phrase not in seen:
+                    unique_phrases.append(phrase)
+                    seen.add(phrase)
+
             if emotion_engine:
-                for phrase in phrases:
+                for phrase in unique_phrases:
                     packet: PhraseEmotionPacket = emotion_engine.analyze_phrase(phrase)
                     phrase_packets.append(packet.to_dict())
         return {
