@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Sequence
 
+from .emotion_profile import EmotionVector
+
 from .logical_engines import BPMEngine as _CoreBPMEngine
 
 
@@ -28,6 +30,14 @@ class BPMEngine(_CoreBPMEngine):
             "poly_rhythm": poly,
             "target_energy": mapping.get("target_energy"),
         }
+
+    def apply_emotional_microshift(self, bpm: float, emotion: EmotionVector) -> float:
+        """
+        Emotional BPM micro-adjustment.
+        Soft shift: ±3% based on emotional arousal.
+        """
+        shift = (emotion.arousal - 0.5) * 0.06 * bpm
+        return bpm + shift
 
 
 __all__ = ["BPMEngine"]
