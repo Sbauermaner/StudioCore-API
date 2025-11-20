@@ -100,7 +100,7 @@ class GenreMatrixEngine:
             ],
         }
 
-    def detect(self, text: str) -> Dict[str, Any]:
+    def detect(self, text: str, emotion_vector: EmotionVector | None = None) -> Dict[str, Any]:
         """Return a weighted map of genres inferred from ``text``."""
 
         lowered = text.lower()
@@ -113,10 +113,21 @@ class GenreMatrixEngine:
 
         total = sum(raw_scores.values()) or 1
         normalized = {genre: score / total for genre, score in raw_scores.items()}
-        dominant = max(raw_scores, key=raw_scores.get) if raw_scores else None
+        score = dict(normalized)
+
+        local_emotion = (emotion_vector or EmotionVector(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)).valence
+
+        if local_emotion < -0.4:
+            score["tragic"] = score.get("tragic", 0) + 0.2
+        elif local_emotion > 0.4:
+            score["lyrical"] = score.get("lyrical", 0) + 0.2
+
+        total_adjusted = sum(score.values()) or 1.0
+        adjusted = {genre: value / total_adjusted for genre, value in score.items()}
+        dominant = max(adjusted, key=adjusted.get) if adjusted else None
 
         return {
-            "scores": normalized,
+            "scores": adjusted,
             "dominant": dominant,
             "keywords": keyword_hits,
         }

@@ -18,6 +18,7 @@ from statistics import mean
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from .emotion import AutoEmotionalAnalyzer
+from .emotion_profile import EmotionVector
 from .instrument import (
     InstrumentLibrary,
     instrument_based_on_emotion as _instrument_based_on_emotion,
@@ -189,6 +190,9 @@ class EmotionEngine:
     def emotion_detection(self, text: str) -> Dict[str, float]:
         return self._analyzer.analyze(text)
 
+    def export_emotion_vector(self, text: str) -> EmotionVector:
+        return self._analyzer.export_emotion_vector(text)
+
     def emotion_intensity_curve(self, text: str) -> List[float]:
         sentences = _split_sentences(text)
         if not sentences:
@@ -294,14 +298,23 @@ class VocalEngine:
             return "lyrical"
         return "melismatic"
 
-    def detect_voice_tone(self, text: str) -> str:
+    def detect_voice_tone(self, text: str, emotion: EmotionVector | None = None) -> str:
         energy = sum(ch in "!?" for ch in text)
         softness = sum(ch in "…" for ch in text)
         if energy > softness * 2:
-            return "intense"
-        if softness > energy:
-            return "soft"
-        return "balanced"
+            timbre = "intense"
+        elif softness > energy:
+            timbre = "soft"
+        else:
+            timbre = "balanced"
+
+        if emotion:
+            if emotion.arousal > 0.7:
+                timbre = "intense"
+            elif emotion.valence < -0.5:
+                timbre = "cold"
+
+        return timbre
 
     def detect_vocal_style(self, text: str, *, voice_type: str | None = None, voice_tone: str | None = None) -> str:
         voice_type = voice_type or self.detect_voice_type(text)

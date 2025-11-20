@@ -11,9 +11,11 @@ import copy
 import os
 import re
 from dataclasses import asdict
-from typing import Any, Dict, Iterable, Sequence
+from typing import Any, Dict, Iterable, List, Sequence
 
 from .bpm_engine import BPMEngine
+from .emotion_field import EmotionFieldEngine
+from .emotion_profile import EmotionVector
 from .rde_engine import RhythmDynamicsEmotionEngine
 from .tone import ToneSyncEngine
 from .section_parser import SectionParser
@@ -381,7 +383,8 @@ class StudioCoreV6:
         # 5. Vocal character
         voice_gender = self.vocal_engine.detect_voice_gender(text)
         voice_type = self.vocal_engine.detect_voice_type(text)
-        voice_tone = self.vocal_engine.detect_voice_tone(text)
+        voice_emotion_vector = self.emotion_engine.export_emotion_vector(text)
+        voice_tone = self.vocal_engine.detect_voice_tone(text, emotion=voice_emotion_vector)
         voice_style = self.vocal_engine.detect_vocal_style(text, voice_type=voice_type, voice_tone=voice_tone)
         vocal_dynamics = self.vocal_engine.vocal_dynamics_map(sections)
         vocal_curve = self.vocal_engine.vocal_intensity_curve(vocal_dynamics)
@@ -648,6 +651,16 @@ class StudioCoreV6:
         tokens = [token for token in re.split(r"[^a-z0-9а-яё]+", text_lower) if token]
         token_count = max(len(tokens), 1)
         lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+        emotion_engine = self.emotion_engine
+        local_vectors: List[EmotionVector] = []
+        for line in lines:
+            vec = emotion_engine.export_emotion_vector(line)
+            local_vectors.append(vec)
+
+        field = EmotionFieldEngine(window=4)
+        smoothed_vectors = field.smooth(local_vectors)
+        result["_emotion_dynamic"] = [v.to_dict() for v in smoothed_vectors]
+
         line_count = max(len(lines), 1)
         palette_items = [
             str(item).lower()

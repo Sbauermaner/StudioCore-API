@@ -12,8 +12,8 @@ Emotion Profile v1 — единый формат эмоций для StudioCore.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import List, Sequence
+from dataclasses import asdict, dataclass
+from typing import Dict, List, Sequence
 
 
 @dataclass
@@ -24,6 +24,20 @@ class EmotionVector:
     valence: float  # V ∈ [-1, 1]
     arousal: float  # A ∈ [0, 1]
     weight: float = 1.0  # вес строки в агрегации
+
+    @staticmethod
+    def average(vectors: Sequence["EmotionVector"]) -> "EmotionVector":
+        if not vectors:
+            return EmotionVector(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+
+        total_weight = sum(v.weight for v in vectors) or 1.0
+        t = sum(v.truth * v.weight for v in vectors) / total_weight
+        l = sum(v.love * v.weight for v in vectors) / total_weight
+        p = sum(v.pain * v.weight for v in vectors) / total_weight
+        v_mean = sum(v.valence * v.weight for v in vectors) / total_weight
+        a = sum(v.arousal * v.weight for v in vectors) / total_weight
+        weight = sum(v.weight for v in vectors) / len(vectors)
+        return EmotionVector(t, l, p, v_mean, a, weight).clipped()
 
     def clipped(self) -> "EmotionVector":
         def clip(x: float, lo: float, hi: float) -> float:
@@ -37,6 +51,9 @@ class EmotionVector:
             arousal=clip(self.arousal, 0.0, 1.0),
             weight=max(self.weight, 0.0),
         )
+
+    def to_dict(self) -> Dict[str, float]:
+        return asdict(self.clipped())
 
 
 class EmotionAggregator:
