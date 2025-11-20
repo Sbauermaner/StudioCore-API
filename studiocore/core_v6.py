@@ -62,6 +62,7 @@ from .text_utils import (
 )
 from .user_override_manager import UserOverrideManager, UserOverrides
 from studiocore.emotion_map import EmotionMapEngine
+from studiocore.emotion_curve import build_global_emotion_curve
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
@@ -312,10 +313,15 @@ class StudioCoreV6:
         section_intel_payload = self.section_intelligence.analyze(
             text, sections, emotion_curve, emotion_engine=self._emotion_engine
         )
+        section_emotions = list(section_intel_payload.get("section_emotions", []))
+        global_emotion_curve = build_global_emotion_curve(section_emotions)
+        curve_dict = global_emotion_curve.to_dict()
         structure_context["section_intelligence"] = section_intel_payload
         structure_context["emotion_profile"] = dict(emotion_profile)
         structure_context["emotion_profile_axes7"] = dict(dynamic_emotion_profile)
         structure_context["emotion_curve"] = list(emotion_curve)
+        structure_context["emotion_curve_global"] = curve_dict
+        structure_context.setdefault("dynamic_bias", curve_dict.get("dynamic_bias", {}))
         if language_info:
             structure_context["language"] = dict(language_info)
 
@@ -1096,6 +1102,7 @@ class StudioCoreV6:
                 "section_emotions": section_intel_payload.get("section_emotions", []),
                 "semantic_hints": semantic_hints,
                 "auto_context": structure_context,
+                "emotion_curve": curve_dict,
                 "instrument_dynamics": instrument_dynamics_payload,
                 "override_debug": override_manager.debug_summary(),
                 "rde_summary": rde_summary,
@@ -1199,6 +1206,7 @@ class StudioCoreV6:
         merged["style_prompt"] = payload.get("style_prompt")
         merged["summary"] = payload.get("style", {}).get("prompt") or payload.get("summary") or ""
         merged["section_emotions"] = payload.get("section_emotions", [])
+        merged["emotion_curve"] = payload.get("emotion_curve", {})
         merged.pop("_overrides_applied", None)
         return merged
 
