@@ -341,6 +341,8 @@ class StudioCoreV6:
         if language_info:
             structure["language"] = dict(language_info)
 
+        result: Dict[str, Any] = {}
+
         zero_hint = self.text_engine.detect_zero_pulse(text, sections=sections)
 
         # 3. Emotional layers
@@ -357,6 +359,13 @@ class StudioCoreV6:
             "conflict": self.emotion_engine.emotion_conflict_map(emotion_profile),
         }
         emotion_payload = self._merge_semantic_hints(emotion_payload, semantic_hints.get("emotion", {}))
+
+        try:
+            from studiocore.emotion_profile import EmotionAggregator
+
+            result["_emotion_stub"] = EmotionAggregator
+        except Exception:
+            result["_emotion_stub"] = None
 
         # 4. Tonal colours and style hints
         color_profile = self.color_engine.assign_color_by_emotion(emotion_profile)
@@ -906,34 +915,36 @@ class StudioCoreV6:
         if semantic_hints.get("annotations"):
             annotations = self._merge_semantic_hints(annotations, semantic_hints["annotations"])
 
-        result = {
-            "legacy": legacy_result,
-            "structure": structure,
-            "emotion": emotion_payload,
-            "color": {
-                "profile": color_profile,
-                "wave": color_wave,
-                "transitions": color_transitions,
-            },
-            "vocal": vocal_payload,
-            "breathing": {**breathing_profile, "sync": breath_sync},
-            "bpm": bpm_payload,
-            "meaning": meaning_payload,
-            "tonality": tonality_payload,
-            "instrumentation": instrumentation_payload,
-            "rem": rem_payload,
-            "zero_pulse": zero_pulse_payload,
-            "tlp": dict(tlp_profile),
-            "style": style_payload,
-            "commands": command_payload,
-            "annotations": annotations,
-            "semantic_hints": semantic_hints,
-            "auto_context": structure_context,
-            "instrument_dynamics": instrument_dynamics_payload,
-            "override_debug": override_manager.debug_summary(),
-            "rde_summary": rde_summary,
-            "genre_analysis": genre_analysis,
-        }
+        result.update(
+            {
+                "legacy": legacy_result,
+                "structure": structure,
+                "emotion": emotion_payload,
+                "color": {
+                    "profile": color_profile,
+                    "wave": color_wave,
+                    "transitions": color_transitions,
+                },
+                "vocal": vocal_payload,
+                "breathing": {**breathing_profile, "sync": breath_sync},
+                "bpm": bpm_payload,
+                "meaning": meaning_payload,
+                "tonality": tonality_payload,
+                "instrumentation": instrumentation_payload,
+                "rem": rem_payload,
+                "zero_pulse": zero_pulse_payload,
+                "tlp": dict(tlp_profile),
+                "style": style_payload,
+                "commands": command_payload,
+                "annotations": annotations,
+                "semantic_hints": semantic_hints,
+                "auto_context": structure_context,
+                "instrument_dynamics": instrument_dynamics_payload,
+                "override_debug": override_manager.debug_summary(),
+                "rde_summary": rde_summary,
+                "genre_analysis": genre_analysis,
+            }
+        )
         fanf_analysis_payload = {
             "emotion": {"profile": emotion_profile, "curve": emotion_curve},
             "bpm": bpm_payload,

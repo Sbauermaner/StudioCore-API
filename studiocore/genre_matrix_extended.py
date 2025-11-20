@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from studiocore.emotion_profile import EmotionVector, EmotionAggregator
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
@@ -118,6 +120,19 @@ class GenreMatrixEngine:
             "dominant": dominant,
             "keywords": keyword_hits,
         }
+
+    def export_emotion_vector(self, text: str) -> EmotionVector:
+        """
+        Passive hook. Returns a neutral EmotionVector until dynamic mode is enabled.
+        """
+        return EmotionVector(
+            truth=0.0,
+            love=0.0,
+            pain=0.0,
+            valence=0.0,
+            arousal=0.0,
+            weight=1.0,
+        )
 
 
 class GenreMatrixExtended(GenreMatrixEngine):

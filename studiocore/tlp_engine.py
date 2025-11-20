@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
+from studiocore.emotion_profile import EmotionVector, EmotionAggregator
+
 from .emotion import TruthLovePainEngine as _TruthLovePainEngine
 
 
@@ -22,6 +24,19 @@ class TruthLovePainEngine(_TruthLovePainEngine):
         profile["dominant_axis"] = dominant
         profile["balance"] = round((profile.get("truth", 0.0) + profile.get("love", 0.0)) - profile.get("pain", 0.0), 3)
         return profile
+
+    def export_emotion_vector(self, text: str) -> EmotionVector:
+        """
+        Passive hook. Returns a neutral EmotionVector until dynamic mode is enabled.
+        """
+        return EmotionVector(
+            truth=0.0,
+            love=0.0,
+            pain=0.0,
+            valence=0.0,
+            arousal=0.0,
+            weight=1.0,
+        )
 
 
 __all__ = ["TruthLovePainEngine"]
