@@ -243,6 +243,7 @@ class EmotionEngine:
     def __init__(self) -> None:
         self.lexicon = EmotionLexiconExtended()
         self.auto_analyzer = AutoEmotionalAnalyzer()
+        self.tlp_engine = TruthLovePainEngine()
         self._model = load_emotion_model()
         self._base_emotions = self._collect_base_emotions()
         self._phrase_packets: list[PhraseEmotionPacket] = []
@@ -265,15 +266,64 @@ class EmotionEngine:
         return list(self._phrase_packets)
 
     def analyze_phrase(self, phrase: str) -> PhraseEmotionPacket:
-        """Placeholder phrase-level analyzer (weights applied later)."""
+        """Phrase-level analyzer that leverages the v1 emotion model."""
+
+        safe_phrase = phrase or ""
+        normalized = " ".join(safe_phrase.lower().strip().split())
+
+        # Semantic role detection (early to avoid failures later)
+        semantic_role = "statement"
+        if any(marker in safe_phrase.lower() for marker in ("как", "словно", "будто")):
+            semantic_role = "metaphor"
+        if any(ch in safe_phrase for ch in ("!", "?")):
+            semantic_role = "exclamation"
+
+        # Neutral fallback for empty input
+        if not normalized:
+            base_vector = {emotion: 0.0 for emotion in self._base_emotions}
+            cluster_vector = {name: 0.0 for name in self._model.get("clusters", {})}
+            tlp_profile = self.tlp_engine.analyze("")
+            weight = 0.05
+            impact_zone = "mixed"
+        else:
+            base_vector = self.build_raw_emotion_vector(normalized)
+            cluster_vector = self.project_to_clusters(base_vector)
+
+            # Normalize cluster values if they exceed 1.0
+            max_cluster = max(cluster_vector.values()) if cluster_vector else 0.0
+            if max_cluster > 1.0:
+                cluster_vector = {k: round(v / max_cluster, 3) for k, v in cluster_vector.items()}
+
+            tlp_profile = self.tlp_engine.analyze(normalized)
+
+            base_energy = min(1.0, sum(base_vector.values())) if base_vector else 0.0
+            weight = max(base_energy, max_cluster)
+            if weight <= 0:
+                weight = 0.05
+
+            pain = tlp_profile.get("pain", 0.0)
+            love = tlp_profile.get("love", 0.0)
+            if pain > love and pain > 0.6:
+                impact_zone = "pain"
+            elif love > pain and love > 0.6:
+                impact_zone = "love"
+            else:
+                impact_zone = "mixed"
+
+        emotions_payload = {
+            "base": base_vector,
+            "clusters": cluster_vector,
+            "tlp": tlp_profile,
+        }
 
         packet = PhraseEmotionPacket(
-            phrase=phrase,
-            emotions={},
-            weight=1.0,
-            impact_zone="unknown",
-            semantic_role="phrase",
+            phrase=safe_phrase,
+            emotions=emotions_payload,
+            weight=float(min(1.0, weight)),
+            impact_zone=impact_zone,
+            semantic_role=semantic_role,
         )
+
         self._phrase_packets.append(packet)
         return packet
 
