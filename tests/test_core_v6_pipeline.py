@@ -19,3 +19,5 @@ def test_core_v6_analyze_produces_expected_sections():
     assert result["language"]["language"]
     assert result["bpm"].get("section_annotations")
     assert result["bpm"].get("emotion_map", {}).get("target_bpm")
+    assert result.get("fanf", {}).get("annotated_text_fanf")
+    assert "choir_active" in result.get("fanf", {})

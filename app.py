@@ -363,38 +363,53 @@ threading.Thread(target=auto_core_check, daemon=True).start()
 # === 8. АНАЛИЗ ТЕКСТА (Gradio) ===
 
 def analyze_text(text: str, gender: str = "auto"):
-    """
-    Основная функция анализа текста через StudioCore для UI Gradio.
-    v8+: Возвращает 4 значения: Style Prompt, Lyrics Prompt, Аннотированный текст, Summary
-    """
+    """Основная функция анализа текста через StudioCore для UI Gradio."""
+
+    def _empty_payload(message: str = ""):
+        return {
+            prompt_suno_style: gr.update(value=""),
+            annotated_text_suno: gr.update(value=""),
+            annotated_text_ui: gr.update(value=""),
+            annotated_text_fanf: gr.update(value=""),
+            summary_box: gr.update(value=message or ""),
+        }
+
     log.debug(f"Gradio analyze_text: получено {len(text)} символов, gender={gender}")
 
     if not text.strip():
-        return "", "", "", "⚠️ Введите текст для анализа."
+        return _empty_payload("⚠️ Введите текст для анализа.")
 
     is_valid, validation_error = _validate_input_length(text)
     if not is_valid:
-        return "", "", "", validation_error
+        return _empty_payload(validation_error)
 
     try:
         core = create_core_instance()
     except Exception as exc:
         log.error("Gradio analyze_text: не удалось создать ядро: %s", exc)
-        return "", "", "", f"❌ Ядро не загружено: {exc}"
+        return _empty_payload(f"❌ Ядро не загружено: {exc}")
 
     try:
-        # --- Проверка пользовательских описаний вокала ---
-        semantic_hints = {}
+        semantic_hints: Dict[str, Any] = {}
         voice_hint_keywords = [
-            "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
-            "пескляв", "soft", "airy", "shout", "grit", "фальцет", "whisper"
+            "вокал",
+            "voice",
+            "growl",
+            "scream",
+            "raspy",
+            "мужск",
+            "женск",
+            "пескляв",
+            "soft",
+            "airy",
+            "shout",
+            "grit",
+            "фальцет",
+            "whisper",
         ]
 
-        # v8: Улучшенная логика: ищем хинт только в ПОСЛЕДНЕЙ строке,
-        # если она в скобках или начинается с "под"
         last_line = text.strip().splitlines()[-1].strip().lower()
-        if (last_line.startswith("(") and last_line.endswith(")")) or \
-           last_line.startswith("под "):
+        if (last_line.startswith("(") and last_line.endswith(")")) or last_line.startswith("под "):
             if any(k in last_line for k in voice_hint_keywords):
                 semantic_hints["voice_profile_hint"] = last_line
                 log.info(f"🎙️ [UI] Обнаружено описание вокала: {semantic_hints['voice_profile_hint']}")
@@ -404,83 +419,88 @@ def analyze_text(text: str, gender: str = "auto"):
 
         if isinstance(result, dict) and "error" in result:
             log.error(f"Gradio: Ядро вернуло ошибку: {result['error']}")
-            return "", "", "", f"❌ Ошибка: {result['error']}"
+            return _empty_payload(f"❌ Ошибка: {result['error']}")
 
         if not isinstance(result, dict):
             log.warning("Gradio: unexpected result type, coercing to empty dict")
             result = {}
 
-        summary_section = result.get("summary", {}) if isinstance(result.get("summary"), dict) else {}
         legacy = result.get("legacy", {}) if isinstance(result.get("legacy"), dict) else {}
-
-        # --- Обеспечиваем наличие ключей в результате ---
-        result.setdefault("style_prompt", summary_section.get("prompt_suno_style"))
-        result.setdefault("lyrics_prompt", summary_section.get("annotated_text_suno"))
-        result.setdefault("annotated_text", summary_section.get("annotated_text_ui"))
-
-        # --- 1. Summary ---
+        fanf_block = result.get("fanf", {}) if isinstance(result.get("fanf"), dict) else {}
         style = result.get("style", {}) if isinstance(result.get("style"), dict) else {}
-        vocal_form = style.get("vocal_form", "auto")
+        bpm = result.get("bpm", {}) if isinstance(result.get("bpm"), dict) else {}
+        tonality = result.get("tonality", {}) if isinstance(result.get("tonality"), dict) else {}
+        tlp = result.get("tlp", {}) if isinstance(result.get("tlp"), dict) else {}
+        zero = result.get("zero_pulse", {}) if isinstance(result.get("zero_pulse"), dict) else {}
+        color_wave = result.get("color", {}).get("wave") if isinstance(result.get("color"), dict) else None
+        rde = result.get("rde_summary", {}) if isinstance(result.get("rde_summary"), dict) else {}
 
-        summary_text = (
-            f"✅ StudioCore {STUDIOCORE_VERSION}\n"
-            f"🎭 {style.get('genre', '—')} | "
-            f"🎵 {style.get('style', '—')} | "
-            f"🎙 {vocal_form} ({result.get('final_gender_preference', 'auto')}) | "
-            f"⏱ {result.get('bpm', '—')} BPM | "
-            f"🔑 {style.get('key', 'auto')}"
+        def _coalesce(*values: Any, fallback: str = "—") -> str:
+            for val in values:
+                if val is None:
+                    continue
+                if isinstance(val, (int, float)):
+                    return str(val)
+                if isinstance(val, str) and val.strip():
+                    return val
+                if val:
+                    return str(val)
+            return fallback
+
+        style_prompt_value = _coalesce(
+            result.get("style_prompt"),
+            legacy.get("prompt_suno_style") if isinstance(legacy, dict) else None,
+            fanf_block.get("cinematic_header"),
+            fallback="Ошибка: style_prompt отсутствует",
         )
 
-        summary_payload = summary_section if summary_section else {"summary": summary_text}
-        summary_box_value = (
-            json.dumps(summary_payload, ensure_ascii=False, indent=2)
-            if isinstance(summary_payload, dict)
-            else str(summary_payload)
+        annotated_text_suno_value = _coalesce(
+            fanf_block.get("annotated_text_suno"),
+            legacy.get("annotated_text_suno") if isinstance(legacy, dict) else None,
+            "",
+            fallback="Ошибка: annotated_text_suno отсутствует",
         )
 
-        # --- 2. Style Prompt ---
-        style_prompt_value = (
-            result.get("style_prompt")
-            or legacy.get("prompt_suno_style")
-            or summary_section.get("prompt_suno_style")
-            or "Ошибка: style_prompt отсутствует"
+        annotated_text_ui_value = _coalesce(
+            fanf_block.get("annotated_text_ui"),
+            legacy.get("annotated_text_ui") if isinstance(legacy, dict) else None,
+            result.get("annotations", {}).get("vocal") if isinstance(result.get("annotations"), dict) else None,
+            fallback="Ошибка: annotated_text_ui отсутствует",
         )
 
-        # --- 3. Lyrics Prompt ---
-        lyrics_prompt_value = (
-            result.get("lyrics_prompt")
-            or legacy.get("prompt_suno_lyrics")
-            or legacy.get("annotated_text_suno")
-            or summary_section.get("prompt_suno_lyrics")
-            or summary_section.get("annotated_text_suno")
-            or "Ошибка: lyrics_prompt отсутствует"
+        annotated_text_fanf_value = _coalesce(
+            fanf_block.get("annotated_text_fanf"),
+            result.get("annotations", {}).get("vocal") if isinstance(result.get("annotations"), dict) else None,
+            fallback="Ошибка: FANF аннотация отсутствует",
         )
 
-        # --- 4. Аннотированный текст (для UI) ---
-        annotated_text_ui_value = (
-            result.get("annotated_text")
-            or legacy.get("annotated_text_ui")
-            or summary_section.get("annotated_text_ui")
-            or "Ошибка: annotated_text отсутствует"
-        )
+        summary_payload = {
+            "genre": _coalesce(style.get("genre"), style.get("domain_genre")),
+            "style": _coalesce(style.get("tone"), style.get("mood")),
+            "bpm": _coalesce(bpm.get("estimate"), bpm.get("emotion_map", {}).get("target_bpm") if isinstance(bpm.get("emotion_map"), dict) else None),
+            "key": _coalesce(style.get("key"), _coalesce(*tonality.get("section_keys", []), fallback="auto")),
+            "tlp": tlp or {},
+            "rde": rde,
+            "zero_pulse_count": len(zero.get("analysis", [])) if isinstance(zero.get("analysis"), list) else 0,
+            "color_wave": color_wave or "adaptive",
+            "choir": bool(fanf_block.get("choir_active", False)),
+            "mode_shifts": tonality.get("modal_shifts", []),
+            "resonance_layers": tonality.get("key_curve", []),
+        }
 
-        annotated_text_suno_value = (
-            legacy.get("annotated_text_suno")
-            or summary_section.get("annotated_text_suno")
-            or lyrics_prompt_value
-        )
+        summary_box_value = json.dumps(summary_payload, ensure_ascii=False, indent=2)
 
-        return (
-            gr.Textbox.update(value=style_prompt_value),
-            gr.Textbox.update(value=annotated_text_suno_value),
-            gr.Textbox.update(value=annotated_text_ui_value),
-            gr.Textbox.update(value=summary_box_value),
-        )
+        return {
+            prompt_suno_style: gr.update(value=style_prompt_value),
+            annotated_text_suno: gr.update(value=annotated_text_suno_value),
+            annotated_text_ui: gr.update(value=annotated_text_ui_value),
+            annotated_text_fanf: gr.update(value=annotated_text_fanf_value),
+            summary_box: gr.update(value=summary_box_value),
+        }
 
     except Exception as e:
         log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА в analyze_text (Gradio): {traceback.format_exc()}")
-        # v10: Возвращаем traceback в UI для легкой отладки
-        return "", "", "", f"❌ Внутреннее исключение: {e}\n\n{traceback.format_exc()}"
+        return _empty_payload(f"❌ Внутреннее исключение: {e}\n\n{traceback.format_exc()}")
 
 # === 9. INLINE TEST RUNNER ===
 def run_inline_tests():
@@ -571,35 +591,39 @@ with gr.Blocks(
 
         analyze_button = gr.Button("🔍 Анализировать")
 
-        prompt_suno_style = gr.Textbox(
+        prompt_suno_style = gr.Code(
             label="[STYLE PROMPT - КОПИРОВАТЬ В SUNO 'Style of Music']",
-            placeholder="Suno Style Prompt",
-            lines=3,
+            language="markdown",
+            interactive=False,
             show_copy_button=True,
         )
 
-        annotated_text_suno = gr.Textbox(
+        annotated_text_suno = gr.Code(
             label="[LYRICS PROMPT - КОПИРОВАТЬ В SUNO 'Lyrics']",
-            placeholder="Suno Lyrics Prompt",
-            lines=10,
+            language="markdown",
+            interactive=False,
             show_copy_button=True,
         )
 
-        annotated_text_ui = gr.Textbox(
+        annotated_text_ui = gr.Code(
             label="Аннотированный текст (UI)",
-            placeholder="UI Annotated Text",
-            lines=10,
+            language="markdown",
+            interactive=False,
             show_copy_button=True,
         )
+
+        with gr.Accordion("🎞 FANF Cinematic Annotation", open=False):
+            annotated_text_fanf = gr.Code(
+                label="FANF Cinematic", language="markdown", interactive=False, show_copy_button=True
+            )
 
         with gr.Accordion("Показать расширенный анализ (Summary и Аннотация)", open=False):
-            # v8: Кнопки копирования возвращены
-            summary_box = gr.Textbox(label="📊 Результат (Summary)", lines=6, show_copy_button=True)
+            summary_box = gr.Code(label="📊 Результат (Summary)", language="json", interactive=False)
 
         analyze_button.click(
             fn=analyze_text,
             inputs=[text_input, gender_input],
-            outputs=[prompt_suno_style, annotated_text_suno, annotated_text_ui, summary_box],
+            outputs=[prompt_suno_style, annotated_text_suno, annotated_text_ui, annotated_text_fanf, summary_box],
         )
 
         # === JSON DEBUG SECTION ===
