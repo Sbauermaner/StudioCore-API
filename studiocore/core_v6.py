@@ -23,6 +23,8 @@ from .section_parser import SectionParser
 from .tlp_engine import TruthLovePainEngine
 from .genre_router import DynamicGenreRouter
 from .genre_universe_adapter import GenreUniverseAdapter
+from .dynamic_emotion_engine import DynamicEmotionEngine
+from .emotion_genre_matrix import compute_genre_bias
 from .logical_engines import (
     BreathingEngine,
     ColorEmotionEngine,
@@ -58,7 +60,6 @@ from .text_utils import (
     translate_text_for_analysis,
 )
 from .user_override_manager import UserOverrideManager, UserOverrides
-from .emotion_profile import EmotionVector
 from studiocore.emotion_map import EmotionMapEngine
 
 # StudioCore Signature Block (Do Not Remove)
@@ -107,6 +108,7 @@ class StudioCoreV6:
         self.override_engine = UserOverrideEngine()
         self.symbiosis_engine = UserAdaptiveSymbiosisEngine()
         self.tlp_engine = TruthLovePainEngine()
+        self.dynamic_emotion_engine = DynamicEmotionEngine(self.emotion_engine, self.tlp_engine)
         self.rde_engine = RhythmDynamicsEmotionEngine()
         self.genre_router = DynamicGenreRouter()
         self.genre_universe_adapter = GenreUniverseAdapter()
@@ -303,9 +305,11 @@ class StudioCoreV6:
         self._last_text = text
         emotion_profile = self.emotion_engine.emotion_detection(text)
         emotion_curve = self.emotion_engine.emotion_intensity_curve(text)
+        dynamic_emotion_profile = self.dynamic_emotion_engine.emotion_profile(text)
         section_intel_payload = self.section_intelligence.analyze(text, sections, emotion_curve)
         structure_context["section_intelligence"] = section_intel_payload
         structure_context["emotion_profile"] = dict(emotion_profile)
+        structure_context["emotion_profile_axes7"] = dict(dynamic_emotion_profile)
         structure_context["emotion_curve"] = list(emotion_curve)
         if language_info:
             structure_context["language"] = dict(language_info)
@@ -316,6 +320,7 @@ class StudioCoreV6:
                 "dominant_emotion": max(emotion_profile, key=emotion_profile.get) if emotion_profile else None,
                 "emotion_curve_max": max(emotion_curve) if emotion_curve else None,
                 "section_intelligence": section_intel_payload,
+                "emotion_profile_axes7": dynamic_emotion_profile,
             },
         )
         structure_context["semantic_hints"] = semantic_hints
@@ -323,6 +328,9 @@ class StudioCoreV6:
         emotion_profile = self._merge_semantic_hints(
             dict(emotion_profile),
             semantic_hints.get("emotion_profile", {}),
+        )
+        dynamic_emotion_profile = self._merge_semantic_hints(
+            dict(dynamic_emotion_profile), semantic_hints.get("emotion_profile_axes7", {})
         )
         commands = list(structure_context.get("commands", []))
 
@@ -371,6 +379,7 @@ class StudioCoreV6:
             tlp_profile["emotion"] = dominant_emotion
         emotion_payload = {
             "profile": emotion_profile,
+            "dynamic_profile": dynamic_emotion_profile,
             "curve": emotion_curve,
             "pivots": self.emotion_engine.emotion_pivot_points(text, intensity_curve=emotion_curve),
             "secondary": self.emotion_engine.secondary_emotion_detection(emotion_profile),
@@ -895,6 +904,7 @@ class StudioCoreV6:
 
         # 14. Style synthesis
         style_commands = command_payload.get("style") or {}
+        emotion_bias = compute_genre_bias(dynamic_emotion_profile)
         style_genre = (
             style_commands.get("genre")
             or semantic_hints.get("style", {}).get("genre")
@@ -953,6 +963,7 @@ class StudioCoreV6:
             "visual": style_visual,
             "tone": style_tone,
             "prompt": style_prompt,
+            "genre_bias": emotion_bias,
         }
         if domain_genre:
             style_payload["domain_genre"] = domain_genre
