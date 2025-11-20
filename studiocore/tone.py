@@ -19,6 +19,11 @@ class ToneSyncEngine:
     into a synesthetic visual–resonant signature.
     """
 
+    RIFT_MARKERS = (
+        "сегодня я",
+        "теперь года прошли",
+    )
+
     BASE_COLOR_MAP = {
         "C": "red",
         "C#": "orange-red",
@@ -127,3 +132,9 @@ class ToneSyncEngine:
             "synesthetic_signature": f"{color} + {accent} ({temp}, {resonance} Hz)",
             "signature_id": signature_id,
         }
+
+    def has_rhetorical_rift(self, paragraph: str) -> bool:
+        if not paragraph:
+            return False
+        normalized = paragraph.strip().lower()
+        return any(normalized.startswith(marker) for marker in self.RIFT_MARKERS)

@@ -13,6 +13,12 @@ from typing import Any, Dict, List, Sequence
 class SectionIntelligenceEngine:
     """Detect chorus/mantra/transition cues beyond naive splitting."""
 
+    LONGFORM_SECTION_RULES = (
+        "semantic_markers_strict",
+        "hard_boundary_on_pronouns",
+        "no_block_merging",
+    )
+
     def _prepare_sections(self, sections: Sequence[str] | None, text: str | None) -> List[str]:
         if sections:
             return [section.strip() for section in sections if section and section.strip()]
@@ -119,6 +125,21 @@ class SectionIntelligenceEngine:
         outro["label"] = "outro"
         return outro
 
+    def detect_longform(self, text: str, sections: Sequence[str] | None) -> Dict[str, Any]:
+        resolved = self._prepare_sections(sections, text)
+        line_count = sum(len(section.splitlines()) for section in resolved) or len(text.splitlines())
+        mode = "default"
+        rules: List[str] = []
+        if line_count > 120:
+            mode = "longform"
+            rules = list(self.LONGFORM_SECTION_RULES)
+        return {
+            "mode": mode,
+            "line_count": line_count,
+            "rules": rules,
+            "prefer_strict_markers": mode == "longform",
+        }
+
     def compute_structure_tension(self, sections: Sequence[str] | None) -> float:
         segments = [section.strip() for section in (sections or []) if section and section.strip()]
         if not segments:
@@ -153,5 +174,6 @@ class SectionIntelligenceEngine:
             "transition_drop": self.detect_transition_drop(emotion_curve),
             "intro": self.detect_intro(sections, text),
             "outro": self.detect_outro(sections, text),
+            "longform": self.detect_longform(text, sections),
             "structure_tension": structure_tension,
         }
