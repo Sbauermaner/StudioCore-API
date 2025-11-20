@@ -186,21 +186,29 @@ async def diagnostics():
 
 @app.get("/health")
 async def health(force_reload: bool = False):
-    """Проверка того, что ядро можно создать и запустить минимальный анализ."""
+    """
+    Проверка того, что ядро можно создать и выполнить минимальный анализ.
+    Здесь исправлена ошибка: global CORE_RELOAD_REQUIRED должен объявляться
+    до любого использования внутри функции.
+    """
+
+    global CORE_RELOAD_REQUIRED
 
     try:
         core = create_core_instance(force_reload=force_reload)
         probe = core.analyze("healthcheck ping", preferred_gender="auto")
         status = "ok" if isinstance(probe, dict) and "error" not in probe else "degraded"
+        
         return {
             "status": status,
             "core_inits": CORE_SUCCESSFUL_INITS,
             "reload_required": CORE_RELOAD_REQUIRED,
             "last_error": LAST_CORE_ERROR,
         }
+
     except Exception as exc:  # pragma: no cover - defensive guard
-        global CORE_RELOAD_REQUIRED
         CORE_RELOAD_REQUIRED = True
+        
         return JSONResponse(
             status_code=500,
             content={
