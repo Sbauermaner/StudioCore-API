@@ -77,3 +77,29 @@ def test_fake_user_emotion_and_genre(user):
     )
 
     print(f"✅ OK: {user['id']} | emotion={emotion_name} | genre={genre}")
+
+
+def test_fake_user_state_and_bias_reset():
+    core = StudioCoreV6()
+    results = [core.analyze(user["sample_text"], preferred_gender="auto") for user in load_fake_users()]
+
+    biases = []
+    bpms = []
+    genres = []
+    for user, res in zip(load_fake_users(), results):
+        style_block = res.get("style", {}) or {}
+        bias = style_block.get("genre_bias") or {}
+        bpm_estimate = res.get("bpm", {}).get("estimate")
+        genre = str(style_block.get("genre", "")).lower()
+
+        assert bias, f"❌ genre_bias missing for user={user['id']}"
+        assert all(0.0 <= float(v) <= 1.0 for v in bias.values()), "❌ genre_bias values out of range"
+
+        biases.append(bias)
+        bpms.append(bpm_estimate)
+        genres.append(genre)
+
+    assert len({json.dumps(b, sort_keys=True) for b in biases}) > 1, "❌ Bias values must differ across samples"
+    numeric_bpms = {b for b in bpms if isinstance(b, (int, float))}
+    assert len(numeric_bpms) > 1, "❌ BPM must reset per request"
+    assert any(g != "edm" for g in genres), "❌ Genre must not default to EDM"

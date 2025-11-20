@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
+
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
@@ -145,6 +150,33 @@ class DynamicGenreRouter:
             score += 0.2
         return score
 
+    def apply_emotion_bias(
+        self, genre_scores: Dict[str, float], bias: Dict[str, float] | None
+    ) -> Dict[str, float]:
+        """Apply Variant A emotion bias to genre scores.
+
+        Keeps user overrides intact and falls back to the original scores if
+        bias data is missing. When the strongest bias exceeds ``0.85`` it may
+        override textual cues, reflecting the "emotion stronger than text"
+        requirement.
+        """
+
+        if not bias:
+            return dict(genre_scores)
+
+        max_bias = max(bias.values()) if bias else 0.0
+        dominant_bias = [genre for genre, value in bias.items() if value == max_bias]
+
+        adjusted: Dict[str, float] = {}
+        for genre, score in genre_scores.items():
+            bias_value = float(bias.get(genre, 1.0))
+            adjusted_score = score * bias_value
+            if max_bias >= 0.85 and genre in dominant_bias:
+                adjusted_score = max(adjusted_score, bias_value)
+            adjusted[genre] = adjusted_score
+
+        return adjusted
+
     # --- PUBLIC API --------------------------------------------------------
 
     def route(self, result: Dict[str, Any]) -> Tuple[str, str]:
@@ -174,5 +206,9 @@ class DynamicGenreRouter:
             "pop": self._score_pop(ctx),
         }
 
-        macro_genre = max(scores.items(), key=lambda kv: kv[1])[0]
-        return macro_genre, "dynamic_router"
+        bias = style_block.get("genre_bias") or result.get("genre_bias")
+        adjusted_scores = self.apply_emotion_bias(scores, bias)
+
+        macro_genre = max(adjusted_scores.items(), key=lambda kv: kv[1])[0]
+        reason = "dynamic_router_emotion_bias" if bias else "dynamic_router"
+        return macro_genre, reason
