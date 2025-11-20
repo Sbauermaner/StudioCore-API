@@ -1093,6 +1093,7 @@ class StudioCoreV6:
                 "commands": command_payload,
                 "annotations": annotations,
                 "phrase_packets": section_intel_payload.get("phrase_packets", []),
+                "section_emotions": section_intel_payload.get("section_emotions", []),
                 "semantic_hints": semantic_hints,
                 "auto_context": structure_context,
                 "instrument_dynamics": instrument_dynamics_payload,
@@ -1197,6 +1198,7 @@ class StudioCoreV6:
         merged["fanf"] = payload.get("fanf", {})
         merged["style_prompt"] = payload.get("style_prompt")
         merged["summary"] = payload.get("style", {}).get("prompt") or payload.get("summary") or ""
+        merged["section_emotions"] = payload.get("section_emotions", [])
         merged.pop("_overrides_applied", None)
         return merged
 

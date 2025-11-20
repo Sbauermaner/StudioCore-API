@@ -19,3 +19,23 @@ class PhraseEmotionPacket:
             "impact_zone": self.impact_zone,
             "semantic_role": self.semantic_role,
         }
+
+
+class SectionEmotionWave:
+    def __init__(self, section, tlp_mean, cluster_peak, intensity, emotional_shape, hot_phrases):
+        self.section = section
+        self.tlp_mean = tlp_mean
+        self.cluster_peak = cluster_peak
+        self.intensity = intensity
+        self.emotional_shape = emotional_shape
+        self.hot_phrases = hot_phrases
+
+    def to_dict(self):
+        return {
+            "section": self.section,
+            "tlp_mean": self.tlp_mean,
+            "cluster_peak": self.cluster_peak,
+            "intensity": self.intensity,
+            "emotional_shape": self.emotional_shape,
+            "hot_phrases": self.hot_phrases,
+        }
