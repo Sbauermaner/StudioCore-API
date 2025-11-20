@@ -55,6 +55,8 @@ class GenreWeightsEngine:
                 "hl_minor": 0.10,
                 "hl_major": 0.10,
                 "cinematic_spread": 0.10,
+                "poetic_density": -0.12,
+                "lyric_form_weight": -0.14,
             },
             "jazz": {
                 "jazz_complexity": 0.26,
@@ -71,6 +73,10 @@ class GenreWeightsEngine:
                 "hl_major": 0.12,
                 "hl_minor": 0.10,
                 "vocal_intention": 0.12,
+                "poetic_density": 0.18,
+                "lyric_form_weight": 0.22,
+                "gothic_factor": 0.06,
+                "dramatic_weight": 0.06,
             },
             "cinematic": {
                 "cinematic_spread": 0.28,
@@ -79,6 +85,8 @@ class GenreWeightsEngine:
                 "structure_tension": 0.14,
                 "hl_minor": 0.12,
                 "hl_major": 0.12,
+                "dramatic_weight": 0.18,
+                "darkness_level": 0.12,
             },
             "comedy": {
                 "comedy_factor": 0.40,
@@ -94,6 +102,7 @@ class GenreWeightsEngine:
                 "power": 0.10,
                 "rhythm_density": 0.10,
                 "structure_tension": 0.14,
+                "poetic_density": 0.12,
             },
         }
 
@@ -182,8 +191,18 @@ class GenreWeightsEngine:
         for domain, weights in self.domain_feature_weights.items():
             s = 0.0
             for feat, w in weights.items():
-                s += features.get(feat, 0.0) * w
+                value = features.get(feat, 0.0)
+                s += value * w
             scores[domain] = s
+
+        poetic = features.get("poetic_density", 0.0)
+        gothic = features.get("gothic_factor", 0.0)
+        dramatic = features.get("dramatic_weight", 0.0)
+        lyric = features.get("lyric_form_weight", poetic)
+
+        scores["lyrical"] = scores.get("lyrical", 0.0) + (poetic * 0.2) + (lyric * 0.25)
+        scores["cinematic"] = scores.get("cinematic", 0.0) + (dramatic * 0.15) + (gothic * 0.1)
+        scores["electronic"] = max(0.0, scores.get("electronic", 0.0) - (poetic * 0.25 + gothic * 0.2 + dramatic * 0.1))
         return scores
 
     def infer_domain(self, features: Dict[str, float]) -> str:
@@ -226,4 +245,13 @@ class GenreWeightsEngine:
 
         # Для начала выбираем "главный" жанр домена — первый.
         # Позже можно сделать тонкую дифференциацию по поджанрам.
-        return domain_genres[0]
+        selected = domain_genres[0]
+
+        poetic = features.get("poetic_density", 0.0)
+        lyric = features.get("lyric_form_weight", poetic)
+        gothic = features.get("gothic_factor", 0.0)
+
+        if domain == "electronic" and (poetic > 0.35 or lyric > 0.35 or gothic > 0.25):
+            return "lyrical_song"
+
+        return selected

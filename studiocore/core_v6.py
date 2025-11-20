@@ -393,9 +393,24 @@ class StudioCoreV6:
         breathing_profile = self._merge_semantic_hints(breathing_profile, semantic_hints.get("breathing", {}))
 
         # 7. Rhythm & BPM
+        legacy_bpm = None
+        if isinstance(legacy_result, dict):
+            legacy_bpm = legacy_result.get("bpm") or legacy_result.get("style", {}).get("bpm")
+            semantic_layers = legacy_result.get("semantic_layers", {}) if isinstance(legacy_result.get("semantic_layers"), dict) else {}
+        else:
+            semantic_layers = {}
+
         bpm_estimate = self.bpm_engine.text_bpm_estimation(text)
-        if isinstance(semantic_hints.get("target_bpm"), (int, float)):
-            bpm_estimate = float(semantic_hints["target_bpm"])
+        user_bpm_hint = semantic_hints.get("target_bpm") if isinstance(semantic_hints, dict) else None
+        if isinstance(user_bpm_hint, (int, float)):
+            bpm_estimate = float(user_bpm_hint)
+        elif legacy_bpm is not None:
+            bpm_estimate = float(legacy_bpm)
+
+        semantic_suggested_bpm = semantic_layers.get("bpm_suggested")
+        if semantic_suggested_bpm is not None and user_bpm_hint is None:
+            bpm_estimate = float(semantic_suggested_bpm)
+
         bpm_estimate = self.override_engine.resolve_bpm(override_manager, bpm_estimate)
         bpm_curve = self.bpm_engine.meaning_bpm_curve(sections, base_bpm=bpm_estimate)
         bpm_estimate, bpm_curve, bpm_locks = self._enforce_bpm_limits(
@@ -453,6 +468,16 @@ class StudioCoreV6:
             "fallback_key": anchor_key,
         }
         tonality_payload = self._merge_semantic_hints(tonality_payload, semantic_hints.get("tonality", {}))
+
+        legacy_key = None
+        if isinstance(legacy_result, dict):
+            legacy_key = legacy_result.get("style", {}).get("key") or legacy_result.get("key")
+        if legacy_key and not getattr(override_manager.overrides, "key", None):
+            if "minor" in str(legacy_key).lower():
+                tonality_payload["mode"] = "minor"
+                tonality_payload["section_keys"] = [
+                    key if "minor" in key.lower() or key.split()[0].startswith(str(legacy_key).split()[0]) else f"{legacy_key}" for key in tonality_payload.get("section_keys", [])
+                ] or [str(legacy_key)]
 
         # 10. Instrumentation suggestions
         instrument_selection = self.instrumentation_engine.instrument_selection(
@@ -730,6 +755,15 @@ class StudioCoreV6:
         laughter_hits = sum(1 for keyword in laughter_keywords if keyword in text_lower)
         comedy_factor = _clamp((comedy_hits / line_count) * 0.6 + comedy_blob_hits * 0.15 + laughter_hits * 0.1)
 
+        gothic_keywords = ("gothic", "готик", "dark", "тень", "мрак", "ноч", "grave", "cathedral")
+        gothic_hits = _token_hits(gothic_keywords)
+        gothic_factor = _clamp((gothic_hits / max(line_count, 1)) + (harmonic_lumen_minor * 0.3))
+
+        dramatic_weight = _clamp((structure_tension * 0.5) + (emotional_gradient * 0.3) + (narrative_pressure * 0.2))
+        darkness_level = _clamp((harmonic_lumen_minor * 0.4) + (tlp_profile.get("pain", 0.0) * 0.3) + (gothic_hits * 0.1))
+        lyric_form_weight = _clamp(poetic_density * 0.6 + (gothic_hits * 0.05))
+        narrative_arch = _clamp((narrative_pressure + emotional_gradient) / 2)
+
         rde_axes = {
             "epic": float(emotion_profile.get("epic", 0.0)),
             "hope": float(max(emotion_profile.get("joy", 0.0), tlp_profile.get("love", 0.0))),
@@ -760,11 +794,40 @@ class StudioCoreV6:
             "electronic_pressure": electronic_pressure,
             "comedy_factor": comedy_factor,
             "poetic_density": poetic_density,
+            "gothic_factor": gothic_factor,
+            "dramatic_weight": dramatic_weight,
+            "darkness_level": darkness_level,
+            "lyric_form_weight": lyric_form_weight,
+            "narrative_arch": narrative_arch,
             "rde": rde_axes,
             "tlp": dict(tlp_profile),
         }
         feature_map = self.build_feature_map(genre_feature_inputs)
         domain_genre = self.genre_matrix.evaluate(feature_map)
+
+        try:
+            from .genre_universe_loader import load_genre_universe
+
+            universe = load_genre_universe()
+        except Exception:  # pragma: no cover - fallback if loader fails
+            universe = None
+
+        legacy_style_genre = legacy_result.get("style", {}).get("genre") if isinstance(legacy_result, dict) else None
+        if legacy_style_genre and universe:
+            resolved = universe.resolve(legacy_style_genre)
+            domain_info = universe.detect_domain(resolved)
+            if domain_info.get("domain") != "unknown":
+                domain_genre = resolved
+
+        gothic_bias = feature_map.get("gothic_factor", 0.0)
+        poetic_bias = feature_map.get("poetic_density", 0.0)
+        lyric_bias = feature_map.get("lyric_form_weight", 0.0)
+        dramatic_bias = feature_map.get("dramatic_weight", 0.0)
+
+        if domain_genre == "edm" and (gothic_bias > 0.2 or poetic_bias > 0.25 or lyric_bias > 0.25):
+            domain_genre = "gothic_poetry" if gothic_bias >= max(poetic_bias, lyric_bias) else "lyrical_song"
+        elif domain_genre == "edm" and dramatic_bias > 0.25:
+            domain_genre = "cinematic"
         genre_analysis = {"feature_map": feature_map, "domain_genre": domain_genre}
 
         # 14. Style synthesis
@@ -1107,6 +1170,14 @@ class StudioCoreV6:
             # Лирика/комедия
             "lyrical_emotion_score": float(lee.get("lyrical_emotion_score", 0.0)),
             "comedy_factor": _value("comedy_factor"),
+            "poetic_density": _value("poetic_density"),
+
+            # Новые жанровые маркеры
+            "gothic_factor": _value("gothic_factor"),
+            "dramatic_weight": _value("dramatic_weight"),
+            "narrative_arch": _value("narrative_arch"),
+            "darkness_level": _value("darkness_level"),
+            "lyric_form_weight": _value("lyric_form_weight"),
         }
 
     @staticmethod
