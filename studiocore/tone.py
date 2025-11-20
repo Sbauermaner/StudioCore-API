@@ -11,6 +11,7 @@ Unified color–resonance engine for emotional frequency visualization.
 
 import math
 from typing import Dict, Any
+from studiocore.emotion_profile import EmotionVector
 
 
 class ToneSyncEngine:
@@ -131,6 +132,53 @@ class ToneSyncEngine:
             "contrast_level": contrast,
             "synesthetic_signature": f"{color} + {accent} ({temp}, {resonance} Hz)",
             "signature_id": signature_id,
+        }
+
+    def detect_key(self, text: str) -> Dict[str, Any]:
+        if not text:
+            return {"key": "auto", "confidence": 0.0}
+
+        lowered = text.lower()
+        candidates = [key for key in self.BASE_COLOR_MAP if key.lower() in lowered]
+        base_key = candidates[0] if candidates else "auto"
+        confidence = 0.65 if candidates else 0.0
+
+        return {"key": base_key, "confidence": confidence}
+
+    def apply_emotion_modulation(self, base_key: str, emotion: EmotionVector) -> dict:
+        """
+        Tone Emotion Modulation (TEM).
+        Adjusts modal color and tonal shading without changing global key.
+        Soft shifts only.
+        """
+
+        val = emotion.valence
+        ar = emotion.arousal
+
+        # Начальное поле
+        mode = "default"
+        color_shift = 0.0
+
+        # --- VALENCE-DRIVEN MODALITY ---
+        if val < -0.5:
+            mode = "darker_minor"      # aeolian / harmonic minor tint
+            color_shift = -0.15
+        elif val > 0.5:
+            mode = "brighter_major"    # ionian / lydian tint
+            color_shift = +0.15
+
+        # --- AROUSAL-DRIVEN INTENSITY ---
+        if ar > 0.7:
+            mode = "intense_modal"     # phrygian, dorian, altered color
+            color_shift += 0.10
+        elif ar < 0.3:
+            mode = "calm_modal"        # natural minor / pentatonic tint
+            color_shift -= 0.10
+
+        return {
+            "base_key": base_key,
+            "mode": mode,
+            "color_shift": round(color_shift, 3),
         }
 
     def has_rhetorical_rift(self, paragraph: str) -> bool:

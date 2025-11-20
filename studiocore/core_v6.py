@@ -15,6 +15,7 @@ from typing import Any, Dict, Iterable, Sequence
 
 from .bpm_engine import BPMEngine
 from .rde_engine import RhythmDynamicsEmotionEngine
+from .tone import ToneSyncEngine
 from .section_parser import SectionParser
 from .tlp_engine import TruthLovePainEngine
 from .logical_engines import (
@@ -46,6 +47,7 @@ from .text_utils import (
     translate_text_for_analysis,
 )
 from .user_override_manager import UserOverrideManager, UserOverrides
+from .emotion_profile import EmotionVector
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
@@ -76,6 +78,7 @@ class StudioCoreV6:
         self.bpm_engine = BPMEngine()
         self.meaning_engine = MeaningVelocityEngine()
         self.tonality_engine = TonalityEngine()
+        self.tone_engine = ToneSyncEngine()
         self.instrumentation_engine = InstrumentationEngine()
         self.section_intelligence = SectionIntelligenceEngine()
         self.instrument_dynamics = InstrumentalDynamicsEngine()
@@ -360,6 +363,8 @@ class StudioCoreV6:
         }
         emotion_payload = self._merge_semantic_hints(emotion_payload, semantic_hints.get("emotion", {}))
 
+        smoothed_vectors: list[EmotionVector] = []
+
         try:
             from studiocore.emotion_profile import EmotionAggregator
 
@@ -492,6 +497,17 @@ class StudioCoreV6:
                 tonality_payload["section_keys"] = [
                     key if "minor" in key.lower() or key.split()[0].startswith(str(legacy_key).split()[0]) else f"{legacy_key}" for key in tonality_payload.get("section_keys", [])
                 ] or [str(legacy_key)]
+
+        tone_result = self.tone_engine.detect_key(text)
+
+        try:
+            local_tone_mod = []
+            for ev in smoothed_vectors:   # список EmotionVector из шага 5
+                mod = self.tone_engine.apply_emotion_modulation(tone_result["key"], ev)
+                local_tone_mod.append(mod)
+            result["_tone_dynamic"] = local_tone_mod
+        except Exception:
+            result["_tone_dynamic"] = []
 
         # 10. Instrumentation suggestions
         instrument_selection = self.instrumentation_engine.instrument_selection(
