@@ -14,6 +14,7 @@ from dataclasses import asdict
 from typing import Any, Dict, Iterable, List, Sequence
 
 from .bpm_engine import BPMEngine
+from .multimodal_emotion_matrix import MultimodalEmotionMatrixV1
 from .color_engine_adapter import ColorEngineAdapter
 from .emotion_field import EmotionFieldEngine
 from .emotion_profile import EmotionVector
@@ -116,6 +117,7 @@ class StudioCoreV6:
         self.rde_engine = RhythmDynamicsEmotionEngine()
         self.genre_router = DynamicGenreRouter()
         self.genre_universe_adapter = GenreUniverseAdapter()
+        self.emotion_matrix = MultimodalEmotionMatrixV1()
 
         # Late import to avoid circular dependencies during module import time.
         from .monolith_v4_3_1 import StudioCore as LegacyCore  # pylint: disable=import-outside-toplevel
@@ -317,6 +319,7 @@ class StudioCoreV6:
         section_emotions = list(section_intel_payload.get("section_emotions", []))
         global_emotion_curve = build_global_emotion_curve(section_emotions)
         curve_dict = global_emotion_curve.to_dict()
+        dynamic_bias = curve_dict.get("dynamic_bias", {})
         structure_context["section_intelligence"] = section_intel_payload
         structure_context["emotion_profile"] = dict(emotion_profile)
         structure_context["emotion_profile_axes7"] = dict(dynamic_emotion_profile)
@@ -1110,6 +1113,19 @@ class StudioCoreV6:
                 "genre_analysis": genre_analysis,
             }
         )
+        phrase_emotions = section_intel_payload.get("phrase_packets", [])
+        matrix = self.emotion_matrix.build_matrix(
+            phrase_emotions=phrase_emotions,
+            section_emotions=section_emotions,
+            global_curve=curve_dict,
+            tlp_profile=tlp_profile,
+            dynamic_bias=dynamic_bias,
+            genre_hint=result["style"].get("genre") if "style" in result else None,
+            bpm_hint=result.get("bpm", {}).get("estimate"),
+            key_hint=result.get("tone", {}).get("key"),
+            suno_annotation=result.get("suno_annotation", {}),
+        )
+        result["emotion_matrix"] = matrix
         result["suno_annotation"] = build_suno_annotations(
             text=text,
             sections=section_intel_payload.get("section_emotions", []),
@@ -1179,6 +1195,7 @@ class StudioCoreV6:
                 },
                 "vocal": result.get("vocal", {}),
                 "commands": command_payload,
+                "emotion_matrix": result.get("emotion_matrix"),
             },
         )
         result["suno_annotations"] = suno_annotations
@@ -1210,6 +1227,7 @@ class StudioCoreV6:
         merged["rde_summary"] = payload.get("rde_summary", {})
         merged["genre_analysis"] = payload.get("genre_analysis", {})
         merged["fanf"] = payload.get("fanf", {})
+        merged["emotion_matrix"] = payload.get("emotion_matrix", {})
         merged["style_prompt"] = payload.get("style_prompt")
         merged["summary"] = payload.get("style", {}).get("prompt") or payload.get("summary") or ""
         merged["section_emotions"] = payload.get("section_emotions", [])
@@ -1549,3 +1567,9 @@ def _merge_command_lists(
         merged.append({k: v for k, v in item.items()})
         seen_raw.add(raw)
     return merged
+
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

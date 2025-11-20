@@ -76,6 +76,8 @@ def test_fake_user_emotion_and_genre(user):
         f"❌ summary missing for user={user['id']}"
     )
 
+    _assert_integrity(result)
+
     print(f"✅ OK: {user['id']} | emotion={emotion_name} | genre={genre}")
 
 
@@ -99,7 +101,24 @@ def test_fake_user_state_and_bias_reset():
         bpms.append(bpm_estimate)
         genres.append(genre)
 
+        _assert_integrity(res)
+
     assert len({json.dumps(b, sort_keys=True) for b in biases}) > 1, "❌ Bias values must differ across samples"
     numeric_bpms = {b for b in bpms if isinstance(b, (int, float))}
     assert len(numeric_bpms) > 1, "❌ BPM must reset per request"
     assert any(g != "edm" for g in genres), "❌ Genre must not default to EDM"
+
+
+def _assert_integrity(result: dict) -> None:
+    matrix = result.get("emotion_matrix")
+    if matrix is not None:
+        assert isinstance(matrix, dict)
+        assert "genre" in matrix
+        assert "bpm" in matrix
+        assert "key" in matrix
+
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
