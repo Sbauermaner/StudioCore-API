@@ -7,12 +7,12 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Sequence, Tuple
 import re
 
 from .emotion import EmotionEngine
-from .structures import PhraseEmotionPacket
-from .text_utils import extract_phrases_from_section
+from .structures import PhraseEmotionPacket, SectionEmotionWave
+from .text_utils import extract_phrases_from_section, extract_sections
 
 
 class SectionIntelligenceEngine:
@@ -176,7 +176,24 @@ class SectionIntelligenceEngine:
         sections = self._prepare_sections(sections, text)
         structure_tension = self.compute_structure_tension(sections)
         phrase_packets: List[Dict[str, Any]] = []
-        for section in sections:
+        section_waves: List[SectionEmotionWave] = []
+
+        structured_sections = extract_sections(text)
+        resolved_sections: List[Tuple[str, str]] = []
+
+        if structured_sections:
+            for idx, item in enumerate(structured_sections):
+                tag = item.get("tag") or f"Section {idx + 1}"
+                section_text = "\n".join(item.get("lines", [])).strip()
+                if section_text:
+                    resolved_sections.append((tag, section_text))
+
+        if not resolved_sections:
+            for idx, section in enumerate(sections):
+                if section:
+                    resolved_sections.append((f"Section {idx + 1}", section))
+
+        for label, section in resolved_sections:
             raw_lines = [ln for ln in section.splitlines() if ln and ln.strip()]
             cleaned_lines: List[str] = []
             for ln in raw_lines:
@@ -204,10 +221,16 @@ class SectionIntelligenceEngine:
                     unique_phrases.append(phrase)
                     seen.add(phrase)
 
+            section_packets: List[PhraseEmotionPacket] = []
             if emotion_engine:
                 for phrase in unique_phrases:
                     packet: PhraseEmotionPacket = emotion_engine.analyze_phrase(phrase)
                     phrase_packets.append(packet.to_dict())
+                    section_packets.append(packet)
+
+            if section_packets:
+                section_wave = self._build_section_wave(label, section_packets)
+                section_waves.append(section_wave)
         return {
             "motifs": self.detect_repeated_motif(sections, text),
             "chorus_pattern": self.detect_chorus_by_pattern(sections, text),
@@ -221,4 +244,67 @@ class SectionIntelligenceEngine:
             "longform": self.detect_longform(text, sections),
             "structure_tension": structure_tension,
             "phrase_packets": phrase_packets,
+            "section_emotions": [wave.to_dict() for wave in section_waves],
         }
+
+    def _build_section_wave(self, section_label: str, packets: Sequence[PhraseEmotionPacket]) -> SectionEmotionWave:
+        count = len(packets) or 1
+        truth_sum = sum((p.emotions.get("tlp", {}).get("truth", 0.0) for p in packets))
+        love_sum = sum((p.emotions.get("tlp", {}).get("love", 0.0) for p in packets))
+        pain_sum = sum((p.emotions.get("tlp", {}).get("pain", 0.0) for p in packets))
+        tlp_mean = {
+            "truth": round(truth_sum / count, 3),
+            "love": round(love_sum / count, 3),
+            "pain": round(pain_sum / count, 3),
+        }
+
+        cluster_totals: Counter[str] = Counter()
+        max_clusters: List[float] = []
+        pain_love_series: List[float] = []
+        for packet in packets:
+            clusters = packet.emotions.get("clusters", {}) or {}
+            cluster_totals.update(clusters)
+            max_clusters.append(max(clusters.values()) if clusters else 0.0)
+            tlp = packet.emotions.get("tlp", {}) or {}
+            pain_love_series.append((tlp.get("pain", 0.0) + tlp.get("love", 0.0)))
+
+        cluster_peak = None
+        if cluster_totals:
+            cluster_peak = max(cluster_totals, key=cluster_totals.get)
+
+        intensity = round(sum(max_clusters) / count, 3)
+
+        emotional_shape = "flat"
+        if any(packet.weight > 0.8 for packet in packets):
+            emotional_shape = "spike"
+        elif len(pain_love_series) >= 2:
+            deltas = [pain_love_series[i + 1] - pain_love_series[i] for i in range(len(pain_love_series) - 1)]
+            if deltas and all(delta > 0.15 for delta in deltas):
+                emotional_shape = "rising"
+            elif deltas and all(delta < -0.15 for delta in deltas):
+                emotional_shape = "falling"
+
+        hot_phrases = [
+            packet.phrase
+            for packet in sorted(packets, key=lambda p: p.weight, reverse=True)[:3]
+        ]
+
+        return SectionEmotionWave(
+            section=section_label,
+            tlp_mean=tlp_mean,
+            cluster_peak=cluster_peak,
+            intensity=intensity,
+            emotional_shape=emotional_shape,
+            hot_phrases=hot_phrases,
+        )
+
+
+class SectionIntelligence:
+    def __init__(self, engine: EmotionEngine | None = None) -> None:
+        self.engine = engine or EmotionEngine()
+        self._engine = SectionIntelligenceEngine()
+
+    def parse(self, text: str, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+        self.engine.reset_phrase_packets()
+        result = self._engine.analyze(text, sections, emotion_curve=None, emotion_engine=self.engine)
+        return result
