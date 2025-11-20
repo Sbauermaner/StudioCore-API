@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 # -*- coding: utf-8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
@@ -72,3 +76,8 @@ class LyricalEmotionEngine:
             "lyrical_emotion_score": max(0.0, min(1.0, final_score)),
             "prefer_strict_boundary": prefer_strict_boundary,
         }
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

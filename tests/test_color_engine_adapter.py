@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 def test_color_engine_adapter_basic():
     from studiocore.color_engine_adapter import ColorEngineAdapter
 
@@ -17,3 +21,8 @@ def test_color_engine_adapter_basic():
         "emotion": {"anger": 0.9},
     })
     assert "#8B0000" in res2.colors
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

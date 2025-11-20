@@ -283,3 +283,7 @@ class FANFAnnotationEngine:
         section_line = " ".join(sections)
         return f"{cinematic_header} {resonance_header} {section_line} {choir_tag}"
 
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

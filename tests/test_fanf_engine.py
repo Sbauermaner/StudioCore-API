@@ -30,3 +30,8 @@ def test_fanf_choir_disabled_for_intimate_text():
     annotation = engine.build_annotations("soft whisper under blankets", ["intro"], analysis)
     assert annotation.choir_active is False
     assert "No choir" in annotation.annotated_text_suno
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

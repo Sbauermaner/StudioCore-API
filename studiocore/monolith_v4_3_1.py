@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 # -*- coding: utf-8 -*-
 """
 StudioCore v4.3.11 — Monolith (v6 - Suno Аннотации)
@@ -602,3 +606,8 @@ class StudioCoreV5:
 # ==========================================================
 STUDIOCORE_VERSION = "v4.3.11"
 log.info(f"🔹 [StudioCore {STUDIOCORE_VERSION}] Monolith loaded (Section-Aware Duet Mode v2).")
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

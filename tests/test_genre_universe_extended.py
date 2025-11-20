@@ -34,3 +34,8 @@ def test_resolve_and_detect_domain():
 
     hybrid_info = universe.detect_domain("tribal_techno")
     assert hybrid_info["type"] in {"hybrid", "music", "edm"}
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

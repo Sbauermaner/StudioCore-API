@@ -1021,3 +1021,8 @@ class FinalCompiler:
         if not payload.get("style", {}).get("prompt"):
             issues.append("Style prompt missing")
         return {"issues": issues, "is_consistent": not issues}
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

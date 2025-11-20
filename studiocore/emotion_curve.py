@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 """Global emotion curve construction utilities."""
 
 from __future__ import annotations
@@ -162,3 +166,8 @@ def build_global_emotion_curve(section_emotions: Sequence[Dict]) -> GlobalEmotio
 
 
 __all__ = ["GlobalEmotionCurve", "build_global_emotion_curve"]
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

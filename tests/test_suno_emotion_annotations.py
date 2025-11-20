@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 from studiocore.suno_annotations import build_suno_annotations
 
 
@@ -16,3 +20,7 @@ def test_suno_emotion_adapter_basic():
     assert "section_annotations" in ann
     assert "chorus" in ann["section_annotations"]
 
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

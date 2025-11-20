@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 from studiocore.emotion_curve import build_global_emotion_curve
 from studiocore.core_v6 import StudioCoreV6
 
@@ -53,3 +57,8 @@ def test_core_exposes_emotion_curve():
     assert "emotion_curve" in result
     assert "auto_context" in result
     assert "dynamic_bias" in result["auto_context"]
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

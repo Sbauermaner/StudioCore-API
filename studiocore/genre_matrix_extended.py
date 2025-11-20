@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 """Light-weight rule-based genre detector for StudioCore v6."""
 from __future__ import annotations
 
@@ -158,3 +162,8 @@ class GenreMatrixExtended(GenreMatrixEngine):
 
         engine = GenreWeightsEngine()
         return engine.infer_genre(feature_map)
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
