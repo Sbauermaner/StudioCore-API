@@ -48,6 +48,7 @@ from .text_utils import (
 )
 from .user_override_manager import UserOverrideManager, UserOverrides
 from .emotion_profile import EmotionVector
+from studiocore.emotion_map import EmotionMapEngine
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
@@ -364,6 +365,13 @@ class StudioCoreV6:
         emotion_payload = self._merge_semantic_hints(emotion_payload, semantic_hints.get("emotion", {}))
 
         smoothed_vectors: list[EmotionVector] = []
+
+        try:
+            emap = EmotionMapEngine()
+            emotion_map_output = emap.build_map(smoothed_vectors)
+            result["_emotion_map"] = emotion_map_output
+        except Exception:
+            result["_emotion_map"] = {"wave": [], "global": "#000000"}
 
         try:
             from studiocore.emotion_profile import EmotionAggregator
