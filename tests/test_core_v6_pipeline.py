@@ -26,3 +26,8 @@ def test_core_v6_analyze_produces_expected_sections():
     assert result["bpm"].get("emotion_map", {}).get("target_bpm")
     assert result.get("fanf", {}).get("annotated_text_fanf")
     assert "choir_active" in result.get("fanf", {})
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

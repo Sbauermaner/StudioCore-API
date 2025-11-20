@@ -284,3 +284,8 @@ if __name__ == "__main__":  # pragma: no cover - manual smoke-test only
             print(f"⚙️ Активные подсистемы: {', '.join(subsystems)}\n")
     except Exception as exc:
         print(f"❌ Ошибка инициализации: {exc}")
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

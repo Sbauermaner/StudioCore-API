@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 # -*- coding: utf-8 -*-
 """
 StudioCore v5 — Централизованный конфигуратор логов. (v2 - TypeError ИСПРАВЛЕН)
@@ -77,3 +81,8 @@ def setup_logging(level=logging.INFO):
     log.info(f"🚀 Централизованное логирование (УРОВЕНЬ {logging.getLevelName(CURRENT_LOG_LEVEL)}) активировано.")
     log.info("=" * 50)
     _is_configured = True
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

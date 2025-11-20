@@ -28,3 +28,8 @@ def test_rde_engine_compose_returns_snapshot():
     assert snapshot.target_bpm == BPM_PAYLOAD["estimate"]
     assert "pads" in (snapshot.palette or [])
     assert snapshot.breath_sync == BREATH["sync_score"]
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

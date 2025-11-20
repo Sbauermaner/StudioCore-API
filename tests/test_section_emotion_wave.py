@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 from studiocore.section_intelligence import SectionIntelligence
 from studiocore.emotion import EmotionEngine
 
@@ -27,3 +31,8 @@ def test_section_wave_detects_spike():
     si = SectionIntelligence(engine=engine)
     waves = si.parse(text)["section_emotions"]
     assert waves[0]["emotional_shape"] in ("spike", "rising")
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

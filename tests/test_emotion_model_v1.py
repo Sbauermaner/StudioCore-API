@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 import math
 
 from studiocore.emotion import EmotionEngine, load_emotion_model
@@ -45,3 +49,8 @@ def test_integration_aggression_and_love():
     assert any(love_profile.get("genre_scores", {}).get(name, 0) >= 0 for name in soft_genres)
     assert 70 <= love_profile.get("bpm", 0) <= 110
     assert str(love_profile.get("key", {}).get("scale", "")).startswith("major")
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

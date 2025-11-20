@@ -19,3 +19,8 @@ def coerce_sections(text_obj: Any) -> List[Any]:
     if isinstance(sections, Iterable) and not isinstance(sections, (str, bytes)):
         return list(sections)
     return [sections] if sections else []
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

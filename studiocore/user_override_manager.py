@@ -152,3 +152,8 @@ class UserOverrideManager:
                 "structure_hints": self.overrides.structure_hints,
             },
         }
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

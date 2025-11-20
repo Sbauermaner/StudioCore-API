@@ -1,3 +1,7 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
 from __future__ import annotations
 
 # StudioCore Signature Block (Do Not Remove)
@@ -212,3 +216,8 @@ class DynamicGenreRouter:
         macro_genre = max(adjusted_scores.items(), key=lambda kv: kv[1])[0]
         reason = "dynamic_router_emotion_bias" if bias else "dynamic_router"
         return macro_genre, reason
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e

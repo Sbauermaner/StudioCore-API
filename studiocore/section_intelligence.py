@@ -308,3 +308,8 @@ class SectionIntelligence:
         self.engine.reset_phrase_packets()
         result = self._engine.analyze(text, sections, emotion_curve=None, emotion_engine=self.engine)
         return result
+
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
