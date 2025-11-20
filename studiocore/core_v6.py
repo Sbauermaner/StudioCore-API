@@ -39,6 +39,7 @@ from .instrument_dynamics import InstrumentalDynamicsEngine
 from .genre_matrix_extended import GenreMatrixExtended
 from .section_intelligence import SectionIntelligenceEngine
 from .suno_annotations import SunoAnnotationEngine
+from .fanf_annotation import FANFAnnotationEngine
 from .text_utils import (
     detect_language,
     extract_commands_and_tags,
@@ -86,6 +87,7 @@ class StudioCoreV6:
         self.annotation_engine = LyricsAnnotationEngine()
         self.compiler = FinalCompiler()
         self.suno_engine = SunoAnnotationEngine()
+        self.fanf_engine = FANFAnnotationEngine()
         self.override_engine = UserOverrideEngine()
         self.symbiosis_engine = UserAdaptiveSymbiosisEngine()
         self.tlp_engine = TruthLovePainEngine()
@@ -836,6 +838,7 @@ class StudioCoreV6:
             "instrumentation": instrumentation_payload,
             "rem": rem_payload,
             "zero_pulse": zero_pulse_payload,
+            "tlp": dict(tlp_profile),
             "style": style_payload,
             "commands": command_payload,
             "annotations": annotations,
@@ -846,6 +849,38 @@ class StudioCoreV6:
             "rde_summary": rde_summary,
             "genre_analysis": genre_analysis,
         }
+        try:
+            fanf_annotation = self.fanf_engine.build_annotations(
+                text,
+                sections,
+                {
+                    "emotion": {"profile": emotion_profile, "curve": emotion_curve},
+                    "bpm": bpm_payload,
+                    "tonality": tonality_payload,
+                    "style": style_payload,
+                    "tlp": tlp_profile,
+                    "zero_pulse": zero_pulse_payload,
+                    "color": {"wave": color_wave, "profile": color_profile},
+                    "instrumentation": instrumentation_payload,
+                    "rde": rde_summary,
+                },
+            )
+            result["fanf"] = {
+                "annotated_text_fanf": fanf_annotation.annotated_text_fanf,
+                "annotated_text_ui": fanf_annotation.annotated_text_ui,
+                "annotated_text_suno": fanf_annotation.annotated_text_suno,
+                "choir_active": fanf_annotation.choir_active,
+                "cinematic_header": fanf_annotation.cinematic_header,
+                "resonance_header": fanf_annotation.resonance_header,
+            }
+        except Exception as exc:  # pragma: no cover - defensive guard
+            result["fanf"] = {
+                "annotated_text_fanf": "FANF generation unavailable.",
+                "annotated_text_ui": "FANF generation unavailable.",
+                "annotated_text_suno": "FANF generation unavailable.",
+                "choir_active": False,
+                "error": str(exc),
+            }
         applied_overrides = self._apply_user_overrides_once(result, override_manager)
         result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(
             override_manager,
@@ -888,6 +923,7 @@ class StudioCoreV6:
         merged["language"] = payload.get("language", payload.get("auto_context", {}).get("language"))
         merged["rde_summary"] = payload.get("rde_summary", {})
         merged["genre_analysis"] = payload.get("genre_analysis", {})
+        merged["fanf"] = payload.get("fanf", {})
         merged.pop("_overrides_applied", None)
         return merged
 
