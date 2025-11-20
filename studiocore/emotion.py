@@ -13,6 +13,7 @@ import logging
 
 from studiocore.emotion_profile import EmotionVector, EmotionAggregator
 from studiocore.emotion_dictionary_extended import EmotionLexiconExtended
+from studiocore.structures import PhraseEmotionPacket
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
@@ -244,6 +245,7 @@ class EmotionEngine:
         self.auto_analyzer = AutoEmotionalAnalyzer()
         self._model = load_emotion_model()
         self._base_emotions = self._collect_base_emotions()
+        self._phrase_packets: list[PhraseEmotionPacket] = []
 
     def _collect_base_emotions(self) -> list[str]:
         clusters = self._model.get("clusters", {})
@@ -251,6 +253,29 @@ class EmotionEngine:
         for cluster in clusters.values():
             emotions.extend(cluster.get("emotions", []))
         return sorted(set(emotions))
+
+    def reset_phrase_packets(self) -> None:
+        """Reset the internal phrase packet buffer."""
+
+        self._phrase_packets = []
+
+    def get_phrase_packets(self) -> list[PhraseEmotionPacket]:
+        """Expose collected phrase packets for downstream consumers."""
+
+        return list(self._phrase_packets)
+
+    def analyze_phrase(self, phrase: str) -> PhraseEmotionPacket:
+        """Placeholder phrase-level analyzer (weights applied later)."""
+
+        packet = PhraseEmotionPacket(
+            phrase=phrase,
+            emotions={},
+            weight=1.0,
+            impact_zone="unknown",
+            semantic_role="phrase",
+        )
+        self._phrase_packets.append(packet)
+        return packet
 
     def build_raw_emotion_vector(self, text: str) -> Dict[str, float]:
         """Build normalized raw emotion scores (0..1) for atomic emotions."""

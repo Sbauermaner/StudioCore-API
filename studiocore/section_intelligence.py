@@ -9,6 +9,10 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any, Dict, List, Sequence
 
+from .emotion import EmotionEngine
+from .structures import PhraseEmotionPacket
+from .text_utils import extract_phrases_from_section
+
 
 class SectionIntelligenceEngine:
     """Detect chorus/mantra/transition cues beyond naive splitting."""
@@ -161,9 +165,22 @@ class SectionIntelligenceEngine:
             previous = energy
         return round(min(1.0, tension), 3)
 
-    def analyze(self, text: str, sections: Sequence[str] | None, emotion_curve: Sequence[float] | None = None) -> Dict[str, Any]:
+    def analyze(
+        self,
+        text: str,
+        sections: Sequence[str] | None,
+        emotion_curve: Sequence[float] | None = None,
+        emotion_engine: EmotionEngine | None = None,
+    ) -> Dict[str, Any]:
         sections = self._prepare_sections(sections, text)
         structure_tension = self.compute_structure_tension(sections)
+        phrase_packets: List[Dict[str, Any]] = []
+        for section in sections:
+            phrases = extract_phrases_from_section(section)
+            if emotion_engine:
+                for phrase in phrases:
+                    packet: PhraseEmotionPacket = emotion_engine.analyze_phrase(phrase)
+                    phrase_packets.append(packet.to_dict())
         return {
             "motifs": self.detect_repeated_motif(sections, text),
             "chorus_pattern": self.detect_chorus_by_pattern(sections, text),
@@ -176,4 +193,5 @@ class SectionIntelligenceEngine:
             "outro": self.detect_outro(sections, text),
             "longform": self.detect_longform(text, sections),
             "structure_tension": structure_tension,
+            "phrase_packets": phrase_packets,
         }
