@@ -20,6 +20,7 @@ from .rde_engine import RhythmDynamicsEmotionEngine
 from .tone import ToneSyncEngine
 from .section_parser import SectionParser
 from .tlp_engine import TruthLovePainEngine
+from .genre_router import DynamicGenreRouter
 from .logical_engines import (
     BreathingEngine,
     ColorEmotionEngine,
@@ -98,6 +99,7 @@ class StudioCoreV6:
         self.symbiosis_engine = UserAdaptiveSymbiosisEngine()
         self.tlp_engine = TruthLovePainEngine()
         self.rde_engine = RhythmDynamicsEmotionEngine()
+        self.genre_router = DynamicGenreRouter()
 
         # Late import to avoid circular dependencies during module import time.
         from .monolith_v4_3_1 import StudioCore as LegacyCore  # pylint: disable=import-outside-toplevel
@@ -932,6 +934,30 @@ class StudioCoreV6:
         if style_commands:
             style_payload["commands"] = style_commands
         style_payload = self._merge_semantic_hints(style_payload, semantic_hints.get("style", {}))
+
+        integrity_block: Dict[str, Any] = {}
+        if isinstance(legacy_result, dict) and isinstance(legacy_result.get("integrity"), dict):
+            integrity_block = dict(legacy_result["integrity"])
+
+        router_input = {
+            **result,
+            "bpm": bpm_payload,
+            "tlp": tlp_profile,
+            "integrity": integrity_block or result.get("integrity", {}),
+            "emotion": {**emotion_payload, "label": emotion_label},
+            "style": {**style_payload},
+        }
+        macro_genre, genre_reason = self.genre_router.route(router_input)
+
+        style_block = router_input.get("style") or {}
+        if not isinstance(style_block, dict):
+            style_block = {}
+
+        if "genre" not in style_block or str(style_block.get("genre")).lower() in ("auto", "unknown", ""):
+            style_block["genre"] = macro_genre
+
+        style_block.setdefault("genre_reason", genre_reason)
+        style_payload = style_block
 
         rde_snapshot = self.rde_engine.compose(
             bpm_payload=bpm_payload,
