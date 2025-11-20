@@ -21,6 +21,7 @@ from .tone import ToneSyncEngine
 from .section_parser import SectionParser
 from .tlp_engine import TruthLovePainEngine
 from .genre_router import DynamicGenreRouter
+from .genre_universe_adapter import GenreUniverseAdapter
 from .logical_engines import (
     BreathingEngine,
     ColorEmotionEngine,
@@ -100,6 +101,7 @@ class StudioCoreV6:
         self.tlp_engine = TruthLovePainEngine()
         self.rde_engine = RhythmDynamicsEmotionEngine()
         self.genre_router = DynamicGenreRouter()
+        self.genre_universe_adapter = GenreUniverseAdapter()
 
         # Late import to avoid circular dependencies during module import time.
         from .monolith_v4_3_1 import StudioCore as LegacyCore  # pylint: disable=import-outside-toplevel
@@ -957,6 +959,17 @@ class StudioCoreV6:
             style_block["genre"] = macro_genre
 
         style_block.setdefault("genre_reason", genre_reason)
+
+        if not style_block.get("macro_genre"):
+            style_block["macro_genre"] = macro_genre
+
+        if not style_block.get("subgenre") and not style_block.get("universe_id"):
+            resolution = self.genre_universe_adapter.resolve(macro_genre, result)
+            if not style_block.get("subgenre"):
+                style_block["subgenre"] = resolution.subgenre
+            style_block.setdefault("universe_tags", resolution.tags)
+            style_block.setdefault("universe_source", resolution.source)
+
         style_payload = style_block
 
         rde_snapshot = self.rde_engine.compose(
