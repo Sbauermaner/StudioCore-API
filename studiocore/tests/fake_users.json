@@ -1,0 +1,39 @@
+{
+  "users": [
+    {
+      "id": "u_gothic_02",
+      "name": "TestUser_Gothic_Deep",
+      "sample_text": "Не сложилась сегодня эротика… Это – готика!",
+      "expected_emotion": "melancholy_dark",
+      "expected_genre": "gothic adaptive darkwave"
+    },
+    {
+      "id": "u_rage_02",
+      "name": "TestUser_Rage_Max",
+      "sample_text": "Убей! Убей их всех! НАЧНИ С СЕБЯ!",
+      "expected_emotion": "rage_extreme",
+      "expected_genre": "ideological extreme adaptive rage"
+    },
+    {
+      "id": "u_love_02",
+      "name": "TestUser_Love_Lyric",
+      "sample_text": "И я пришел к тебе, любовь… тенистый парк, и липы цвет…",
+      "expected_emotion": "love_soft",
+      "expected_genre": "lyrical love adaptive classic"
+    },
+    {
+      "id": "u_joy_02",
+      "name": "TestUser_Joy_Daylight",
+      "sample_text": "Какое чудо этот день! Солнечный ветер в волосах…",
+      "expected_emotion": "joy_bright",
+      "expected_genre": "pop adaptive light"
+    },
+    {
+      "id": "u_hiphop_02",
+      "name": "TestUser_Hiphop_Street",
+      "sample_text": "Я выхожу на бит — улица качает…",
+      "expected_emotion": "confidence",
+      "expected_genre": "hiphop adaptive"
+    }
+  ]
+}
