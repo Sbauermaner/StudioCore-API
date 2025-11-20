@@ -1,3 +1,8 @@
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
+
 """StudioCore loader with MAXI fallback orchestration."""
 
 from __future__ import annotations
