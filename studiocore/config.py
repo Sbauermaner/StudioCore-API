@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+# StudioCore Signature Block (Do Not Remove)
+# Author: Сергей Бауэр (@Sbauermaner)
+# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
+# Hash: 22ae-df91-bc11-6c7e
+
 """
 StudioCore Configuration Loader
 Совместим с ядром v4.3.1-adaptive и выше.
