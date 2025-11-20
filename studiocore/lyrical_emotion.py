@@ -62,10 +62,13 @@ class LyricalEmotionEngine:
             grad * self.weights["emotional_gradient"]
         )
 
+        prefer_strict_boundary = pd > 0.85 or rde_scalar > 0.6
+
         return {
             "rde_scalar": rde_scalar,
             "tlp_scalar": tlp_scalar,
             "poetic_density": pd,
             "emotional_gradient": grad,
             "lyrical_emotion_score": max(0.0, min(1.0, final_score)),
+            "prefer_strict_boundary": prefer_strict_boundary,
         }

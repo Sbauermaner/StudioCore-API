@@ -13,7 +13,7 @@ class SunoAnnotationEngine:
     """Wrap annotations with English parenthesised commands."""
 
     def build_suno_safe_annotations(self, sections: Sequence[str], diagnostics: Dict[str, Any]) -> List[str]:
-        headers = self.generate_section_headers(sections)
+        headers = self.generate_section_headers(sections, diagnostics)
         annotations = []
         payload = {
             "legacy": diagnostics.get("legacy", {}),
@@ -57,11 +57,38 @@ class SunoAnnotationEngine:
                 result.append(f"({raw})")
         return result[:2]
 
-    def generate_section_headers(self, sections: Sequence[str]) -> List[str]:
+    def _starts_with_ljubimaya(self, section: str) -> bool:
+        return section.strip().startswith("Любимая!")
+
+    def _has_direct_address_peak(self, section: str, diagnostics: Dict[str, Any] | None) -> bool:
+        lowered = section.lower()
+        direct_tokens = ("ты", "тебя", "тебе", "твой", "любимая", "дорогая", "друг мой")
+        address_hit = any(token in lowered for token in direct_tokens)
+        emotional_peak = section.count("!") >= 1 or section.count("!") + section.count("?") >= 2
+        if not address_hit:
+            return False
+        if emotional_peak:
+            return True
+        commands = diagnostics.get("commands", {}) if isinstance(diagnostics, dict) else {}
+        return bool(commands)
+
+    def generate_section_headers(self, sections: Sequence[str], diagnostics: Dict[str, Any] | None = None) -> List[str]:
         headers = []
         labels = ("Intro", "Verse", "Pre-Chorus", "Chorus", "Bridge", "Outro")
         for idx in range(len(sections)):
-            headers.append(f"{labels[idx % len(labels)]} {idx + 1}")
+            section_text = sections[idx] if idx < len(sections) else ""
+            label = labels[idx % len(labels)]
+            chorus_override = False
+            if self._starts_with_ljubimaya(section_text):
+                label = "Chorus"
+                chorus_override = True
+            elif self._has_direct_address_peak(section_text, diagnostics):
+                label = "Chorus"
+                chorus_override = True
+            header = f"{label} {idx + 1}"
+            if chorus_override:
+                header = f"{header} ★"
+            headers.append(header)
         return headers
 
     def attach_bpm_and_fracture_commands(self, diagnostics: Dict[str, Any], index: int) -> List[str]:
