@@ -88,6 +88,8 @@ class FANFAnnotationEngine:
         sections: Sequence[str],
         analysis: Dict[str, Any] | None,
     ) -> FANFAnnotation:
+        if not isinstance(sections, list):
+            sections = list(sections.values()) if isinstance(sections, dict) else list(sections or [])
         analysis = analysis or {}
         emotion = analysis.get("emotion", {})
         bpm = analysis.get("bpm", {})
@@ -142,22 +144,22 @@ class FANFAnnotationEngine:
     # Internal helpers -------------------------------------------------
     def _should_add_choir(self, text: str, emotion: Dict[str, Any]) -> bool:
         text_lower = text.lower()
-        intense_curve = emotion.get("curve") if isinstance(emotion, dict) else []
-        curve_peak = max(intense_curve) if intense_curve else 0.0
-        dramatic_axes = (
-            emotion.get("profile", {}).get("epic", 0.0)
-            if isinstance(emotion, dict) and isinstance(emotion.get("profile"), dict)
-            else emotion.get("epic", 0.0)
-        )
+        sadness_score = 0.0
+        if isinstance(emotion, dict):
+            profile = emotion.get("profile", {}) if isinstance(emotion.get("profile"), dict) else {}
+            sadness_score = float(profile.get("sadness") or emotion.get("sadness") or 0.0)
 
-        keyword_trigger = any(token in text_lower for token in self.CHOIR_KEYWORDS)
-        intimate_trigger = any(token in text_lower for token in self.INTIMATE_KEYWORDS)
-        emotional_peak = max(curve_peak, float(dramatic_axes or 0.0))
+        keyword_trigger = any(token in text_lower for token in (
+            "chorus",
+            "choir",
+            "prayer",
+            "echo",
+            "stone",
+            "gothic",
+            "cathedral",
+        ))
 
-        if intimate_trigger:
-            return False
-
-        return keyword_trigger or emotional_peak >= 0.62
+        return sadness_score > 0.55 or keyword_trigger
 
     def _build_cinematic_header(
         self, style: Dict[str, Any], bpm: Dict[str, Any], tonality: Dict[str, Any], tlp: Dict[str, Any]
@@ -206,12 +208,18 @@ class FANFAnnotationEngine:
             "Outro",
         ]
         bpm_val = _safe(bpm.get("estimate"), "120") if isinstance(bpm, dict) else "120"
-        modal_shifts = tonality.get("modal_shifts") if isinstance(tonality, dict) else []
+        modal_shifts_raw = tonality.get("modal_shifts") if isinstance(tonality, dict) else []
+        modal_shifts = (
+            list(modal_shifts_raw.values())
+            if isinstance(modal_shifts_raw, dict)
+            else list(modal_shifts_raw or [])
+        )
         emotion_profile = emotion.get("profile", {}) if isinstance(emotion, dict) else {}
-        intensity = emotion.get("curve", []) if isinstance(emotion, dict) else []
+        intensity_raw = emotion.get("curve", []) if isinstance(emotion, dict) else []
+        intensity = list(intensity_raw.values()) if isinstance(intensity_raw, dict) else list(intensity_raw or [])
 
         descriptors = []
-        for idx, section in enumerate(sections or []):
+        for idx, section in enumerate(list(sections or [])):
             label = labels[idx] if idx < len(labels) else f"Section {idx + 1}"
             tone = _first(modal_shifts[idx:idx + 1], "stable") if modal_shifts else "stable"
             height = round(intensity[idx] * 100) if idx < len(intensity) else 50

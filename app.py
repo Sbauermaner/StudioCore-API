@@ -416,6 +416,9 @@ def analyze_text(text: str, gender: str = "auto"):
 
         log.debug("Gradio -> core.analyze...")
         result = core.analyze(text, preferred_gender=gender, semantic_hints=semantic_hints or None)
+        result["fanf"] = core.build_fanf_output() or result.get("fanf", {})
+        result["annotated_text_ui"] = core.annotate_ui()
+        result["annotated_text_suno"] = core.annotate_suno()
 
         if isinstance(result, dict) and "error" in result:
             log.error(f"Gradio: Ядро вернуло ошибку: {result['error']}")

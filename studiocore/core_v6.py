@@ -97,6 +97,11 @@ class StudioCoreV6:
         from .monolith_v4_3_1 import StudioCore as LegacyCore  # pylint: disable=import-outside-toplevel
 
         self._legacy_core_cls = LegacyCore
+        self._last_backend_payload: Dict[str, Any] = {}
+        self._last_fanf_output: Dict[str, Any] = {}
+        self._last_sections: Sequence[str] | None = None
+        self._last_text: str | None = None
+        self._last_fanf_context: Dict[str, Any] | None = None
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         incoming_text = text or ""
@@ -275,6 +280,8 @@ class StudioCoreV6:
             sections = self._resolve_sections_from_hints(text, hinted_sections) or sections
         if not sections:
             sections = self.text_engine.auto_section_split(text)
+        self._last_sections = sections
+        self._last_text = text
         emotion_profile = self.emotion_engine.emotion_detection(text)
         emotion_curve = self.emotion_engine.emotion_intensity_curve(text)
         section_intel_payload = self.section_intelligence.analyze(text, sections, emotion_curve)
@@ -849,21 +856,23 @@ class StudioCoreV6:
             "rde_summary": rde_summary,
             "genre_analysis": genre_analysis,
         }
+        fanf_analysis_payload = {
+            "emotion": {"profile": emotion_profile, "curve": emotion_curve},
+            "bpm": bpm_payload,
+            "tonality": tonality_payload,
+            "style": style_payload,
+            "tlp": tlp_profile,
+            "zero_pulse": zero_pulse_payload,
+            "color": {"wave": color_wave, "profile": color_profile},
+            "instrumentation": instrumentation_payload,
+            "rde": rde_summary,
+        }
+        self._last_fanf_context = {"text": text, "sections": sections, "analysis": fanf_analysis_payload}
         try:
             fanf_annotation = self.fanf_engine.build_annotations(
                 text,
                 sections,
-                {
-                    "emotion": {"profile": emotion_profile, "curve": emotion_curve},
-                    "bpm": bpm_payload,
-                    "tonality": tonality_payload,
-                    "style": style_payload,
-                    "tlp": tlp_profile,
-                    "zero_pulse": zero_pulse_payload,
-                    "color": {"wave": color_wave, "profile": color_profile},
-                    "instrumentation": instrumentation_payload,
-                    "rde": rde_summary,
-                },
+                fanf_analysis_payload,
             )
             result["fanf"] = {
                 "annotated_text_fanf": fanf_annotation.annotated_text_fanf,
@@ -881,6 +890,7 @@ class StudioCoreV6:
                 "choir_active": False,
                 "error": str(exc),
             }
+        self._last_fanf_output = result.get("fanf", {})
         applied_overrides = self._apply_user_overrides_once(result, override_manager)
         result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(
             override_manager,
@@ -902,6 +912,7 @@ class StudioCoreV6:
         result["suno_annotations"] = suno_annotations
         if language_info:
             result["language"] = dict(language_info)
+        self._last_backend_payload = dict(result)
         return result
 
     def _finalize_result(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -926,6 +937,34 @@ class StudioCoreV6:
         merged["fanf"] = payload.get("fanf", {})
         merged.pop("_overrides_applied", None)
         return merged
+
+    def build_fanf_output(self) -> Dict[str, Any]:
+        context = self._last_fanf_context or {}
+        text = context.get("text") or self._last_text or ""
+        sections = context.get("sections") or self._last_sections or []
+        analysis = context.get("analysis") or {}
+        try:
+            annotation = self.fanf_engine.build_annotations(text, sections, analysis)
+        except TypeError:
+            safe_sections = (
+                list(sections.values()) if isinstance(sections, dict) else list(sections or [])
+            )
+            annotation = self.fanf_engine.build_annotations(text, safe_sections, analysis)
+        self._last_fanf_output = {
+            "annotated_text_fanf": annotation.annotated_text_fanf,
+            "annotated_text_ui": annotation.annotated_text_ui,
+            "annotated_text_suno": annotation.annotated_text_suno,
+            "choir_active": annotation.choir_active,
+            "cinematic_header": annotation.cinematic_header,
+            "resonance_header": annotation.resonance_header,
+        }
+        return self._last_fanf_output
+
+    def annotate_ui(self) -> str | None:
+        return (self._last_fanf_output or {}).get("annotated_text_ui")
+
+    def annotate_suno(self) -> str | None:
+        return (self._last_fanf_output or {}).get("annotated_text_suno")
 
     def _apply_vocal_fusion(self, vocal_payload: Dict[str, Any], overrides: UserOverrides | None) -> Dict[str, Any]:
         payload = dict(vocal_payload)
