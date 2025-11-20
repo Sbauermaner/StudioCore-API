@@ -24,6 +24,7 @@ import uvicorn
 import logging
 import subprocess # v10: ИСПРАВЛЕН NameError: name 'subprocess' is not defined
 import importlib
+import json
 from dataclasses import asdict
 
 # === 1. Исправление пути импорта ===
@@ -364,22 +365,22 @@ threading.Thread(target=auto_core_check, daemon=True).start()
 def analyze_text(text: str, gender: str = "auto"):
     """
     Основная функция анализа текста через StudioCore для UI Gradio.
-    v8: Возвращает 3 строки: Summary, Suno Prompt, Annotated Text
+    v8+: Возвращает 4 значения: Style Prompt, Lyrics Prompt, Аннотированный текст, Summary
     """
     log.debug(f"Gradio analyze_text: получено {len(text)} символов, gender={gender}")
 
     if not text.strip():
-        return "⚠️ Введите текст для анализа.", "", ""
+        return "", "", "", "⚠️ Введите текст для анализа."
 
     is_valid, validation_error = _validate_input_length(text)
     if not is_valid:
-        return validation_error, "", ""
+        return "", "", "", validation_error
 
     try:
         core = create_core_instance()
     except Exception as exc:
         log.error("Gradio analyze_text: не удалось создать ядро: %s", exc)
-        return f"❌ Ядро не загружено: {exc}", "", ""
+        return "", "", "", f"❌ Ядро не загружено: {exc}"
 
     try:
         # --- Проверка пользовательских описаний вокала ---
@@ -388,8 +389,8 @@ def analyze_text(text: str, gender: str = "auto"):
             "вокал", "voice", "growl", "scream", "raspy", "мужск", "женск",
             "пескляв", "soft", "airy", "shout", "grit", "фальцет", "whisper"
         ]
-        
-        # v8: Улучшенная логика: ищем хинт только в ПОСЛЕДНЕЙ строке, 
+
+        # v8: Улучшенная логика: ищем хинт только в ПОСЛЕДНЕЙ строке,
         # если она в скобках или начинается с "под"
         last_line = text.strip().splitlines()[-1].strip().lower()
         if (last_line.startswith("(") and last_line.endswith(")")) or \
@@ -397,19 +398,30 @@ def analyze_text(text: str, gender: str = "auto"):
             if any(k in last_line for k in voice_hint_keywords):
                 semantic_hints["voice_profile_hint"] = last_line
                 log.info(f"🎙️ [UI] Обнаружено описание вокала: {semantic_hints['voice_profile_hint']}")
-        
+
         log.debug("Gradio -> core.analyze...")
         result = core.analyze(text, preferred_gender=gender, semantic_hints=semantic_hints or None)
 
         if isinstance(result, dict) and "error" in result:
             log.error(f"Gradio: Ядро вернуло ошибку: {result['error']}")
-            return f"❌ Ошибка: {result['error']}", "", ""
+            return "", "", "", f"❌ Ошибка: {result['error']}"
+
+        if not isinstance(result, dict):
+            log.warning("Gradio: unexpected result type, coercing to empty dict")
+            result = {}
+
+        summary_section = result.get("summary", {}) if isinstance(result.get("summary"), dict) else {}
+
+        # --- Обеспечиваем наличие ключей в результате ---
+        result.setdefault("style_prompt", summary_section.get("prompt_suno_style"))
+        result.setdefault("lyrics_prompt", summary_section.get("annotated_text_suno"))
+        result.setdefault("annotated_text", summary_section.get("annotated_text_ui"))
 
         # --- 1. Summary ---
-        style = result.get("style", {})
+        style = result.get("style", {}) if isinstance(result.get("style"), dict) else {}
         vocal_form = style.get("vocal_form", "auto")
-        
-        summary = (
+
+        summary_text = (
             f"✅ StudioCore {STUDIOCORE_VERSION}\n"
             f"🎭 {style.get('genre', '—')} | "
             f"🎵 {style.get('style', '—')} | "
@@ -418,28 +430,33 @@ def analyze_text(text: str, gender: str = "auto"):
             f"🔑 {style.get('key', 'auto')}"
         )
 
-        # --- 2. Suno Prompt (v8) ---
-        # (Объединяет Style и Lyrics)
-        suno_prompt = (
-            f"[STYLE PROMPT - КОПИРОВАТЬ В SUNO 'Style of Music']\n"
-            f"{result.get('prompt_suno_style', 'Ошибка: prompt_suno_style не найден')}\n\n"
-            f"[LYRICS PROMPT - КОПИРОВАТЬ В SUNO 'Lyrics']\n"
-            f"{result.get('annotated_text_suno', 'Ошибка: annotated_text_suno не найден')}"
+        summary_payload = summary_section if summary_section else {"summary": summary_text}
+        summary_box_value = (
+            json.dumps(summary_payload, ensure_ascii=False, indent=2)
+            if isinstance(summary_payload, dict)
+            else str(summary_payload)
         )
-        
-        # --- 3. Аннотированный текст (для UI) ---
-        annotated_text_ui = result.get("annotated_text_ui", "Ошибка: annotated_text_ui не найден")
+
+        # --- 2. Style Prompt ---
+        style_prompt = result.get("style_prompt") or "Ошибка: style_prompt отсутствует"
+
+        # --- 3. Lyrics Prompt ---
+        lyrics_prompt = result.get("lyrics_prompt") or "Ошибка: lyrics_prompt отсутствует"
+
+        # --- 4. Аннотированный текст (для UI) ---
+        annotated_text_ui = result.get("annotated_text") or "Ошибка: annotated_text отсутствует"
 
         return (
-            summary,
-            suno_prompt,
+            style_prompt,
+            lyrics_prompt,
             annotated_text_ui,
+            summary_box_value,
         )
 
     except Exception as e:
         log.critical(f"❌ КРИТИЧЕСКАЯ ОШИБКА в analyze_text (Gradio): {traceback.format_exc()}")
         # v10: Возвращаем traceback в UI для легкой отладки
-        return f"❌ Внутреннее исключение: {e}\n\n{traceback.format_exc()}", "", ""
+        return "", "", "", f"❌ Внутреннее исключение: {e}\n\n{traceback.format_exc()}"
 
 # === 9. INLINE TEST RUNNER ===
 def run_inline_tests():
@@ -530,23 +547,35 @@ with gr.Blocks(
 
         analyze_button = gr.Button("🔍 Анализировать")
 
-        # --- v8: Единый блок Suno Prompt ---
-        suno_box = gr.Textbox(
-            label="[StudioCore] Suno Prompt (Style + Lyrics)", 
-            lines=16, 
+        prompt_suno_style = gr.Textbox(
+            label="[STYLE PROMPT - КОПИРОВАТЬ В SUNO 'Style of Music']",
+            placeholder="Suno Style Prompt",
+            lines=3,
             show_copy_button=True,
-            info="Скопируйте [STYLE PROMPT] в 'Style of Music' и [LYRICS PROMPT] в 'Lyrics' в Suno."
+        )
+
+        annotated_text_suno = gr.Textbox(
+            label="[LYRICS PROMPT - КОПИРОВАТЬ В SUNO 'Lyrics']",
+            placeholder="Suno Lyrics Prompt",
+            lines=10,
+            show_copy_button=True,
+        )
+
+        annotated_text_ui = gr.Textbox(
+            label="Аннотированный текст (UI)",
+            placeholder="UI Annotated Text",
+            lines=10,
+            show_copy_button=True,
         )
 
         with gr.Accordion("Показать расширенный анализ (Summary и Аннотация)", open=False):
             # v8: Кнопки копирования возвращены
-            result_box = gr.Textbox(label="📊 Результат (Summary)", lines=6, show_copy_button=True)
-            annotated_box = gr.Textbox(label="🎙️ Аннотированный текст (UI)", lines=24, show_copy_button=True)
+            summary_box = gr.Textbox(label="📊 Результат (Summary)", lines=6, show_copy_button=True)
 
         analyze_button.click(
             fn=analyze_text,
             inputs=[text_input, gender_input],
-            outputs=[result_box, suno_box, annotated_box],
+            outputs=[prompt_suno_style, annotated_text_suno, annotated_text_ui, summary_box],
         )
 
         # === JSON DEBUG SECTION ===
