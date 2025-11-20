@@ -113,7 +113,7 @@ def build_global_genre_universe_v2() -> GenreUniverse:
         "vaporwave",
     ]
     for g in edm_genres:
-        u.add_edm(g)
+        u.add_edm(g, tags=["edm", "electronic"])
 
     # --- LITERATURE STYLES ---
     literature_styles = [
@@ -139,7 +139,7 @@ def build_global_genre_universe_v2() -> GenreUniverse:
         "essay",
     ]
     for g in literature_styles:
-        u.add_literature_style(g)
+        u.add_literature_style(g, tags=["literature"])
 
     # --- LYRIC FORMS ---
     lyric_forms = [
@@ -165,7 +165,7 @@ def build_global_genre_universe_v2() -> GenreUniverse:
         "spoken_word",
     ]
     for f in lyric_forms:
-        u.add_lyric_form(f)
+        u.add_lyric_form(f, tags=["lyric"])
 
     # --- DRAMA ---
     dramatic_genres = [
@@ -181,7 +181,7 @@ def build_global_genre_universe_v2() -> GenreUniverse:
         "historical_drama",
     ]
     for g in dramatic_genres:
-        u.add_dramatic_genre(g)
+        u.add_dramatic_genre(g, tags=["stage", "drama"])
 
     # --- COMEDY ---
     comedy_genres = [
@@ -197,7 +197,7 @@ def build_global_genre_universe_v2() -> GenreUniverse:
         "musical_parody",
     ]
     for g in comedy_genres:
-        u.add_comedy_genre(g)
+        u.add_comedy_genre(g, tags=["comedy"])
 
     # --- GOTHIC ---
     gothic_styles = [
@@ -213,7 +213,7 @@ def build_global_genre_universe_v2() -> GenreUniverse:
         "gothic_cabaret",
     ]
     for g in gothic_styles:
-        u.add_gothic_style(g)
+        u.add_gothic_style(g, tags=["gothic"])
 
     # --- ETHNIC ---
     ethnic_schools = [
@@ -231,21 +231,21 @@ def build_global_genre_universe_v2() -> GenreUniverse:
         "andalusian_flamenco",
     ]
     for g in ethnic_schools:
-        u.add_ethnic_school(g)
+        u.add_ethnic_school(g, tags=["ethnic"])
 
     # --- HYBRIDS ---
     hybrids = [
-        ("orchestral_dnb", ["orchestral", "drum_and_bass"]),
-        ("gothic_cabaret", ["gothic", "cabaret"]),
-        ("cinematic_dark_folk", ["cinematic", "dark_folk"]),
-        ("tribal_techno", ["tribal", "techno"]),
-        ("flamenco_metal", ["flamenco", "metal"]),
-        ("oriental_trap", ["oriental", "trap"]),
-        ("folk_rap", ["folk", "rap"]),
-        ("cinematic_orchestral", ["cinematic", "orchestral"]),
+        ("orchestral_dnb", ["orchestral", "drum_and_bass"], ["hybrid", "cinematic"]),
+        ("gothic_cabaret", ["gothic", "cabaret"], ["hybrid", "gothic", "stage"]),
+        ("cinematic_dark_folk", ["cinematic", "dark_folk"], ["hybrid", "dark"]),
+        ("tribal_techno", ["tribal", "techno"], ["hybrid", "club"]),
+        ("flamenco_metal", ["flamenco", "metal"], ["hybrid", "ethnic"]),
+        ("oriental_trap", ["oriental", "trap"], ["hybrid", "world"]),
+        ("folk_rap", ["folk", "rap"], ["hybrid", "lyric"]),
+        ("cinematic_orchestral", ["cinematic", "orchestral"], ["hybrid", "score"]),
     ]
-    for name, parents in hybrids:
-        u.add_hybrid(name, parents=parents)
+    for name, parents, tags in hybrids:
+        u.add_hybrid(name, components=parents, tags=tags)
 
     # --- ALIASES ---
     aliases = {
