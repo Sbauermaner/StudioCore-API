@@ -9,6 +9,84 @@ from __future__ import annotations
 from typing import Any, Dict, List, Sequence
 
 
+def _dominant_emotion(vectors):
+    """
+    Определяет доминирующую эмоцию по сглаженным векторам.
+    Возвращает: "dark", "love", "rage", "melancholic", "epic", "hope"
+    """
+    if not vectors:
+        return "neutral"
+
+    total_valence = sum(v.valence for v in vectors) / len(vectors)
+    total_arousal = sum(v.arousal for v in vectors) / len(vectors)
+    total_pain = sum(v.pain for v in vectors) / len(vectors)
+
+    # НАБОР ПРАВИЛ ДЛЯ ЭМОЦИЙ — НЕ МЕНЯТЬ
+    if total_pain > 0.6 and total_valence < -0.3:
+        return "dark"
+    if total_pain > 0.5 and total_arousal > 0.5:
+        return "rage"
+    if total_valence > 0.6 and total_arousal > 0.4:
+        return "hope"
+    if total_valence > 0.5 and total_pain < 0.2:
+        return "love"
+    if total_valence < -0.2 and total_arousal < 0.3:
+        return "melancholic"
+    if total_arousal > 0.7:
+        return "epic"
+
+    return "neutral"
+
+
+def emotion_to_instruments(emotion: str) -> List[str]:
+    """
+    Подбор инструментов по эмоции.
+    Это ПРАВИЛА, НЕ ИИ.
+    """
+    table = {
+        "dark": ["cello", "low choir", "synth pads", "metallic hits"],
+        "rage": ["distorted guitars", "blast beat", "aggro bass", "choir shouts"],
+        "love": ["acoustic guitar", "soft piano", "warm strings", "harp"],
+        "hope": ["piano", "string ensemble", "soft drums", "airy synth"],
+        "melancholic": ["cello", "ambient pads", "piano", "soft drums"],
+        "epic": ["full orchestra", "toms", "horns", "epic choir"],
+        "neutral": ["piano", "cello"],
+    }
+    return table.get(emotion, table["neutral"])
+
+
+def emotion_to_vocal(emotion: str) -> str:
+    """
+    Подбор вокала по эмоции.
+    """
+    table = {
+        "dark": "male low whisper + distant choir",
+        "rage": "male harsh / female aggressive",
+        "love": "soft female alto / gentle male tenor",
+        "hope": "female airy soprano",
+        "melancholic": "male baritone soft",
+        "epic": "layered choir",
+        "neutral": "auto",
+    }
+    return table.get(emotion, "auto")
+
+
+def emotion_to_style(emotion: str) -> str:
+    """
+    Отдаём стилистический лейбл для Suno.
+    """
+    table = {
+        "dark": "dark gothic dramatic",
+        "rage": "extreme rage industrial",
+        "love": "romantic emotional ballad",
+        "hope": "uplifting cinematic heroic",
+        "melancholic": "melancholic soft indie",
+        "epic": "epic orchestral hybrid",
+        "neutral": "cinematic narrative",
+    }
+    return table.get(emotion, "cinematic narrative")
+
+
 class SunoAnnotationEngine:
     """Wrap annotations with English parenthesised commands."""
 
