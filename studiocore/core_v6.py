@@ -272,6 +272,7 @@ class StudioCoreV6:
         backend_payload = self._inject_normalized_snapshot(normalized_text, backend_payload)
 
         # Best-effort FusionEngine + Suno prompt integration
+        # This step is critical for final BPM/Key/Genre consolidation and Suno prompt generation.
         backend_payload = self._apply_fusion_and_suno(backend_payload)
         fanf_output = self.build_fanf_output(
             text=normalized_text,
@@ -690,11 +691,16 @@ class StudioCoreV6:
             result["_tone_dynamic"] = []
 
         # Fix Key-Emotion Link: Apply the final modulated key/mode
+        # This ensures the Style Engine and later stages see the emotionally corrected key.
         if local_tone_mod and (final_mod := local_tone_mod[-1]):
+            # Use final_mod key only if it's explicitly detected and the tonality_payload is 'auto' or missing
             if final_mod.get("key") and tonality_payload.get("key") in (None, "auto"):
                 tonality_payload["key"] = final_mod["key"]
-            if final_mod.get("mode") and tonality_payload.get("mode") in (None, "auto"):
+                tonality_payload["source"] = "emotional_tone_modulation"
+            if final_mod.get("mode"):
+                # Always prefer the modulated mode, as it's emotionally synced
                 tonality_payload["mode"] = final_mod["mode"]
+                tonality_payload.setdefault("source", "emotional_tone_modulation")
 
         freq_profile = self.frequency_engine.resonance_profile(tlp_profile)
         freq_profile["recommended_octaves"] = self.rns_safety.clamp_octaves(

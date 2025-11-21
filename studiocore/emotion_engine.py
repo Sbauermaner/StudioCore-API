@@ -181,7 +181,7 @@ class EmotionEngineV64:
         tlp = self.compute_TLP(dominant, vector)
 
         # динамическое обновление веса
-        self.update_weights(vector)
+        # self.update_weights(vector) # COMMENTED OUT: Removing state leak for stateless architecture
 
         return {
             "vector": vector,
