@@ -358,25 +358,38 @@ class StudioCore:
         
         num_blocks = len(text_blocks)
         
-        # --- (v6) Улучшенная логика мэппинга секций (ПРИОРИТЕТ Outro) ---
-        # Создаем гибкий паттерн: Intro, Verse, Chorus, Verse, Chorus, Bridge, ...
-        # Это решает проблему некорректного маппинга для длинных текстов.
-        base_map_pattern = ["Intro", "Verse", "Chorus", "Verse", "Chorus", "Bridge"]
-        semantic_map = []
+        # --- (v6) Динамическое построение семантической карты ---
+        # Гарантирует корректный порядок (интро → куплеты/припевы → бридж → аутро)
+        # и стабильное добавление Outro для любых длин текстов.
+        semantic_map: List[str] = []
 
-        for i in range(num_blocks):
-            if i < len(base_map_pattern):
-                semantic_map.append(base_map_pattern[i])
-            else:
-                # Повторяем Verse/Chorus/Verse... для очень длинных песен
-                semantic_map.append(base_map_pattern[i % 2 + 1]) # 1=Verse, 2=Chorus
-
-        # 🎯 ГАРАНТИЯ: Последний блок всегда Outro, как запросил пользователь
         if num_blocks > 0:
-            semantic_map[-1] = "Outro"
-            if num_blocks > 1 and semantic_map[-2] == "Outro":
-                # Если предпоследний был Outro, делаем его Bridge
-                semantic_map[-2] = "Bridge"
+            slots_before_outro = num_blocks - 1
+
+            if slots_before_outro == 0:
+                semantic_map = ["Outro"]
+            else:
+                # Базовый шаблон и повторяющийся цикл куплет/припев
+                base_map_pattern = ["Intro", "Verse", "Chorus", "Verse", "Chorus", "Bridge"]
+                vc_cycle = ["Verse", "Chorus"]
+
+                semantic_map = base_map_pattern[:slots_before_outro]
+
+                # Продолжаем чередование куплет/припев для очень длинных текстов
+                cycle_idx = 0
+                while len(semantic_map) < slots_before_outro:
+                    semantic_map.append(vc_cycle[cycle_idx % len(vc_cycle)])
+                    cycle_idx += 1
+
+                # Особый случай: всего два блока (Verse → Outro)
+                if num_blocks == 2:
+                    semantic_map = ["Verse"]
+
+                # Гарантируем наличие припева, если есть место минимум под два блока до аутро
+                if slots_before_outro >= 2 and "Chorus" not in semantic_map:
+                    semantic_map[-1] = "Chorus"
+
+                semantic_map.append("Outro")
         
         # Находим определения секций
         sec_defs = {s["tag"].lower(): s for s in semantic_sections}
