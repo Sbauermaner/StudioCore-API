@@ -1,58 +1,42 @@
-Отчёт аудита StudioCore-API (репозиторий: /workspace/StudioCore-API)
-Дата: 2025-11-21 12:27:19 UTC
+Отчёт аудита StudioCore (директория studiocore/*)
+Дата: 2025-11-21 (UTC)
 
-1) Краткое резюме и охват
-- Проверены корневой шлюз app.py, загрузчик studiocore/__init__.py, движок core_v6.py и профильные модули (adapter.py, section_parser.py, suno_annotations.py, config.py и др.).
-- Внимание уделено пайплайну анализа текста (очистка → секции → эмоции/тон/ритм → жанровые веса → аннотации Suno/FANF), fallback-цепочке загрузчика и синхронизации с монолитом v4.3.1.
+1) Пайплайн: фактический порядок и сбои
+- Загрузка ядра: порядок get_core → v6 → v5 → monolith → fallback; LOADER_DIAGNOSTICS инициализируется со значением engine_variant="fallback" ещё до попыток загрузки, поэтому статус до вызова get_core вводит в заблуждение (показывает fallback при доступном v6).【F:studiocore/__init__.py†L22-L188】
+- Основной анализ StudioCoreV6: последовательность анализа — очистка/команды → перевод → построение structure_context → apply overrides → backend_analyze (legacy + новые движки). semantic_hints и preserved_tags мерджатся без очистки; при повторных вызовах одного экземпляра возможно накопление тегов/подсказок и повторный пересчёт секций, что искажает BPM/section_intelligence.【F:studiocore/core_v6.py†L45-L119】【F:studiocore/core_v6.py†L280-L338】
+- SectionParser: prefer_strict_boundary рассчитывается, но нигде дальше не применяется; metadata копируется из TextStructureEngine без сброса, поэтому повторные parse на том же экземпляре могут вернуть заголовки предыдущего текста (залипание состояния).【F:studiocore/section_parser.py†L15-L52】
+- Suno prompt builder: ветка else (prompt_variant не suno_style/suno_lyrics) использует techniques/visual без объявления, что приводит к NameError и стопорит весь пайплайн подсказок при выборе prompt_variant="full" или любого нестандартного значения.【F:studiocore/adapter.py†L170-L186】
 
-2) Пайплайн и согласованность
-- В core_v6.analyze после extract_commands_and_tags/translate_text_for_analysis состояние собирается в structure_context, затем backend вызывает монолит и композитные движки. Порядок согласован, однако semantic_hints многократно мутабельно дополняются (структура → эмоции → тон/жанр), что может скрывать исходные подсказки пользователя и делает источники подсказок неявными. Сильных расхождений между подсистемами не найдено, но гарантий idempotency при повторных мерджах нет (списки объединяются без сохранения порядка).【F:studiocore/core_v6.py†L45-L119】【F:studiocore/core_v6.py†L297-L365】
-- Секционный анализ использует TextStructureEngine.auto_section_split и SectionParser.parse; prefer_strict_boundary лишь добавляется в metadata и не применяется при дальнейшем разборе, поэтому строгие границы никак не влияют на downstream-энжины (chorus/verse детекторы игнорируют флаг).【F:studiocore/section_parser.py†L15-L52】
-- build_global_emotion_curve/section_intelligence сохраняются в semantic_hints, но затем merge повторно переписывает curve/emotion_profile, что повышает риск «залипания» старых подсказок при внешних semantic_hints (merge добавляет элементы списков без очистки).【F:studiocore/core_v6.py†L333-L377】【F:studiocore/core_v6.py†L941-L990】
+2) Проверка подсистем
+- Emo engine: _emotion_stub записывает класс EmotionAggregator, а не экземпляр → class-leak и несериализуемый объект в финальном JSON; _emotion_map строится по пустому smoothed_vectors, поэтому карта эмоций всегда заглушка и не отражает реальных кривых (смещает downstream эвристики).【F:studiocore/core_v6.py†L415-L429】
+- TLP/Dynamic bias: dominant_emotion может быть None, но tlp_profile не получает neutral fallback; genre/tonality опираются на tlp_profile, поэтому в нейтральных текстах цепочка может вернуть пустые признаки и ослабить жанровое определение.【F:studiocore/core_v6.py†L397-L414】
+- RDE engine: rde_snapshot формируется из diagnostics, но instrumentation_consistency/genre_alignment флаги всегда True (расчёт отсутствует) → проверка согласованности фактически отключена, возможны скрытые конфликты темпа/палитры без уведомления пользователя.【F:studiocore/core_v6.py†L1089-L1127】
+- Tone/freq: UniversalFrequencyEngine не интегрирован в core_v6 пайплайн — частотная безопасность (RNSSafety) не применяется, хотя config объявляет пороги; это оставляет freq/bpm без RNS-клапана и может нарушить ожидания «safety» движка.【F:studiocore/frequency.py†L14-L73】【F:studiocore/core_v6.py†L480-L506】
+- BPM engine: при отсутствии секций происходит повторный auto_section_split внутри _backend_analyze; если SectionParser уже вернул иное разбиение, BPM кривые расходятся. Кроме того, semantic_layers из legacy заполняются только если legacy_result dict, но ошибки монолита скрываются (legacy_result={"error":…}, пайплайн продолжает работу без явного сигнала).【F:studiocore/core_v6.py†L297-L378】
+- Genre matrix/router: при наличии legacy_style_genre и universe.resolve(...)="unknown" алгоритм меняет genre_analysis, но diagnostics не фиксируют источник выбора; клиенты не понимают, использован ли legacy или новая матрица. (см. блок feature_map/genre после вычисления rde_axes).【F:studiocore/core_v6.py†L1004-L1072】
+- Vocals engine: vocal_payload проходит merge → override_engine.apply_to_vocals → _apply_vocal_fusion; двойное применение может продублировать стилевые подсказки при user_overrides (одно и то же словарное состояние обрабатывается дважды).【F:studiocore/core_v6.py†L454-L459】
+- Integrity engine: IntegrityScanEngine не используется в core_v6.analyze, поэтому заявленная «integrity» подсистема фактически отключена для API; нарушения симметрии/повторов не попадают в diagnostics/auto_context.【F:studiocore/integrity.py†L12-L61】【F:studiocore/core_v6.py†L45-L119】
+- Annotation engine: SunoAnnotationEngine.build_suno_safe_annotations мутирует diagnostics через setdefault и _prepare_diagnostics; повторное использование одного словаря приводит к накоплению BPM/тональности/палитры из предыдущих анализов (залипание состояния).【F:studiocore/suno_annotations.py†L203-L309】
 
-3) Проверка engines (emo, tlp, rde, tone, freq, bpm, genre, vocals, annotation, integrity)
-- Emo/EmotionEngine: после emotion_detection/emotion_intensity_curve значения кладутся в result, но дополнительный «_emotion_stub» записывается как класс EmotionAggregator, а не объект, что создаёт class-leak и не сериализуется напрямую в JSON (требует sanitize_for_json в app.py).【F:studiocore/core_v6.py†L420-L429】
-- TLP (TruthLovePainEngine) и dynamic bias: данные корректно агрегируются, но при отсутствии эмоций dominant_emotion может вернуть пустую строку, что ухудшает подбор жанра/тональности (нет fallback на neutral).
-- RDE (RhythmDynamicsEmotionEngine) и tone: rde_snapshot сериализуется через dataclass.asdict, проблем не выявлено; однако consistency-блок выставляет все проверки True без фактической валидации (instrumentation_consistency, genre_alignment и др. не сверяются с diagnostics).【F:studiocore/core_v6.py†L1100-L1155】
-- BPM: порядок приоритетов (user hint → legacy → semantic_layers) соблюдён, но при отсутствии секций авто-сплит выполняется повторно, что может дать иной bpm_curve, чем использовал SectionParser. Ограничения bpm_limits зависят от длины sections, поэтому рассинхрон секций даёт плавающий BPM.
-- Genre: feature_map собирается из множества эвристик; при загрузке legacy_genre (из монолита) приоритет отдаётся universe.resolve только если domain != "unknown", иначе текущий расчёт используется. Несогласованность возможна, когда legacy_style_genre присутствует, но resolve возвращает unknown — тогда жанр меняется с domain_genre на routing_engine, но diagnostics не фиксируют источник выбора.
-- Vocals: vocal_payload проходит два слоя модификации (merge семантики → override_engine.apply_to_vocals), затем вокальный fusion применяется ещё раз в instrumentation_engine.build_palette, что повышает риск «двоения» вокальных подсказок при user_overrides, но явных ошибок не обнаружено.
-- Annotation: LyricsAnnotationEngine/SunoAnnotationEngine корректно создают секционные прометы; однако build_suno_safe_annotations мутирует diagnostics in-place через setdefault/emotion_matrix, что может загрязнить входящий словарь при повторном вызове с тем же объектом.【F:studiocore/suno_annotations.py†L203-L218】
-- Integrity: IntegrityScanEngine не используется в core_v6 пайплайне, поэтому движок не влияет на auto_context/consistency и не ловит структурные нарушения (потенциальная несогласованность дизайна).
+3) Несоответствия версий и монолит vs. новые движки
+- config.py объявляет STUDIOCORE_VERSION "v4.3.1-adaptive", в то время как публичный загрузчик сообщает "v6.4.0-protected"; клиенты получают разный номер версии в зависимости от точки входа (config vs __init__), что нарушает контракт совместимости и лимиты VERSION_LIMITS (расчёт на v5/1000 символов).【F:studiocore/config.py†L11-L50】【F:studiocore/__init__.py†L16-L47】
+- core_v6 запускает legacy_core.analyze и продолжает пайплайн даже если legacy_result={"error":…}; downstream блоки (genre/bpm/annotations) принимают пустые данные, возвращая «успешный» ответ без явного флага сбоя монолита. Это ломает fallback-chain семантически: монолит может упасть, но результат будет выглядеть валидным.
 
-4) Fallback-цепочки и загрузчик
-- loader.get_core перебирает (v6 → v5 → monolith → fallback) с записью ошибок, но _LOADER_DIAGNOSTICS и LOADER_STATUS инициализируются с engine_variant="fallback" до первой удачной загрузки, поэтому /status до вызова get_core показывает «fallback» даже при доступном v6 (косметическое несоответствие статуса).【F:studiocore/__init__.py†L180-L236】
-- StudioCoreFallback.analyze поднимает RuntimeError без доп. сведений; sanitize_for_json не вызывается, поэтому /api/predict вернёт 500 без структурированного тела при активации fallback, что усложняет обработку ошибок.
-- auto_core_check из app.py всегда стартует поток с POST на 127.0.0.1:7860/api/predict через 5 секунд; в средах без сервиса это гарантированное сетевое исключение и лишний шум в логах. Переменная DISABLE_SELF_CHECK есть, но по умолчанию отключить невозможно через конфиг, что нарушает заявленную stateless-модель.【F:app.py†L333-L360】
+4) Нарушения stateless/безопасности
+- StudioCoreV6 хранит _last_sections/_last_text/_last_fanf_output/_last_fanf_context между вызовами; без явного сброса инстанс несёт состояние и может утянуть прошлые значения в debug_summary, что противоречит заявленному stateless режиму.【F:studiocore/core_v6.py†L65-L76】【F:studiocore/core_v6.py†L309-L337】
+- auto_core_check в app.py всегда запускается в отдельном потоке и делает POST на 127.0.0.1:7860 через 5 секунд. В окружениях без сервиса это гарантированный сетевой шум/ошибка; DISABLE_SELF_CHECK по умолчанию "0", так что самопроверка включена без возможности отключения конфигом (только переменной окружения).【F:app.py†L332-L360】
 
-5) Секционный парсер
-- SectionParser.parse возвращает prefer_strict_boundary и добавляет метаданные (lyrical_density, rde_emotion_hint), но эти значения дальше не учитываются ни в core_v6, ни в SectionIntelligenceEngine — эффекты аннотаций ограничены. Возможен «липкий» headers: metadata копируется без очистки при повторных вызовах section_parser.parse (использует self._text_engine.section_metadata() без reset), поэтому последовательные analyze на одном экземпляре StudioCoreV6 могут возвращать заголовки предыдущих текстов.【F:studiocore/section_parser.py†L19-L39】
+5) Итоговые риски (без исправлений)
+- Class-leak и пустая карта эмоций нарушают JSON-совместимость и качество эмоциональных подсказок (emo engine).
+- NameError в build_suno_prompt блокирует полноценные промпты Suno и ломает fallback цепочку подсказок.
+- Версионный разнобой (v6.4 vs v4.3.1) вводит пользователей в заблуждение и может применить неверные лимиты/правила.
+- Накопление semantic_hints/diagnostics в живом экземпляре приводит к «липким» тегам и повторному использованию старых BPM/тональности.
+- Integrity/RNS safety не интегрированы в основной пайплайн: анализ не ловит структурные или частотные риски, хотя декларации об этих подсистемах присутствуют.
 
-6) Class-leaks и несериализуемые объекты
-- core_v6 добавляет в результат класс EmotionAggregator (см. пункт 3) и хранит EmotionMapEngine output в _emotion_map, который может включать объекты с нестандартными типами, если EmotionMapEngine изменится. sanitize_for_json в app.py умеет разворачивать __dict__, но класс остаётся строкой-плейсхолдером, что отличается от ожиданий клиентов API (ожидают числа/строки, а не описания классов).【F:studiocore/core_v6.py†L420-L429】
-- _last_backend_payload, _last_fanf_output, _last_fanf_context в StudioCoreV6 сохраняют результаты между вызовами, что нарушает строгую stateless-декларацию и может утянуть старые значения при отладке.
-
-7) build_suno_prompt / Suno интеграция
-- В adapter.build_suno_prompt ветка else (prompt_variant не suno_style/suno_lyrics) использует переменные techniques и visual, которые не определены в области (NameError). При вызове с prompt_variant="full" или любым иным значением функция аварийно падает до semantic_compress, ломая fallback-промпты и философский блок. Это прямая ошибка пайплайна подсказок Suno.【F:studiocore/adapter.py†L170-L186】
-- Ветка suno_style использует style_data["visual"] как production, но при отсутствии ключа возвращает "clean mix" — согласовано с документацией; ограничений по длине (VERSION_LIMITS) корректны.
-
-8) Риск «залипания» подсказок/тегов
-- merge_semantic_hints объединяет списки конкатенацией без дедупликации порядка; preserved_tags из extract_commands_and_tags передаются в structure и затем возвращаются без очистки, но не используются для фильтрации команд. При нескольких вызовах на одном экземпляре StudioCoreV6 списки в manual_overrides/semantic_hints могут увеличиваться, если пользователь передаёт пересекающиеся подсказки (не глубокая копия при старте structure_context).【F:studiocore/core_v6.py†L300-L377】
-- SunoAnnotationEngine.build_suno_safe_annotations перезаписывает diagnostics = self._prepare_diagnostics(diagnostics) после setdefault, оставляя исходный словарь мутированным; повторное использование diagnostics из кеша приведёт к накоплению BPM/key значений даже при смене текста.
-
-9) Монолит vs. engines
-- STUDIOCORE_VERSION в config.py остаётся "v4.3.1-adaptive", тогда как публичный шлюз и __init__.py объявляют "v6.4.0-protected". Это несоответствие поверх монолита v4.3.1 приводит к тому, что status/version и build_suno_prompt (который использует version для лимитов) могут расходиться: клиенты видят v6.4, но внутренние лимиты/конфиг — v4.3.1. Требуется синхронизация версии или явное разнесение по компонентам.【F:studiocore/config.py†L19-L80】【F:studiocore/__init__.py†L12-L29】
-- core_v6 использует monolith_v4_3_1 как legacy_core; при ошибке импорт/анализ ловится и возвращается {"error": ...}, но downstream движки продолжают работу на пустых данных, что маскирует сбой монолита и может выдать частично заполненный результат без явного сигнала об ошибке.
-
-10) Итоговые риски
-- Несериализуемый класс и stateful-поля в core_v6 нарушают JSON-совместимость и stateless-декларацию.
-- build_suno_prompt падает в расширенной ветке из-за неопределённых переменных, ломая fallback-промпты.
-- Версионный разнобой (v6.4 vs v4.3.1) и авто-self-check создают расхождения между заявленным «stateless» и фактическим поведением.
-- Мутации diagnostics/semantic_hints без защиты ведут к «залипанию» подсказок между вызовами одного инстанса.
-
-Рекомендации (без внесения изменений)
-- Заменить class-leak в core_v6 на сериализуемый описатель (dict) или удалять _emotion_stub из публичного ответа.
-- Починить build_suno_prompt: определить techniques/visual в ветке else или рефакторить на общий словарь параметров.
-- Вынести auto_core_check в явную опцию окружения (DISABLE_SELF_CHECK=1 по умолчанию) и устранить запись файлов в load_config для truly stateless режима.
-- Синхронизировать STUDIOCORE_VERSION между config.py, __init__.py и публичным API.
-- Добавить глубокие копии/очистку semantic_hints и diagnostics при каждом analyze, чтобы исключить залипание тегов и старых значений.
+Рекомендации по исправлению (не выполнялись):
+- Сделать _emotion_stub сериализуемым (dict) или исключить из публичного ответа; вычислять emotion_map по фактическим smoothed_vectors.
+- Определить visual/techniques в ветке full prompt или вынести общие переменные выше, чтобы исключить NameError.
+- Синхронизировать STUDIOCORE_VERSION между config/__init__ и явно маркировать используемую версию в ответах.
+- Добавить очистку semantic_hints/diagnostics и метаданных секций перед каждым analyze; рассмотреть reset SectionParser/TextStructureEngine state.
+- Интегрировать IntegrityScanEngine и RNSSafety в core_v6 пайплайн или задокументировать их отсутствие.
+- Сделать auto_core_check опциональным по умолчанию (отключённым) или обернуть в безопасный флаг среды.
