@@ -24,5 +24,8 @@ jobs:
       - name: Run full diagnostics
         run: bash ${{ github.workspace }}/run_full_diag.sh
 
+      - name: Clean logs
+        run: python3 main/auto_log_cleaner.py
+
       - name: Run pytest
         run: pytest -q

@@ -1,31 +1,28 @@
-diff --git a/.github/workflows/full-diagnostics.yml b/.github/workflows/full-diagnostics.yml
-new file mode 100644
-index 0000000000000000000000000000000000000000..c70570c7b4da932e0e550d92c983a12324ee14bc
---- /dev/null
-+++ b/.github/workflows/full-diagnostics.yml
-@@ -0,0 +1,25 @@
-+name: Full Diagnostics
-+
-+on:
-+  push:
-+  pull_request:
-+
-+jobs:
-+  run-full-diagnostics:
-+    runs-on: ubuntu-latest
-+    steps:
-+      - name: Checkout repository
-+        uses: actions/checkout@v4
-+
-+      - name: Set up Python
-+        uses: actions/setup-python@v5
-+        with:
-+          python-version: '3.11'
-+
-+      - name: Install dependencies
-+        run: |
-+          python -m pip install --upgrade pip
-+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-+
-+      - name: Run full diagnostics
-+        run: bash run_full_diag.sh
+name: Full Diagnostics
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  run-full-diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run full diagnostics
+        run: bash run_full_diag.sh
+
+      - name: Clean logs
+        run: python3 main/auto_log_cleaner.py
