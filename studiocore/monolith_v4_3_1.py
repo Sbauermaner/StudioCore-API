@@ -358,21 +358,25 @@ class StudioCore:
         
         num_blocks = len(text_blocks)
         
-        # --- (v6) Улучшенная логика мэппинга секций ---
-        # intro, verse1, chorus1, verse2, chorus2, bridge, chorus3, outro
+        # --- (v6) Улучшенная логика мэппинга секций (ПРИОРИТЕТ Outro) ---
+        # Создаем гибкий паттерн: Intro, Verse, Chorus, Verse, Chorus, Bridge, ...
+        # Это решает проблему некорректного маппинга для длинных текстов.
+        base_map_pattern = ["Intro", "Verse", "Chorus", "Verse", "Chorus", "Bridge"]
         semantic_map = []
-        if num_blocks <= 5:
-            semantic_map = ["Intro", "Verse", "Bridge", "Chorus", "Outro"]
-        elif num_blocks == 6:
-            semantic_map = ["Intro", "Verse", "Chorus", "Verse", "Chorus", "Outro"]
-        elif num_blocks == 7:
-            semantic_map = ["Intro", "Verse", "Pre-Chorus", "Chorus", "Verse", "Bridge", "Outro"]
-        else: # 8+
-            semantic_map = ["Intro", "Verse", "Pre-Chorus", "Chorus", "Verse", "Bridge", "Chorus", "Outro"]
-            
-        # Дополняем карту, если блоков больше 8
-        if num_blocks > len(semantic_map):
-            semantic_map.extend(["Verse", "Chorus"] * (num_blocks - len(semantic_map)))
+
+        for i in range(num_blocks):
+            if i < len(base_map_pattern):
+                semantic_map.append(base_map_pattern[i])
+            else:
+                # Повторяем Verse/Chorus/Verse... для очень длинных песен
+                semantic_map.append(base_map_pattern[i % 2 + 1]) # 1=Verse, 2=Chorus
+
+        # 🎯 ГАРАНТИЯ: Последний блок всегда Outro, как запросил пользователь
+        if num_blocks > 0:
+            semantic_map[-1] = "Outro"
+            if num_blocks > 1 and semantic_map[-2] == "Outro":
+                # Если предпоследний был Outro, делаем его Bridge
+                semantic_map[-2] = "Bridge"
         
         # Находим определения секций
         sec_defs = {s["tag"].lower(): s for s in semantic_sections}
