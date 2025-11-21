@@ -1192,12 +1192,14 @@ class StudioCoreV6:
         instrumentation_block = result.get("instrumentation")
         if not isinstance(instrumentation_block, dict):
             instrumentation_block = {}
+        result["instrumentation"] = instrumentation_block
 
         dynamics_block = (
             instrument_dynamics_payload
             if isinstance(instrument_dynamics_payload, dict)
             else {}
         )
+        result["instrument_dynamics"] = dynamics_block
 
         suno_annotations = self.suno_engine.build_suno_safe_annotations(
             sections,
@@ -1211,7 +1213,7 @@ class StudioCoreV6:
                 "commands": command_payload,
                 "emotion_matrix": result.get("emotion_matrix"),
             },
-        )
+        ) or []
         result["suno_annotations"] = suno_annotations
         if language_info:
             result["language"] = dict(language_info)
