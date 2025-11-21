@@ -1,0 +1,258 @@
+TRUTH
+- Color(s): (NO COLOR)
+- Source emotion file: emotion.py:41-114
+- Source color file: (none)
+- Engine category: tlp
+- Status: NO_COLOR
+
+LOVE
+- Color(s): #FF0000 → #FF69B4 → #FFFFFF
+- Source emotion file: emotion_engine.py:37-87
+- Source color file: color_engine_adapter.py:58-63
+- Engine category: legacy
+- Status: OK
+
+PAIN
+- Color(s): #0A1F44 → #2F4F4F → #000000
+- Source emotion file: emotion.py:41-114
+- Source color file: color_engine_adapter.py:43-49
+- Engine category: tlp
+- Status: OK
+
+JOY
+- Color(s): #FF0000 → #FF69B4 → #FFFFFF; golden; golden glow
+- Source emotion file: emotion.py:135-199
+- Source color file: color_engine_adapter.py:58-63; logical_engines.py:256-271; tone.py:114-123
+- Engine category: legacy
+- Status: DUPLICATE
+
+SADNESS
+- Color(s): #0A1F44 → #2F4F4F → #000000; deep blue; blue haze
+- Source emotion file: emotion.py:135-199
+- Source color file: color_engine_adapter.py:43-49; logical_engines.py:256-271; tone.py:114-123
+- Engine category: legacy
+- Status: DUPLICATE
+
+ANGER
+- Color(s): #000000 → #8B0000 → #000000; crimson; red flash
+- Source emotion file: emotion.py:135-199
+- Source color file: color_engine_adapter.py:51-56; logical_engines.py:256-271; tone.py:114-123
+- Engine category: legacy
+- Status: DUPLICATE
+
+FEAR
+- Color(s): #2A0038 → #000000; ashen gray; gray mist
+- Source emotion file: emotion.py:135-199
+- Source color file: color_engine_adapter.py:72-77; logical_engines.py:256-271; tone.py:114-123
+- Engine category: legacy
+- Status: DUPLICATE
+
+PEACE
+- Color(s): soft white; soft white aura
+- Source emotion file: emotion.py:135-199
+- Source color file: logical_engines.py:256-271; tone.py:114-123
+- Engine category: legacy
+- Status: OK
+
+EPIC
+- Color(s): violet flare; purple light
+- Source emotion file: emotion.py:135-199
+- Source color file: logical_engines.py:256-271; tone.py:114-123
+- Engine category: legacy
+- Status: DUPLICATE
+
+AWE
+- Color(s): #008080 → #C0C0C0 → #2F4F4F; iridescent teal
+- Source emotion file: emotion.py:135-199
+- Source color file: color_engine_adapter.py:65-70; logical_engines.py:256-271
+- Engine category: legacy
+- Status: DUPLICATE
+
+NEUTRAL
+- Color(s): (NO COLOR)
+- Source emotion file: emotion.py:135-199; emotion_engine.py:37-87
+- Source color file: (none)
+- Engine category: legacy
+- Status: NO_COLOR
+
+HOPE
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_dictionary_extended.py:28-38; emotion_engine.py:45-105
+- Source color file: (none)
+- Engine category: legacy
+- Status: NO_COLOR
+
+CALM
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_dictionary_extended.py:34-38
+- Source color file: (none)
+- Engine category: legacy
+- Status: NO_COLOR
+
+NOSTALGIA
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_dictionary_extended.py:35-38
+- Source color file: (none)
+- Engine category: legacy
+- Status: NO_COLOR
+
+IRONY
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_dictionary_extended.py:36-38
+- Source color file: (none)
+- Engine category: legacy
+- Status: NO_COLOR
+
+CONFLICT
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_dictionary_extended.py:37-38; emotion_engine.py:46-100
+- Source color file: (none)
+- Engine category: legacy
+- Status: NO_COLOR
+
+JOY_BRIGHT
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:37-87
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+LOVE_SOFT
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:37-87
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+LOVE_DEEP
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:37-87
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+DISAPPOINTMENT
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:37-87
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+MELANCHOLY
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:37-87
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+RAGE
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:37-87
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+RAGE_EXTREME
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:37-87
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+AGGRESSION
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:37-87
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+ANXIETY
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:37-87
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+WONDER
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:43-44
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+GOTHIC_DARK
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:46-48
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+DARK_POETIC
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:46-48
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+DARK_ROMANTIC
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:46-48
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+HIPHOP_CONFLICT
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:47-48; dynamic_emotion_engine.py:25-61
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+STREET_POWER
+- Color(s): (NO COLOR)
+- Source emotion file: emotion_engine.py:47-48
+- Source color file: (none)
+- Engine category: new
+- Status: NO_COLOR
+
+DARK
+- Color(s): (NO COLOR)
+- Source emotion file: suno_annotations.py:118-144
+- Source color file: (none)
+- Engine category: diagnostic
+- Status: NO_COLOR
+
+MELANCHOLIC
+- Color(s): (NO COLOR)
+- Source emotion file: suno_annotations.py:118-144
+- Source color file: (none)
+- Engine category: diagnostic
+- Status: NO_COLOR
+
+EPIC_CLUSTER
+- Color(s): (NO COLOR)
+- Source emotion file: suno_annotations.py:118-144
+- Source color file: (none)
+- Engine category: diagnostic
+- Status: NO_COLOR
+
+HOPE_CLUSTER
+- Color(s): (NO COLOR)
+- Source emotion file: suno_annotations.py:118-144
+- Source color file: (none)
+- Engine category: diagnostic
+- Status: NO_COLOR
+
+NEUTRAL_CLUSTER
+- Color(s): (NO COLOR)
+- Source emotion file: suno_annotations.py:118-144
+- Source color file: (none)
+- Engine category: diagnostic
+- Status: NO_COLOR
+
+KEY_COLOR_PALETTE
+- Color(s): red, orange-red, golden, amber, yellow, green, turquoise, blue, indigo, violet, magenta, crimson
+- Source emotion file: (none)
+- Source color file: tone.py:32-45
+- Engine category: tonal
+- Status: UNUSED
