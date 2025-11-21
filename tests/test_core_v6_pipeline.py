@@ -39,6 +39,13 @@ def test_core_v6_handles_missing_instrument_dynamics():
 
     assert isinstance(result["suno_annotations"], list)
 
+
+def test_core_v6_provides_diagnostics():
+    core = StudioCoreV6()
+    result = core.analyze("Тестовый текст")
+    assert "diagnostics" in result
+    assert isinstance(result["diagnostics"], dict)
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27

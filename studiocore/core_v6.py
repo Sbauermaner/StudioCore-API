@@ -1255,6 +1255,19 @@ class StudioCoreV6:
             "zero_pulse_alignment": True,
         }
         self._last_backend_payload = dict(result)
+
+        # === SAFE DIAGNOSTICS FALLBACK ===
+        emotion_matrix = result.get("emotion_matrix", {})
+        diagnostics = {
+            "bpm": result.get("bpm", {}),
+            "tonality": result.get("tone", {}),
+            "vocal": result.get("vocal", {}),
+            "sections": result.get("sections", []),
+            "emotion_matrix_source": emotion_matrix.get("version", None),
+        }
+
+        result["diagnostics"] = diagnostics
+
         return result
 
     def _finalize_result(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -1285,6 +1298,7 @@ class StudioCoreV6:
         merged["summary"] = payload.get("style", {}).get("prompt") or payload.get("summary") or ""
         merged["section_emotions"] = payload.get("section_emotions", [])
         merged["emotion_curve"] = payload.get("emotion_curve", {})
+        merged["diagnostics"] = payload.get("diagnostics", {})
         merged.pop("_overrides_applied", None)
         return merged
 
