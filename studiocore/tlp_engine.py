@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, List, Tuple
 
 from studiocore.emotion_profile import EmotionVector, EmotionAggregator
@@ -26,16 +27,20 @@ class TruthLovePainEngine(_TruthLovePainEngine):
         return profile
 
     def export_emotion_vector(self, text: str) -> EmotionVector:
+        """
+        Calculates dynamic Valence and Arousal based on TLP scores.
+        """
         profile = self.analyze(text)
-
         truth = profile.get("truth", 0.0)
         love = profile.get("love", 0.0)
         pain = profile.get("pain", 0.0)
-        cfreq = profile.get("conscious_frequency", 0.5)
+        weight = profile.get("conscious_frequency", 0.5)
 
-        # === Dynamic Valence / Arousal computation ===
+        # Valence (V): Positivity/Negativity (Love - Pain). Clamped to [-1, 1].
         valence = love - pain
-        arousal = (truth + love + pain) / 3.0
+
+        # Arousal (A): Intensity/Energy (Average of all axes). Clamped to [0, 1].
+        arousal = (love + pain + truth) / 3.0
 
         return EmotionVector(
             truth=truth,
@@ -43,8 +48,7 @@ class TruthLovePainEngine(_TruthLovePainEngine):
             pain=pain,
             valence=valence,
             arousal=arousal,
-            weight=cfreq,
-            extra={},
+            weight=weight,
         )
 
 

@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
 # Hash: 22ae-df91-bc11-6c7e
+# -*- coding: utf-8 -*-
 
 # =========================================
 # 🔐 StudioCore — Protected Source File
@@ -490,21 +490,71 @@ def analyze_text(text: str, gender: str = "auto"):
 
 # === 9. INLINE TEST RUNNER ===
 def run_inline_tests():
-    """Run pytest with absolute path resolution to avoid container path errors."""
-    import subprocess, sys, os, pathlib
+    log.info("=" * 30)
+    log.info("🚀 ЗАПУСК ВСТРОЕННЫХ ТЕСТОВ...")
+    log.info("=" * 30)
 
-    base_dir = pathlib.Path(__file__).resolve().parent.parent
-    tests_dir = base_dir / "tests"
+    buffer = io.StringIO()
+    buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
+    buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
-    if not tests_dir.exists():
-        return f"Tests directory not found: {tests_dir}"
+    # Use absolute path derived from where the script is running
+    tests_path = os.path.join(ROOT, "tests")
+    pytest_missing = False
 
-    cmd = [sys.executable, "-m", "pytest", str(tests_dir)]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        return result.stdout + "\n" + result.stderr
+        import pytest  # type: ignore
+    except Exception:
+        pytest_missing = True
+
+    if pytest_missing:
+        message = (
+            "⚠️ Pytest не установлен. Установите pytest (pip install pytest) "
+            "или запустите тесты локально."
+        )
+        log.warning(message)
+        buffer.write(message + "\n")
+        return buffer.getvalue()
+
+    if not os.path.isdir(tests_path):
+        log.warning(f"Каталог тестов не найден: {tests_path}")
+        buffer.write("ℹ️ Каталог tests/ отсутствует, тесты не запускались.\n")
+        return buffer.getvalue()
+
+    try:
+        log.info(f"🚀 Running pytest in {tests_path}")
+        buffer.write(f"🚀 Running pytest in {tests_path}\n\n")
+
+        # Correct invocation: use python -m pytest and pass the absolute path
+        process = subprocess.run(
+            [sys.executable, "-m", "pytest", "-q", tests_path],
+            # Do not specify cwd=ROOT unless explicitly required to prevent path issues
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=300,
+        )
+
+        if process.stdout:
+            buffer.write(process.stdout)
+
+        if process.stderr:
+            buffer.write("\n--- STDERR ---\n")
+            buffer.write(process.stderr)
+
+    except subprocess.TimeoutExpired:
+        log.error("Test runner: ТЕСТЫ ПРЕВЫСИЛИ ТАЙМАУТ (300с)!")
+        buffer.write(
+            "\n❌ КРИТИЧЕСКАЯ ОШИБКА: Тесты заняли слишком много времени (Timeout 300s).\n"
+        )
     except Exception as e:
-        return f"Error running tests: {e}"
+        log.error(f"Test runner: КРИТИЧЕСКАЯ ОШИБКА: {e}")
+        buffer.write(f"❌ ОШИБКА ПРИ ЗАПУСКЕ ТЕСТОВ: {e}\n{traceback.format_exc()}\n")
+
+    log.info("🏁 ...Встроенные тесты завершены.")
+    buffer.write("\n✅ Inline test session complete.\n")
+    return buffer.getvalue()
 
 
 # === 10. PUBLIC UI (Gradio) — PRO ПАНЕЛЬ ===
