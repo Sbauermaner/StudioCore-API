@@ -76,7 +76,8 @@ class SectionParser:
             for entry in metadata
         ]
         # Force-update internal engine state (required for consistency with section_metadata calls)
-        self._text_engine._section_metadata = metadata
+        # FIX: Direct access to private member is removed. We trust auto_section_split to initialize it.
+        # self._text_engine._section_metadata = metadata
 
         # Final safety check on metadata length to prevent downstream misalignment (Fix #1.2)
         if len(metadata) < len(resolved_sections):
