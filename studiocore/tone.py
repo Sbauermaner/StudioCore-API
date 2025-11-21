@@ -64,6 +64,27 @@ class ToneSyncEngine:
         "B": 480.0,
     }
 
+    KEY_STEPS = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+    def shift_key(self, key: str, steps: int) -> str:
+        """Shift a key by a number of semitone steps, preserving mode suffix if present."""
+
+        if not key or key == "auto":
+            return key
+
+        # Separate root and optional mode (e.g., "C# minor")
+        parts = key.split(maxsplit=1)
+        root = parts[0]
+        suffix = f" {parts[1]}" if len(parts) > 1 else ""
+
+        try:
+            idx = self.KEY_STEPS.index(root)
+        except ValueError:
+            return key
+
+        new_root = self.KEY_STEPS[(idx + steps) % len(self.KEY_STEPS)]
+        return f"{new_root}{suffix}"
+
     # -------------------------------------------------------
     # 🌡️ Emotional temperature
     # -------------------------------------------------------
@@ -152,40 +173,64 @@ class ToneSyncEngine:
 
         return {"key": base_key, "confidence": confidence}
 
-    def apply_emotion_modulation(self, base_key: str, emotion: EmotionVector) -> dict:
+    def apply_emotion_modulation(self, key_payload, emotion_vector):
         """
-        Tone Emotion Modulation (TEM).
-        Adjusts modal color and tonal shading without changing global key.
-        Soft shifts only.
+        Modulate key & mode based on emotion + COLOR WAVE.
+        Emotion now includes: valence, arousal, tlp AND color spectrum.
         """
 
-        val = emotion.valence
-        ar = emotion.arousal
+        base_key = key_payload.get("key", "C")
+        base_mode = key_payload.get("mode", "major")
 
-        # Начальное поле
-        mode = "default"
-        color_shift = 0.0
+        valence = emotion_vector.valence
+        arousal = emotion_vector.arousal
 
-        # --- VALENCE-DRIVEN MODALITY ---
-        if val < -0.5:
-            mode = "darker_minor"      # aeolian / harmonic minor tint
-            color_shift = -0.15
-        elif val > 0.5:
-            mode = "brighter_major"    # ionian / lydian tint
-            color_shift = +0.15
+        # === NEW: COLOR WAVE INPUT ===
+        color_hex = emotion_vector.extra.get("color_hex", None)
+        color_name = emotion_vector.extra.get("color_name", None)
 
-        # --- AROUSAL-DRIVEN INTENSITY ---
-        if ar > 0.7:
-            mode = "intense_modal"     # phrygian, dorian, altered color
-            color_shift += 0.10
-        elif ar < 0.3:
-            mode = "calm_modal"        # natural minor / pentatonic tint
-            color_shift -= 0.10
+        # Default to original key if no color
+        new_key = base_key
+        new_mode = base_mode
+
+        # === COLOR → MODE / FEEL MODULATION ===
+        if color_name:
+            c = color_name.lower()
+
+            if c in ("red", "crimson", "scarlet"):
+                new_mode = "minor"
+                new_key = self.shift_key(base_key, -2)   # darker
+            elif c in ("blue", "navy", "cyan"):
+                new_mode = "minor"
+                new_key = self.shift_key(base_key, -1)
+            elif c in ("yellow", "gold", "amber"):
+                new_mode = "major"
+                new_key = self.shift_key(base_key, +2)   # brighter
+            elif c in ("green", "emerald"):
+                new_mode = base_mode                     # neutral
+            elif c in ("purple", "violet"):
+                new_mode = "phrygian"                    # dramatic
+            elif c in ("black", "gray"):
+                new_mode = "minor"
+                new_key = self.shift_key(base_key, -3)   # darkest
+
+        # === EMOTION INFLUENCE (legacy) ===
+        if valence > 0.3:
+            new_mode = "major"
+        elif valence < -0.3:
+            new_mode = "minor"
+
+        # === AROUSAL SEMITONE SHIFT ===
+        if arousal > 0.6:
+            new_key = self.shift_key(new_key, +1)
+        elif arousal < 0.3:
+            new_key = self.shift_key(new_key, -1)
 
         return {
-            "base_key": base_key,
-            "mode": mode,
-            "color_shift": round(color_shift, 3),
+            "key": new_key,
+            "mode": new_mode,
+            "color": color_name,
+            "color_hex": color_hex,
         }
 
     def has_rhetorical_rift(self, paragraph: str) -> bool:

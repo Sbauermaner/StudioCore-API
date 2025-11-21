@@ -586,7 +586,10 @@ class StudioCoreV6:
         try:
             local_tone_mod = []
             for ev in smoothed_vectors:   # список EmotionVector из шага 5
-                mod = self.tone_engine.apply_emotion_modulation(tone_result["key"], ev)
+                mod = self.tone_engine.apply_emotion_modulation(
+                    {"key": tone_result.get("key"), "mode": mode},
+                    ev,
+                )
                 local_tone_mod.append(mod)
             result["_tone_dynamic"] = local_tone_mod
         except Exception:
