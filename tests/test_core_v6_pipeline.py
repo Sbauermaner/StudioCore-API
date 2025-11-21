@@ -35,9 +35,9 @@ def test_core_v6_handles_missing_instrument_dynamics():
         lambda *args, **kwargs: None
     )
 
-    result = core.analyze("Тестовый текст без инструментальных динамик")
+    result = core.analyze("Тестовый текст…")
 
-    assert isinstance(result.get("suno_annotations"), list)
+    assert isinstance(result["suno_annotations"], list)
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
