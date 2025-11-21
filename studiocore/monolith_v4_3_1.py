@@ -358,38 +358,21 @@ class StudioCore:
         
         num_blocks = len(text_blocks)
         
-        # --- (v6) Динамическое построение семантической карты ---
-        # Гарантирует корректный порядок (интро → куплеты/припевы → бридж → аутро)
-        # и стабильное добавление Outro для любых длин текстов.
-        semantic_map: List[str] = []
-
-        if num_blocks > 0:
-            slots_before_outro = num_blocks - 1
-
-            if slots_before_outro == 0:
-                semantic_map = ["Outro"]
-            else:
-                # Базовый шаблон и повторяющийся цикл куплет/припев
-                base_map_pattern = ["Intro", "Verse", "Chorus", "Verse", "Chorus", "Bridge"]
-                vc_cycle = ["Verse", "Chorus"]
-
-                semantic_map = base_map_pattern[:slots_before_outro]
-
-                # Продолжаем чередование куплет/припев для очень длинных текстов
-                cycle_idx = 0
-                while len(semantic_map) < slots_before_outro:
-                    semantic_map.append(vc_cycle[cycle_idx % len(vc_cycle)])
-                    cycle_idx += 1
-
-                # Особый случай: всего два блока (Verse → Outro)
-                if num_blocks == 2:
-                    semantic_map = ["Verse"]
-
-                # Гарантируем наличие припева, если есть место минимум под два блока до аутро
-                if slots_before_outro >= 2 and "Chorus" not in semantic_map:
-                    semantic_map[-1] = "Chorus"
-
-                semantic_map.append("Outro")
+        # --- (v6) Улучшенная логика мэппинга секций ---
+        # intro, verse1, chorus1, verse2, chorus2, bridge, chorus3, outro
+        semantic_map = []
+        if num_blocks <= 5:
+            semantic_map = ["Intro", "Verse", "Bridge", "Chorus", "Outro"]
+        elif num_blocks == 6:
+            semantic_map = ["Intro", "Verse", "Chorus", "Verse", "Chorus", "Outro"]
+        elif num_blocks == 7:
+            semantic_map = ["Intro", "Verse", "Pre-Chorus", "Chorus", "Verse", "Bridge", "Outro"]
+        else: # 8+
+            semantic_map = ["Intro", "Verse", "Pre-Chorus", "Chorus", "Verse", "Bridge", "Chorus", "Outro"]
+            
+        # Дополняем карту, если блоков больше 8
+        if num_blocks > len(semantic_map):
+            semantic_map.extend(["Verse", "Chorus"] * (num_blocks - len(semantic_map)))
         
         # Находим определения секций
         sec_defs = {s["tag"].lower(): s for s in semantic_sections}
@@ -399,26 +382,20 @@ class StudioCore:
         # --- Конец логики мэппинга ---
 
         # FIX: Use the calculated Chorus BPM as the final tag BPM for consistency (semantic_sections[3] = Chorus)
-        chorus_section = semantic_sections[3] if len(semantic_sections) > 3 else semantic_sections[0]
-        final_bpm = chorus_section.get("bpm", 120) # (BPM припева)
-        final_key = chorus_section.get("key", "auto")
+        final_bpm = semantic_sections[3].get("bpm", 120) # (BPM припева)
+        final_key = semantic_sections[3].get("key", "auto")
         final_vocal_form = "solo_auto" # Будет перезаписан
 
-        # FIX: The original logic failed to correctly map and apply the section tags due to Monolith limitations.
-        # We iterate over the detected semantic map, ensuring a one-to-one mapping to blocks.
-        final_vocal_form = "solo_auto" # Set default outside loop
-        
-        for i, tag_name in enumerate(semantic_map):
-            block_text = text_blocks[i] if i < len(text_blocks) else ""
+        for i, block_text in enumerate(text_blocks):
             if not block_text.strip():
                 continue
 
             # 1. Берем семантику (Intro, Verse...)
-            tag_name_lower = tag_name.lower()
-            sem = sec_defs.get(tag_name_lower, sec_defs["verse"]) # Fallback на 'verse'
+            tag_name = semantic_map[i].lower()
+            sem = sec_defs.get(tag_name, sec_defs["verse"]) # Fallback на 'verse'
             
             # 2. Берем вокальный профиль (Male, Female...)
-            profile = section_profiles[i] if i < len(section_profiles) else {}
+            profile = section_profiles[i]
             gender_tag = profile.get("gender", "auto").upper() # MALE, FEMALE, MIXED, AUTO
             
             # 3. Собираем теги
@@ -435,7 +412,7 @@ class StudioCore:
             ui_tag = f"[{tag_name.upper()} - {gender_tag} - {sem['mood']}, {sem['energy']}, {sem['arrangement']}, BPM≈{sem['bpm']}]"
             
             # Обновляем финальный BPM/Key (берем из припева, если он есть)
-            if "chorus" in tag_name_lower:
+            if "chorus" in tag_name:
                 final_bpm = sem['bpm']
                 final_key = sem['key']
 
