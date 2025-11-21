@@ -114,15 +114,23 @@ class TruthLovePainEngine: # <-- v15: Оригинальное имя
 
     def export_emotion_vector(self, text: str) -> EmotionVector:
         """
-        Passive hook. Returns a neutral EmotionVector until dynamic mode is enabled.
+        Calculates dynamic Valence and Arousal based on TLP scores from the base class.
         """
+        profile = self.analyze(text)
+        truth = profile.get("truth", 0.0)
+        love = profile.get("love", 0.0)
+        pain = profile.get("pain", 0.0)
+        weight = profile.get("conscious_frequency", 0.5)
+        valence = love - pain
+        arousal = (love + pain + truth) / 3.0
+
         return EmotionVector(
-            truth=0.0,
-            love=0.0,
-            pain=0.0,
-            valence=0.0,
-            arousal=0.0,
-            weight=1.0,
+            truth=truth,
+            love=love,
+            pain=pain,
+            valence=valence,
+            arousal=arousal,
+            weight=weight,
         )
 
 
