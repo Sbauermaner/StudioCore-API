@@ -52,20 +52,14 @@ class SectionParser:
         return round(min(1.0, exclaim_weight + caps_weight), 3)
 
     def parse(self, text: str, *, sections: Sequence[str] | None = None) -> SectionParseResult:
-        # Reset text engine state to avoid stale section_metadata between calls
+        # Reset text engine state and perform structural analysis
         self._safe_reset_engine()
         resolved_sections = list(sections) if sections is not None else self._text_engine.auto_section_split(text)
         prefer_strict_boundary = False
-        metadata = []
-        for section in resolved_sections:
-            lines = section.splitlines()
-            meta_entry = {
-                "tag": None,
-                "lines": lines,
-                "line_count": len(lines),
-            }
-            metadata.append(meta_entry)
-        self._text_engine._section_metadata = [dict(item) for item in metadata]
+
+        # Ensure metadata is accessible (it should be populated by auto_section_split)
+        metadata = self._text_engine.section_metadata()
+
         annotations = self._annotation_engine.parse(text)
         lyrical_density = self._estimate_lyrical_density("\n".join(resolved_sections) or text)
         rde_emotion_hint = self._estimate_rde_emotion(text)
@@ -79,11 +73,16 @@ class SectionParser:
             }
             for entry in metadata
         ]
-        self._text_engine._section_metadata = [dict(item) for item in metadata]
-        if len(metadata) > len(resolved_sections):
+        # Force-update internal engine state (required for consistency with section_metadata calls)
+        self._text_engine._section_metadata = metadata
+
+        # Final safety check on metadata length to prevent downstream misalignment (Fix #1.2)
+        if len(metadata) < len(resolved_sections):
+            # Pad with empty dicts if annotation logic somehow lost entries
+            metadata = metadata + [{} for _ in range(len(resolved_sections) - len(metadata))]
+        elif len(metadata) > len(resolved_sections):
+            # Truncate if previous state somehow leaked extra entries
             metadata = metadata[: len(resolved_sections)]
-        elif len(metadata) < len(resolved_sections):
-            metadata = list(metadata) + [{} for _ in range(len(resolved_sections) - len(metadata))]
         return SectionParseResult(resolved_sections, metadata, annotations, prefer_strict_boundary)
 
     def apply_annotation_effects(

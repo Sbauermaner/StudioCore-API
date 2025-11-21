@@ -19,6 +19,7 @@ from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from .color_engine_adapter import EMOTION_COLOR_MAP, get_emotion_colors
 from .emotion import AutoEmotionalAnalyzer
+from .emotion import TruthLovePainEngine  # Import required engine for EmotionVector
 from .emotion_profile import EmotionVector
 from .instrument import (
     InstrumentLibrary,
@@ -202,12 +203,26 @@ class EmotionEngine:
 
     def __init__(self) -> None:
         self._analyzer = AutoEmotionalAnalyzer()
+        self._tlp_engine = TruthLovePainEngine()  # Initialize TLP for vector calculation
 
     def emotion_detection(self, text: str) -> Dict[str, float]:
         return self._analyzer.analyze(text)
 
     def export_emotion_vector(self, text: str) -> EmotionVector:
-        return self._analyzer.export_emotion_vector(text)
+        """Calculates Valence and Arousal based on TLP scores from the TLP engine (Fix #1: Neutral Vector)."""
+        profile = self._tlp_engine.analyze(text)
+        truth, love, pain = profile.get("truth", 0.0), profile.get("love", 0.0), profile.get("pain", 0.0)
+        weight = profile.get("conscious_frequency", 0.5)
+        valence = love - pain
+        arousal = (love + pain + truth) / 3.0
+        return EmotionVector(
+            truth=truth,
+            love=love,
+            pain=pain,
+            valence=valence,
+            arousal=arousal,
+            weight=weight,
+        )
 
     def emotion_intensity_curve(self, text: str) -> List[float]:
         sentences = _split_sentences(text)
