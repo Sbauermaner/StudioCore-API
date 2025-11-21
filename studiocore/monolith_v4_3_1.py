@@ -34,6 +34,7 @@ from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 from .tone import ToneSyncEngine
 from .adapter import build_suno_prompt
 from .vocals import VocalProfileRegistry
+from .integrity import IntegrityScanEngine as FullIntegrityScanEngine  # Импорт движка V6
 from .rhythm import LyricMeter
 # v11: 'PatchedStyleMatrix' - это наш 'StyleMatrix'
 from .style import PatchedStyleMatrix, STYLE_VERSION 
@@ -157,13 +158,24 @@ class PatchedRNSSafety:
         return arr or [2, 3, 4]
 
 class PatchedIntegrityScanEngine:
+    def __init__(self):
+        self._engine = FullIntegrityScanEngine()
+
     def analyze(self, text: str) -> Dict[str, Any]:
-        return {"status": "OK"} # Заглушка
+        """Заменяет заглушку на полноценный анализ целостности (V6 Logic)."""
+        return self._engine.analyze(text)
 
 class AdaptiveVocalAllocator:
+    def __init__(self):
+        self._vocal_registry = VocalProfileRegistry()
+
     def analyze(self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int, text: str) -> Dict[str, Any]:
-        # (Логика v2... без изменений)
-        return {"vocal_form": "auto", "gender": "auto", "vocal_count": 1}
+        """Заменяет заглушку на полноценный аллокатор вокала (V6 Logic)."""
+        # Используем V6 логику для определения формы на основе эмоций/TLP
+        vox, _, vocal_form = self._vocal_registry.get("default", "auto", text, [], [])
+        vocal_count = len([v for v in vox if v in ["solo", "duet", "trio", "quartet", "quintet", "choir"]])
+
+        return {"vocal_form": vocal_form, "gender": "auto", "vocal_count": vocal_count or 1}
 
 # ==========================================================
 # 🚀 StudioCore Monolith (v4.3.11)

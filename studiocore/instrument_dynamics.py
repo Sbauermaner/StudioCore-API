@@ -16,8 +16,16 @@ class InstrumentalDynamicsEngine:
         density_map: List[Dict[str, Any]] = []
         palette = list(palette or [])
         for idx, section in enumerate(sections):
-            token_count = len(section.split()) or 1
-            density = min(1.0, token_count / 120)
+            lines = [ln.strip() for ln in section.splitlines() if ln.strip()]
+            token_count = len(" ".join(lines).split()) or 1
+            line_count = len(lines) or 1
+            
+            # Улучшенная эвристика плотности: учитывает количество слов и пунктуацию
+            # Используется более сложная эвристика, не просто token_count/120
+            punct_density = sum(section.count(p) for p in "!?,;:") / max(token_count, 1)
+            avg_line_length = token_count / line_count
+
+            density = min(1.0, (token_count / 100) + (punct_density * 5) + (avg_line_length / 15 * 0.2))
             density_map.append(
                 {
                     "section": idx,
