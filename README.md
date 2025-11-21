@@ -1,3 +1,18 @@
+<!-- StudioCore LIVE DIAGNOSTICS DASHBOARD -->
+
+### 🟩 Live Status Dashboard
+
+| Function | Status |
+|---------|--------|
+| **Pre-Merge Guard** | ![Pre-Merge](https://github.com/Bauer-Betweens/StudioCore-API/actions/workflows/pre_merge_guard.yml/badge.svg) |
+| **Nightly Diagnostics Patrol** | ![Nightly](https://github.com/Bauer-Betweens/StudioCore-API/actions/workflows/nightly_diagnostics.yml/badge.svg) |
+| **Full Diagnostics** | ![FullDiag](https://github.com/Bauer-Betweens/StudioCore-API/actions/workflows/full-diagnostics.yml/badge.svg) |
+| **Pytest** | ![Tests](https://github.com/Bauer-Betweens/StudioCore-API/actions/workflows/pre_merge_guard.yml/badge.svg?event=pull_request) |
+| **Security / Syntax / Imports** | Анализируется автоматически |
+| **Log Cleaner** | Активен (авто-очистка старых логов) |
+
+---
+
 ---
 title: StudioCore v6.4
 emoji: 🎧
