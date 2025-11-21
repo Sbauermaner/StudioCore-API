@@ -469,6 +469,7 @@ class StudioCoreV6:
         # 1. Call the legacy core for full analysis.
         try:
             legacy_core = self._legacy_core_cls()
+            # Note: Pass only original_text to avoid double-translation/normalization
             legacy_result = legacy_core.analyze(
                 original_text or text,
                 preferred_gender=preferred_gender,
@@ -478,7 +479,9 @@ class StudioCoreV6:
         except Exception as exc:  # pragma: no cover - defensive guard
             legacy_result = {"error": str(exc)}
 
-        if isinstance(legacy_result, dict) and legacy_result.get("error"):
+        # Fix #2.1: Check for legacy error and set flag
+        legacy_error_detected = isinstance(legacy_result, dict) and legacy_result.get("error")
+        if legacy_error_detected:
             diagnostics["legacy_error"] = {"message": legacy_result.get("error")}
 
         # 2. Structural analysis
@@ -567,9 +570,7 @@ class StudioCoreV6:
             "average_intensity": round(sum(vocal_curve) / max(len(vocal_curve), 1), 3) if vocal_curve else 0.5,
         }
         vocal_payload = self._merge_semantic_hints(vocal_payload, semantic_hints.get("vocal", {}))
-        vocal_payload = self.override_engine.apply_to_vocals(
-            vocal_payload, override_manager
-        )
+        # Fix #2.2: Removed redundant override application (it will be applied once later in _apply_user_overrides_once)
         vocal_payload = self._apply_vocal_fusion(vocal_payload, override_manager.overrides)
         vocal_for_instrumentation = dict(vocal_payload)
         diagnostics["vocal"] = dict(vocal_payload)
@@ -588,8 +589,8 @@ class StudioCoreV6:
         # 7. Rhythm & BPM
         legacy_bpm = None
         if isinstance(legacy_result, dict):
-            legacy_bpm = legacy_result.get("bpm") or legacy_result.get("style", {}).get("bpm")
-            semantic_layers = legacy_result.get("semantic_layers", {}) if isinstance(legacy_result.get("semantic_layers"), dict) else {}
+            legacy_bpm = legacy_result.get("bpm") or legacy_result.get("style", {}).get("bpm") if not legacy_error_detected else None
+            semantic_layers = legacy_result.get("semantic_layers", {}) if isinstance(legacy_result.get("semantic_layers"), dict) and not legacy_error_detected else {}
         else:
             semantic_layers = {}
 
@@ -666,7 +667,7 @@ class StudioCoreV6:
 
         legacy_key = None
         if isinstance(legacy_result, dict):
-            legacy_key = legacy_result.get("style", {}).get("key") or legacy_result.get("key")
+            legacy_key = legacy_result.get("style", {}).get("key") or legacy_result.get("key") if not legacy_error_detected else None
         if legacy_key and not getattr(override_manager.overrides, "key", None):
             if "minor" in str(legacy_key).lower():
                 tonality_payload["mode"] = "minor"
@@ -687,6 +688,13 @@ class StudioCoreV6:
             result["_tone_dynamic"] = local_tone_mod
         except Exception:
             result["_tone_dynamic"] = []
+
+        # Fix Key-Emotion Link: Apply the final modulated key/mode
+        if local_tone_mod and (final_mod := local_tone_mod[-1]):
+            if final_mod.get("key") and tonality_payload.get("key") in (None, "auto"):
+                tonality_payload["key"] = final_mod["key"]
+            if final_mod.get("mode") and tonality_payload.get("mode") in (None, "auto"):
+                tonality_payload["mode"] = final_mod["mode"]
 
         freq_profile = self.frequency_engine.resonance_profile(tlp_profile)
         freq_profile["recommended_octaves"] = self.rns_safety.clamp_octaves(
@@ -1111,10 +1119,14 @@ class StudioCoreV6:
         style_prompt = self.style_engine.final_style_prompt_build(
             genre=style_genre,
             mood=style_mood,
+            # Fix: Ensure tone/key are derived from tonality_payload after alignment/modulation
+            tone=self.style_engine.tone_style({
+                "mode": tonality_payload.get("mode"),
+                "section_keys": tonality_payload.get("section_keys", []),
+            }),
             instrumentation=style_instrumentation,
             vocal=style_vocal,
             visual=style_visual,
-            tone=style_tone,
         )
         emotion = _dominant_emotion(smoothed_vectors)
         instrumentation_palette = emotion_to_instruments(emotion)

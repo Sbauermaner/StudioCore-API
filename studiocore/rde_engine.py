@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Sequence
 
 from studiocore.emotion_profile import EmotionVector, EmotionAggregator
+from studiocore.tlp_engine import TruthLovePainEngine  # Import required engine
 
 
 @dataclass(frozen=True)
@@ -58,14 +59,7 @@ class RhythmDynamicsEmotionEngine:
         """
         Passive hook. Returns a neutral EmotionVector until dynamic mode is enabled.
         """
-        return EmotionVector(
-            truth=0.0,
-            love=0.0,
-            pain=0.0,
-            valence=0.0,
-            arousal=0.0,
-            weight=1.0,
-        )
+        return TruthLovePainEngine().export_emotion_vector(text)  # Delegate to TLP Engine
 
 
 __all__ = ["RDESnapshot", "RhythmDynamicsEmotionEngine"]

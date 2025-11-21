@@ -26,6 +26,7 @@ KEY_COLOR_PALETTE: Dict[str, str] = {
 
 
 EMOTION_COLOR_MAP: Dict[str, List[str]] = {
+    # TLP axes
     "truth": [KEY_COLOR_PALETTE["indigo"], "#6C1BB1", "#5B3FA8"],
     "love": [KEY_COLOR_PALETTE["red"], "#FF69B4", KEY_COLOR_PALETTE["magenta"]],
     "pain": [KEY_COLOR_PALETTE["crimson"], "#2F1B25", "#0A1F44"],
@@ -36,6 +37,7 @@ EMOTION_COLOR_MAP: Dict[str, List[str]] = {
     "peace": [KEY_COLOR_PALETTE["turquoise"], "#E0F7FA", KEY_COLOR_PALETTE["white"]],
     "epic": [KEY_COLOR_PALETTE["violet"], "#4B0082", KEY_COLOR_PALETTE["magenta"]],
     "awe": [KEY_COLOR_PALETTE["turquoise"], "#7DF9FF", "#C0C0C0"],
+    # Legacy heuristic emotions
     "neutral": [KEY_COLOR_PALETTE["white"], "#B0BEC5", "#ECEFF1"],
     "hope": ["#9ACD32", KEY_COLOR_PALETTE["turquoise"], "#C5E1A5"],
     "calm": [KEY_COLOR_PALETTE["turquoise"], "#A7FFEB", "#E0F2F1"],
@@ -43,19 +45,20 @@ EMOTION_COLOR_MAP: Dict[str, List[str]] = {
     "irony": ["#800080", KEY_COLOR_PALETTE["magenta"], "#C71585"],
     "conflict": [KEY_COLOR_PALETTE["orange-red"], KEY_COLOR_PALETTE["amber"], KEY_COLOR_PALETTE["crimson"]],
     "joy_bright": ["#FFD700", KEY_COLOR_PALETTE["yellow"], "#FFF59D"],
+    # v6.4+ / EmotionEngineV64 additions (Fix #3.2: Missing Color Definitions)
     "love_soft": ["#FFC0CB", "#FFB6C1", "#FFE4E1"],
     "love_deep": ["#C2185B", "#880E4F", KEY_COLOR_PALETTE["crimson"]],
     "disappointment": ["#708090", "#A9A9A9", "#6C6C6C"],
     "melancholy": ["#4B6C9C", "#2F4F4F", "#1F2F3D"],
     "rage": [KEY_COLOR_PALETTE["crimson"], "#B22222", "#8B0000"],
     "rage_extreme": ["#8B0000", "#4A0000", "#2A0000"],
-    "aggression": ["#C62828", "#B71C1C", KEY_COLOR_PALETTE["orange-red"]],
+    "aggression": ["#8B0000", KEY_COLOR_PALETTE["crimson"], KEY_COLOR_PALETTE["orange-red"]],
     "anxiety": [KEY_COLOR_PALETTE["indigo"], "#6A5ACD", "#2F4F4F"],
     "wonder": ["#7DF9FF", KEY_COLOR_PALETTE["turquoise"], "#E0FFFF"],
-    "gothic_dark": ["#1B1B2F", "#000000", "#2C1A2E"],
+    "gothic_dark": ["#2C1A2E", "#1B1B2F", "#000000"],
     "dark_poetic": ["#2C1A2E", "#3F2A44", "#1B1B2F"],
     "dark_romantic": ["#4A192C", "#2C0F1A", "#6A1B3F"],
-    "hiphop_conflict": [KEY_COLOR_PALETTE["orange-red"], KEY_COLOR_PALETTE["green"], KEY_COLOR_PALETTE["amber"]],
+    "hiphop_conflict": ["#6C7E42", KEY_COLOR_PALETTE["orange-red"], KEY_COLOR_PALETTE["amber"]],
     "street_power": ["#8B4513", "#FF8C00", KEY_COLOR_PALETTE["amber"]],
     "dark": ["#111111", "#2F2F2F", "#0B0B0B"],
     "melancholic": ["#4B5D67", "#243447", "#1A2633"],

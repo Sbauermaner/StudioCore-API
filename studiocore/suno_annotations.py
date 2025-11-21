@@ -259,7 +259,14 @@ class SunoAnnotationEngine:
         except Exception:
             bpm_label = bpm_label
 
-        return f"[{section_label} - AUTO - {mood}, {energy}, {arrangement}, BPM≈{bpm_label}] (Genre={genre}, Key={key})"
+        # Format for Suno: [Section Tag] (BPM:xxx) (Key:x) (Genre:x)
+        # The outer function protect_annotations_from_lyrics will wrap this in ().
+        # We ensure BPM and Key are explicitly separated for clarity.
+        return (
+            f"[{section_label}] "
+            f"(BPM:{bpm_label}) (Key:{key}) "
+            f"(Genre:{genre}) (Mood:{mood}, Energy:{energy}, Arrangement:{arrangement})"
+        )
 
     def protect_annotations_from_lyrics(self, annotations: Sequence[str]) -> List[str]:
         return [f"({item})" if not item.startswith("(") else item for item in annotations]

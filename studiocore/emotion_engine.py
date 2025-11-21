@@ -27,44 +27,41 @@ import math
 
 
 class EmotionEngineV64:
-    """
-    1) Анализирует текст → выдает emotion_vector (24D)
-    2) Определяет dominant emotion
-    3) Вычисляет TLP: Truth/Love/Pain
-    4) Корректирует весовые коэффициенты динамически по тексту
-    """
+    """Emotion inference engine (v6.4) with dynamic weight learning."""
 
-    # === 24 базовых эмоции (универсальный спектр) ===
-    EMOTIONS = [
-        "joy", "joy_bright",
-        "love", "love_soft", "love_deep",
-        "sadness", "disappointment", "melancholy",
-        "rage", "rage_extreme", "aggression",
-        "fear", "anxiety",
-        "awe", "wonder",
-        "hope",
-        "gothic_dark", "dark_poetic", "dark_romantic",
-        "hiphop_conflict", "street_power",
-        "peace", "neutral",
-    ]
+    def __init__(self) -> None:
+        """Initializes instance-level state to ensure statelessness per-request (Fix #1.1)."""
+        # === 24 базовых эмоции (универсальный спектр) ===
+        self.EMOTIONS = [
+            "joy", "joy_bright",
+            "love", "love_soft", "love_deep",
+            "sadness", "disappointment", "melancholy",
+            "rage", "rage_extreme", "aggression",
+            "fear", "anxiety",
+            "awe", "wonder",
+            "hope",
+            "gothic_dark", "dark_poetic", "dark_romantic",
+            "hiphop_conflict", "street_power",
+            "peace", "neutral",
+        ]
 
-    # базовые ключевые слова
-    LEXICON = {
-        "rage": ["убей", "бей", "морг", "кровь", "разорвать", "сломать", "враг"],
-        "rage_extreme": ["уничтожь", "смерть", "ненавижу", "истреби"],
-        "sadness": ["печаль", "слёзы", "одиноко", "грусть"],
-        "disappointment": ["разочарование", "устал", "пустота"],
-        "love": ["люблю", "поцелуй", "ласка"],
-        "love_soft": ["нежный", "ласковый", "тёплый"],
-        "love_deep": ["страсть", "союз", "вечность"],
-        "joy": ["свет", "улыбка", "радость"],
-        "gothic_dark": ["луна", "мрак", "готика", "тьма", "пан", "кровь"],
-        "hiphop_conflict": ["улица", "правда", "деньги", "силой"],
-        "street_power": ["бетон", "двор", "бит", "флоу"],
-    }
+        # базовые ключевые слова (instance scope)
+        self.LEXICON = {
+            "rage": ["убей", "бей", "морг", "кровь", "разорвать", "сломать", "враг"],
+            "rage_extreme": ["уничтожь", "смерть", "ненавижу", "истреби"],
+            "sadness": ["печаль", "слёзы", "одиноко", "грусть"],
+            "disappointment": ["разочарование", "устал", "пустота"],
+            "love": ["люблю", "поцелуй", "ласка"],
+            "love_soft": ["нежный", "ласковый", "тёплый"],
+            "love_deep": ["страсть", "союз", "вечность"],
+            "joy": ["свет", "улыбка", "радость"],
+            "gothic_dark": ["луна", "мрак", "готика", "тьма", "пан", "кровь"],
+            "hiphop_conflict": ["улица", "правда", "деньги", "силой"],
+            "street_power": ["бетон", "двор", "бит", "флоу"],
+        }
 
-    # индивидуальные веса (динамически обучаются)
-    WEIGHTS = {emotion: 1.0 for emotion in EMOTIONS}
+        # индивидуальные веса (динамически обучаются, instance scope)
+        self.WEIGHTS = {emotion: 1.0 for emotion in self.EMOTIONS}
 
     def analyze_emotion(self, text: str) -> Dict[str, float]:
         """
@@ -78,7 +75,7 @@ class EmotionEngineV64:
         for emotion, words in self.LEXICON.items():
             for w in words:
                 if w in lower_text:
-                    vector[emotion] += 1.0 * self.WEIGHTS.get(emotion, 1.0)
+                    vector[emotion] += 1.0 * self.WEIGHTS.get(emotion, 1.0)  # Use instance WEIGHTS
 
         # нормализация
         total = sum(vector.values()) or 1
@@ -115,7 +112,7 @@ class EmotionEngineV64:
         """
         for emotion, score in vector.items():
             # логарифмическое усиление (без взрывов)
-            self.WEIGHTS[emotion] = round(self.WEIGHTS.get(emotion, 1.0) + math.log1p(score), 5)
+            self.WEIGHTS[emotion] = round(self.WEIGHTS.get(emotion, 1.0) + math.log1p(score), 5)  # Use instance WEIGHTS
 
     def process(self, text: str) -> Dict[str, object]:
         """
