@@ -258,10 +258,11 @@ def translate_text_for_analysis(text: str, language: str) -> Tuple[str, bool]:
 
     # 3. Концептуальный Fallback: Имитация успешного перевода (для выполнения контракта)
     log.info(
-        "Simulating translation from '%s' to 'en' (multilingual enablement) to fulfill core analysis contract.",
+        "Translation not available for '%s'. Proceeding with original text.",
         language,
     )
-    return text, True  # Возвращаем исходный текст, но с флагом True
+    # FIX: Was returning (text, True) which incorrectly signaled a successful translation.
+    return text, False
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)

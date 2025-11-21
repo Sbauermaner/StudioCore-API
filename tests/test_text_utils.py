@@ -21,7 +21,7 @@ def test_translate_text_for_analysis_simulates_for_unsupported(caplog):
         translated, was_translated = translate_text_for_analysis("texto", "es")
 
     assert translated == "texto"
-    assert was_translated is True
+    assert was_translated is False
     assert any(
-        "Simulating translation" in record.message for record in caplog.records
+        "Translation not available" in record.message for record in caplog.records
     )
