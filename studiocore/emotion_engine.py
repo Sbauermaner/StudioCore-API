@@ -115,7 +115,7 @@ class EmotionEngineV64:
         }
 
         # индивидуальные веса (динамически обучаются, instance scope)
-        self.WEIGHTS = {emotion: 1.0 for emotion in self.EMOTIONS}
+        # FIX: Removed self.WEIGHTS initialization to enforce statelessness.
 
     def analyze_emotion(self, text: str) -> Dict[str, float]:
         """
@@ -160,14 +160,19 @@ class EmotionEngineV64:
                           vector.get("disappointment", 0), 3),
         }
 
-    def update_weights(self, vector: Dict[str, float]) -> None:
+    def update_weights(self, vector: Dict[str, float]) -> Dict[str, float]:
         """
         Самообучение на основе входного текста.
         Усиливаем эмоции, которые часто встречаются.
+
+        Возвращает новый словарь весов без сохранения состояния экземпляра.
         """
+        weights = {emotion: 1.0 for emotion in self.EMOTIONS}
         for emotion, score in vector.items():
             # логарифмическое усиление (без взрывов)
-            self.WEIGHTS[emotion] = round(self.WEIGHTS.get(emotion, 1.0) + math.log1p(score), 5)  # Use instance WEIGHTS
+            weights[emotion] = round(weights.get(emotion, 1.0) + math.log1p(score), 5)
+
+        return weights
 
     def process(self, text: str) -> Dict[str, object]:
         """
