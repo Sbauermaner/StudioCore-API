@@ -129,7 +129,8 @@ class EmotionEngineV64:
         for emotion, words in self.LEXICON.items():
             for w in words:
                 if w in lower_text:
-                    vector[emotion] += 1.0 * self.WEIGHTS.get(emotion, 1.0)  # Use instance WEIGHTS
+                    # FIX: Enforcing statelessness by removing reliance on self.WEIGHTS
+                    vector[emotion] += 1.0
 
         # нормализация
         total = sum(vector.values()) or 1
