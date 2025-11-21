@@ -313,6 +313,12 @@ class StudioCoreV6:
             sections = self.text_engine.auto_section_split(text)
         self._last_sections = sections
         self._last_text = text
+        diagnostics: Dict[str, Any] = {}
+        diagnostics.setdefault("bpm", {})
+        diagnostics.setdefault("tonality", {})
+        diagnostics.setdefault("vocal", {})
+        diagnostics.setdefault("instrumentation", {})
+        diagnostics.setdefault("emotion_matrix", {})
         emotion_profile = self.emotion_engine.emotion_detection(text)
         emotion_curve = self.emotion_engine.emotion_intensity_curve(text)
         dynamic_emotion_profile = self.dynamic_emotion_engine.emotion_profile(text)
@@ -450,6 +456,7 @@ class StudioCoreV6:
         vocal_for_instrumentation = self.override_engine.apply_to_vocals(
             vocal_payload, override_manager
         )
+        diagnostics["vocal"] = dict(vocal_payload)
 
         # 6. Breathing cues
         breathing_profile = {
@@ -510,6 +517,8 @@ class StudioCoreV6:
             bpm_estimate = annotation_effects.get("bpm", bpm_payload.get("estimate"))
             bpm_payload["estimate"] = bpm_estimate
             bpm_payload["section_annotations"] = annotation_effects.get("annotations", [])
+
+        diagnostics["bpm"] = dict(bpm_payload)
 
         # 8. Meaning velocity
         meaning_curve = self.meaning_engine.meaning_curve_generation(sections)
@@ -597,6 +606,7 @@ class StudioCoreV6:
         instrumentation_payload = self._merge_semantic_hints(
             instrumentation_payload, semantic_hints.get("instrumentation", {})
         )
+        diagnostics["instrumentation"] = dict(instrumentation_payload)
 
         # 11. Command interpretation
         command_payload = {
@@ -1065,6 +1075,8 @@ class StudioCoreV6:
 
         result.setdefault("emotions", {})["profile_v1"] = emotion_profile_v1
 
+        diagnostics["tonality"] = dict(tonality_payload)
+
         rde_snapshot = self.rde_engine.compose(
             bpm_payload=bpm_payload,
             breathing_profile={**breathing_profile, "sync_score": breath_sync},
@@ -1118,6 +1130,8 @@ class StudioCoreV6:
             }
         )
         phrase_emotions = section_intel_payload.get("phrase_packets", [])
+        tonality_hint = result.get("tonality") or result.get("tone") or {}
+        key_hint = tonality_hint.get("key") if isinstance(tonality_hint, dict) else None
         matrix = self.emotion_matrix.build_matrix(
             phrase_emotions=phrase_emotions,
             section_emotions=section_emotions,
@@ -1126,37 +1140,72 @@ class StudioCoreV6:
             dynamic_bias=dynamic_bias,
             genre_hint=result["style"].get("genre") if "style" in result else None,
             bpm_hint=result.get("bpm", {}).get("estimate"),
-            key_hint=result.get("tone", {}).get("key"),
+            key_hint=key_hint,
             suno_annotation=result.get("suno_annotation", {}),
         )
+        emotion_matrix = matrix if isinstance(matrix, dict) else {}
+        diagnostics["emotion_matrix"] = emotion_matrix
         # === Inject emotion_matrix_v1 hints (fallback) ===
-        em_bpm = matrix.get("bpm", {}) if isinstance(matrix, dict) else {}
-        em_key = matrix.get("key", {}) if isinstance(matrix, dict) else {}
-        em_voc = matrix.get("vocals", {}) if isinstance(matrix, dict) else {}
+        em_bpm = emotion_matrix.get("bpm", {}) if isinstance(emotion_matrix, dict) else {}
+        em_key = emotion_matrix.get("key", {}) if isinstance(emotion_matrix, dict) else {}
+        em_voc = emotion_matrix.get("vocals", {}) if isinstance(emotion_matrix, dict) else {}
 
-        # If legacy BPM is missing, use emotion_matrix_v1 recommended BPM
-        if not result.get("bpm") or not result["bpm"].get("estimate"):
-            result["bpm"] = {
-                "estimate": em_bpm.get("recommended"),
-                "source": em_bpm.get("source", "emotion_matrix_v1"),
-            }
+        bpm_diag = diagnostics.get("bpm", {}) if isinstance(diagnostics.get("bpm"), dict) else {}
+        if bpm_diag.get("estimate") is None and em_bpm.get("recommended") is not None:
+            bpm_diag = {**bpm_diag, "estimate": em_bpm.get("recommended")}
+            if not result.get("bpm") or result.get("bpm", {}).get("estimate") is None:
+                result["bpm"] = {
+                    **(result.get("bpm") or {}),
+                    "estimate": em_bpm.get("recommended"),
+                    "source": em_bpm.get("source", "emotion_matrix_v1"),
+                }
+        diagnostics["bpm"] = bpm_diag
 
-        # If tonality missing, use emotion_matrix_v1 key_hint
-        if not result.get("tone") or not result["tone"].get("key"):
-            result["tone"] = {
-                "key": em_key.get("recommended"),
-                "mode": em_key.get("mode"),
-                "source": em_key.get("source", "emotion_matrix_v1"),
-            }
+        tonality_diag = diagnostics.get("tonality", {}) if isinstance(diagnostics.get("tonality"), dict) else {}
+        key_mode = em_key.get("mode")
+        if tonality_diag.get("key") in (None, "auto") and key_mode:
+            tonality_diag = {**tonality_diag, "key": key_mode}
+            if isinstance(result.get("tonality"), dict):
+                result["tonality"] = {**result.get("tonality", {}), **tonality_diag}
+            else:
+                result["tonality"] = dict(tonality_diag)
+            if not result.get("tone"):
+                result["tone"] = dict(tonality_diag)
+        diagnostics["tonality"] = tonality_diag
 
-        # If vocal diagnostics missing, use matrix vocals
-        if not result.get("vocal"):
-            result["vocal"] = {
-                "gender": em_voc.get("gender"),
-                "notes": em_voc.get("notes"),
-                "intensity_curve": em_voc.get("intensity_curve"),
-                "source": "emotion_matrix_v1",
+        vocal_diag = diagnostics.get("vocal", {}) if isinstance(diagnostics.get("vocal"), dict) else {}
+        notes = em_voc.get("notes")
+        if not vocal_diag.get("style") and notes:
+            vocal_diag = {
+                **vocal_diag,
+                "style": notes if isinstance(notes, str) else ", ".join(notes),
             }
+            if not result.get("vocal"):
+                result["vocal"] = {
+                    "gender": em_voc.get("gender"),
+                    "notes": em_voc.get("notes"),
+                    "intensity_curve": em_voc.get("intensity_curve"),
+                    "source": "emotion_matrix_v1",
+                    "style": vocal_diag.get("style"),
+                }
+        diagnostics["vocal"] = vocal_diag
+
+        instr_diag = diagnostics.get("instrumentation", {}) if isinstance(diagnostics.get("instrumentation"), dict) else {}
+        matrix_instruments = emotion_matrix.get("instruments") or {}
+        core = matrix_instruments.get("core") or []
+        accent = matrix_instruments.get("accent") or []
+        texture = matrix_instruments.get("texture") or []
+        palette: list[Any] = []
+        if core:
+            palette.extend(core)
+        if accent:
+            palette.extend(accent)
+        if texture:
+            palette.extend(texture)
+        if palette and not instr_diag.get("palette"):
+            instr_diag = {**instr_diag, "palette": palette}
+        diagnostics["instrumentation"] = instr_diag
+
         result["emotion_matrix"] = matrix
         result["suno_annotation"] = build_suno_annotations(
             text=text,
@@ -1229,18 +1278,18 @@ class StudioCoreV6:
         )
         result["instrument_dynamics"] = dynamics_block
 
+        instrumentation_diag = diagnostics.get("instrumentation", {}) if isinstance(diagnostics.get("instrumentation"), dict) else {}
+        palette = instrumentation_block.get("palette")
+        fractures = dynamics_block.get("fractures")
+        if palette and not instrumentation_diag.get("palette"):
+            instrumentation_diag = {**instrumentation_diag, "palette": palette}
+        if fractures is not None:
+            instrumentation_diag = {**instrumentation_diag, "fractures": fractures}
+        diagnostics["instrumentation"] = instrumentation_diag
+
         suno_annotations = self.suno_engine.build_suno_safe_annotations(
             sections,
-            {
-                "bpm": result.get("bpm", {}),
-                "instrumentation": {
-                    "palette": instrumentation_block.get("palette"),
-                    "fractures": dynamics_block.get("fractures"),
-                },
-                "vocal": result.get("vocal", {}),
-                "commands": command_payload,
-                "emotion_matrix": result.get("emotion_matrix"),
-            },
+            {**diagnostics, "commands": command_payload},
         ) or []
         result["suno_annotations"] = suno_annotations
         if language_info:
@@ -1258,13 +1307,19 @@ class StudioCoreV6:
 
         # === SAFE DIAGNOSTICS FALLBACK ===
         emotion_matrix = result.get("emotion_matrix", {})
-        diagnostics = {
-            "bpm": result.get("bpm", {}),
-            "tonality": result.get("tone", {}),
-            "vocal": result.get("vocal", {}),
-            "sections": result.get("sections", []),
-            "emotion_matrix_source": emotion_matrix.get("version", None),
-        }
+        diagnostics.setdefault("bpm", result.get("bpm", {}))
+        tonality_block = diagnostics.get("tonality", {}) if isinstance(diagnostics.get("tonality"), dict) else {}
+        if not tonality_block and isinstance(result.get("tonality"), dict):
+            tonality_block = dict(result.get("tonality", {}))
+        tone_block = result.get("tone") if isinstance(result.get("tone"), dict) else {}
+        if tone_block.get("key_hint") and not tonality_block.get("key"):
+            tonality_block = {**tonality_block, "key": tone_block.get("key_hint")}
+        diagnostics["tonality"] = tonality_block
+        diagnostics.setdefault("vocal", result.get("vocal", {}))
+        diagnostics.setdefault("instrumentation", result.get("instrumentation", {}))
+        diagnostics.setdefault("emotion_matrix", emotion_matrix or {})
+        diagnostics.setdefault("sections", result.get("sections", []))
+        diagnostics.setdefault("emotion_matrix_source", emotion_matrix.get("version", None))
 
         result["diagnostics"] = diagnostics
 

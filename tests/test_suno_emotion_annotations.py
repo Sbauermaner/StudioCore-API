@@ -41,6 +41,29 @@ def test_prepare_diagnostics_fills_from_emotion_matrix():
     assert prepared["tonality"]["key"] == "minor"
     assert prepared["vocal"]["style"] == "airy, soft"
 
+
+def test_esenin_diagnostics_not_none():
+    from studiocore.core_v6 import StudioCoreV6
+
+    text = (
+        "Вы помните,\n"
+        "Вы всё, конечно, помните,\n"
+        "Как я стоял,\n"
+        "Приблизившись к стене,\n"
+        "Взволнованно ходили вы по комнате\n"
+        "И что-то резкое\n"
+        "В лицо бросали мне."
+    )
+    core = StudioCoreV6()
+    result = core.analyze(text, preferred_gender="auto")
+    diagnostics = result.get("diagnostics", {})
+
+    assert isinstance(diagnostics, dict)
+    assert diagnostics.get("bpm") is not None
+    assert diagnostics.get("tonality") is not None
+    assert diagnostics.get("vocal") is not None
+    assert diagnostics.get("emotion_matrix") is not None
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
