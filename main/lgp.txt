@@ -1,0 +1,18 @@
+=== POST-PATCH CHECK ($(date -u '+%Y-%m-%d %H:%M') UTC) ===
+- StudioCoreV6 import/instantiation: OK
+- Pytest: 48 passed in 0.36s (tests)
+- TLP export_emotion_vector samples:
+  * A: ERROR TypeError (EmotionVector.__init__() got an unexpected keyword argument 'extra')
+  * B: ERROR TypeError (EmotionVector.__init__() got an unexpected keyword argument 'extra')
+  * C: ERROR TypeError (EmotionVector.__init__() got an unexpected keyword argument 'extra')
+- analyze(): OK (dict with keys: engine, legacy, structure, emotion, color, vocal, breathing, bpm, meaning, tonality)
+- WARNINGS: TLP export_emotion_vector currently raises TypeError for all samples; valence/arousal/weight could not be verified.
+=== POST-PATCH CHECK (2025-11-21 15:03 UTC) ===
+- StudioCoreV6 import/instantiation: OK
+- Pytest: 48 passed in 0.36s (tests)
+- TLP export_emotion_vector samples:
+  * A: ERROR TypeError (EmotionVector.__init__() got an unexpected keyword argument 'extra')
+  * B: ERROR TypeError (EmotionVector.__init__() got an unexpected keyword argument 'extra')
+  * C: ERROR TypeError (EmotionVector.__init__() got an unexpected keyword argument 'extra')
+- analyze(): OK (dict with keys: engine, legacy, structure, emotion, color, vocal, breathing, bpm, meaning, tonality)
+- WARNINGS: TLP export_emotion_vector currently raises TypeError for all samples; valence/arousal/weight could not be verified.
