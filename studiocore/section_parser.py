@@ -63,7 +63,9 @@ class SectionParser:
         annotations = self._annotation_engine.parse(text)
         lyrical_density = self._estimate_lyrical_density("\n".join(resolved_sections) or text)
         rde_emotion_hint = self._estimate_rde_emotion(text)
-        prefer_strict_boundary = lyrical_density > 0.85 or rde_emotion_hint > 0.6
+        # RELAXATION: Only force strict boundary if there is extreme lyrical tension (e.g., all caps shout)
+        # Default mode prioritizes repetition recognition, essential for Chorus detection.
+        prefer_strict_boundary = rde_emotion_hint > 0.85
         metadata = [
             {
                 **entry,
