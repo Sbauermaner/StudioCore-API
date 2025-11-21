@@ -27,15 +27,15 @@ class TruthLovePainEngine(_TruthLovePainEngine):
 
     def export_emotion_vector(self, text: str) -> EmotionVector:
         profile = self.analyze(text)
+
         truth = profile.get("truth", 0.0)
         love = profile.get("love", 0.0)
         pain = profile.get("pain", 0.0)
+        cfreq = profile.get("conscious_frequency", 0.5)
 
-        # Compute dynamic emotional parameters
-        valence = love - pain                       # positivity/negativity
-        arousal = (truth + love + pain) / 3.0       # emotional intensity
-
-        weight = profile.get("conscious_frequency", 0.5)
+        # === Dynamic Valence / Arousal computation ===
+        valence = love - pain
+        arousal = (truth + love + pain) / 3.0
 
         return EmotionVector(
             truth=truth,
@@ -43,7 +43,8 @@ class TruthLovePainEngine(_TruthLovePainEngine):
             pain=pain,
             valence=valence,
             arousal=arousal,
-            weight=weight,
+            weight=cfreq,
+            extra={},
         )
 
 
