@@ -251,31 +251,47 @@ class SunoAnnotationEngine:
         emotion_matrix = prepared.get("emotion_matrix") if isinstance(prepared.get("emotion_matrix"), dict) else None
 
         if emotion_matrix:
+            # --- BPM FIX ---
             bpm_block = prepared.get("bpm") if isinstance(prepared.get("bpm"), dict) else {}
-            if bpm_block.get("estimate") is None and emotion_matrix.get("bpm"):
-                bpm_block = {**bpm_block, "estimate": emotion_matrix["bpm"].get("recommended")}
+            recommended_bpm = (emotion_matrix.get("bpm") or {}).get("recommended")
+            if bpm_block.get("estimate") is None and recommended_bpm:
+                bpm_block = {**bpm_block, "estimate": recommended_bpm}
             prepared["bpm"] = bpm_block
 
+            # --- KEY FIX ---
             tonality_block = prepared.get("tonality") if isinstance(prepared.get("tonality"), dict) else {}
-            if tonality_block.get("key") is None and emotion_matrix.get("key"):
-                tonality_block = {**tonality_block, "key": emotion_matrix["key"].get("mode")}
+            key_mode = (emotion_matrix.get("key") or {}).get("mode")
+            if (tonality_block.get("key") in (None, "auto")) and key_mode:
+                tonality_block = {**tonality_block, "key": key_mode}
             prepared["tonality"] = tonality_block
 
+            # --- VOCAL FIX (supports dict or list) ---
             vocal_block = prepared.get("vocal") if isinstance(prepared.get("vocal"), dict) else {}
-            if not vocal_block.get("style") and emotion_matrix.get("vocals"):
-                notes = emotion_matrix["vocals"].get("notes")
-                if notes:
-                    vocal_block = {**vocal_block, "style": notes}
+            matrix_vocals = emotion_matrix.get("vocals") or {}
+            notes = matrix_vocals.get("notes")
+            if not vocal_block.get("style") and notes:
+                vocal_block = {
+                    **vocal_block,
+                    "style": notes if isinstance(notes, str) else ", ".join(notes)
+                }
             prepared["vocal"] = vocal_block
 
+            # --- INSTRUMENTATION FIX (core + accent + texture) ---
             inst_block = prepared.get("instrumentation") if isinstance(prepared.get("instrumentation"), dict) else {}
-            palette = inst_block.get("palette")
-            if not palette and emotion_matrix.get("instruments"):
-                core = emotion_matrix["instruments"].get("core") or []
-                accent = emotion_matrix["instruments"].get("accent") or []
-                palette = list(core) + list(accent)
-                if palette:
-                    inst_block = {**inst_block, "palette": palette}
+            matrix_instruments = emotion_matrix.get("instruments") or {}
+
+            core = matrix_instruments.get("core") or []
+            accent = matrix_instruments.get("accent") or []
+            texture = matrix_instruments.get("texture") or []
+
+            palette = []
+            if core: palette.extend(core)
+            if accent: palette.extend(accent)
+            if texture: palette.extend(texture)
+
+            if palette and not inst_block.get("palette"):
+                inst_block = {**inst_block, "palette": palette}
+
             prepared["instrumentation"] = inst_block
 
         return prepared
