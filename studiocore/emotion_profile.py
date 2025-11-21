@@ -12,8 +12,8 @@ Emotion Profile v1 — единый формат эмоций для StudioCore.
 """
 
 from __future__ import annotations
-from dataclasses import asdict, dataclass
-from typing import Dict, List, Sequence
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Sequence
 
 
 @dataclass
@@ -24,6 +24,7 @@ class EmotionVector:
     valence: float  # V ∈ [-1, 1]
     arousal: float  # A ∈ [0, 1]
     weight: float = 1.0  # вес строки в агрегации
+    extra: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
     def average(vectors: Sequence["EmotionVector"]) -> "EmotionVector":
@@ -37,7 +38,7 @@ class EmotionVector:
         v_mean = sum(v.valence * v.weight for v in vectors) / total_weight
         a = sum(v.arousal * v.weight for v in vectors) / total_weight
         weight = sum(v.weight for v in vectors) / len(vectors)
-        return EmotionVector(t, l, p, v_mean, a, weight).clipped()
+        return EmotionVector(t, l, p, v_mean, a, weight, extra={}).clipped()
 
     def clipped(self) -> "EmotionVector":
         def clip(x: float, lo: float, hi: float) -> float:
@@ -50,6 +51,7 @@ class EmotionVector:
             valence=clip(self.valence, -1.0, 1.0),
             arousal=clip(self.arousal, 0.0, 1.0),
             weight=max(self.weight, 0.0),
+            extra=dict(self.extra),
         )
 
     def to_dict(self) -> Dict[str, float]:
@@ -70,7 +72,7 @@ class EmotionAggregator:
         v_mean = sum(v.valence * v.weight for v in vectors) / total_weight
         a = sum(v.arousal * v.weight for v in vectors) / total_weight
 
-        return EmotionVector(t, l, p, v_mean, a, total_weight).clipped()
+        return EmotionVector(t, l, p, v_mean, a, total_weight, extra={}).clipped()
 
     @staticmethod
     def spikes(

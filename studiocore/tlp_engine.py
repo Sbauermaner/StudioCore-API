@@ -49,6 +49,7 @@ class TruthLovePainEngine(_TruthLovePainEngine):
             valence=valence,
             arousal=arousal,
             weight=weight,
+            extra={},
         )
 
 
