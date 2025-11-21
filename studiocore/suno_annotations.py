@@ -253,6 +253,13 @@ class SunoAnnotationEngine:
 
     def _prepare_diagnostics(self, diagnostics: Dict[str, Any] | None) -> Dict[str, Any]:
         prepared = dict(diagnostics or {})
+        if isinstance(diagnostics, dict):
+            if isinstance(diagnostics.get("bpm"), dict):
+                prepared["bpm"] = dict(diagnostics.get("bpm", {}))
+            if isinstance(diagnostics.get("tone"), dict):
+                prepared["tonality"] = dict(diagnostics.get("tone", {}))
+            if isinstance(diagnostics.get("vocal"), dict):
+                prepared["vocal"] = dict(diagnostics.get("vocal", {}))
         emotion_matrix = prepared.get("emotion_matrix") if isinstance(prepared.get("emotion_matrix"), dict) else None
 
         if emotion_matrix:
