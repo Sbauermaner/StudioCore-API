@@ -1,0 +1,12 @@
+=== POST-FIX AUDIT (2025-11-21 14:49 UTC) ===
+- Runtime import: studiocore.core_v6.StudioCoreV6 imported and instantiated without ImportError/TypeError; JSON handling untouched.
+- Pytest regression: 48 tests collected, 48 passed, 0 failed, 0 skipped. Summary: "48 passed in 0.51s" using tests path /workspace/StudioCore-API/tests (no "//tests" issue).
+- TLP export_emotion_vector samples:
+  * Positive text → truth=0.000, love=1.000, pain=0.000, valence=1.000, arousal=0.333, weight=1.0.
+  * Painful text → truth=0.250, love=0.000, pain=0.750, valence=-0.750, arousal=0.333, weight=0.25.
+  * Mixed text → truth=0.167, love=0.500, pain=0.333, valence=0.167, arousal=0.333, weight=0.667.
+  Valence/arousal vary across inputs and weight follows conscious_frequency (not forced to 1.0).
+- VocalEngine/ToneSync: detect_voice_tone consumed non-zero valence/arousal; tones differed (positive=balanced, painful=cold, mixed=balanced) and ToneSync colors signatures varied (#F-261-ra-50 vs #F-248-co-12 vs #F-255-ra-33) without exceptions.
+- FANF statelessness: core.build_fanf_output returned empty payload for Text A due to missing sections but produced independent output for Text B with provided sections/context, confirming no bleed-through from prior call.
+- Test runner path resolution: simulated run_inline_tests computed /workspace/StudioCore-API/tests and directory exists; no malformed "//tests" paths observed.
+- Warnings: translate_text_for_analysis not configured, so normalized_text was None and sections empty for Text A; behavior noted but did not affect statelessness verification.
