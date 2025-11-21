@@ -1189,13 +1189,23 @@ class StudioCoreV6:
 
         result["style"] = style_block
 
+        instrumentation_block = result.get("instrumentation")
+        if not isinstance(instrumentation_block, dict):
+            instrumentation_block = {}
+
+        dynamics_block = (
+            instrument_dynamics_payload
+            if isinstance(instrument_dynamics_payload, dict)
+            else {}
+        )
+
         suno_annotations = self.suno_engine.build_suno_safe_annotations(
             sections,
             {
                 "bpm": result.get("bpm", {}),
                 "instrumentation": {
-                    "palette": result.get("instrumentation", {}).get("palette"),
-                    "fractures": instrument_dynamics_payload.get("fractures"),
+                    "palette": instrumentation_block.get("palette"),
+                    "fractures": dynamics_block.get("fractures"),
                 },
                 "vocal": result.get("vocal", {}),
                 "commands": command_payload,

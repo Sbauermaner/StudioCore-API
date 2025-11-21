@@ -27,6 +27,18 @@ def test_core_v6_analyze_produces_expected_sections():
     assert result.get("fanf", {}).get("annotated_text_fanf")
     assert "choir_active" in result.get("fanf", {})
 
+
+def test_core_v6_handles_missing_instrument_dynamics():
+    core = StudioCoreV6()
+
+    core.instrument_dynamics.map_instruments_to_structure = (
+        lambda *args, **kwargs: None
+    )
+
+    result = core.analyze("Тестовый текст без инструментальных динамик")
+
+    assert isinstance(result.get("suno_annotations"), list)
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
