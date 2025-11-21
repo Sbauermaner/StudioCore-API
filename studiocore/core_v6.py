@@ -272,41 +272,39 @@ class StudioCoreV6:
         backend_payload = self._inject_normalized_snapshot(normalized_text, backend_payload)
 
         # Best-effort FusionEngine + Suno prompt integration
-        # This step is critical for final BPM/Key/Genre consolidation and Suno prompt generation.
         backend_payload = self._apply_fusion_and_suno(backend_payload)
 
         # CRITICAL FIX: Propagate Fusion results to ensure final BPM/Key/Genre consistency
         if fusion_summary := backend_payload.get("fusion_summary"):
-            if isinstance(backend_payload.get("bpm"), dict):
-                bpm_block = backend_payload["bpm"]
-            else:
-                bpm_block = backend_payload.setdefault("bpm", {})
-
-            bpm_override = None
+            bpm_block = backend_payload.setdefault("bpm", {}) if isinstance(backend_payload.get("bpm"), dict) else backend_payload.setdefault("bpm", {})
             manual_override = bpm_block.get("manual_override") if isinstance(bpm_block, dict) else None
-            if isinstance(manual_override, dict):
-                bpm_override = manual_override.get("bpm")
+            bpm_override = manual_override.get("bpm") if isinstance(manual_override, dict) else None
 
-            if bpm_block is not None and isinstance(bpm_block, dict):
-                final_bpm = bpm_override if bpm_override is not None else fusion_summary.get("final_bpm")
-                if final_bpm is not None:
-                    bpm_block["estimate"] = final_bpm
+            final_bpm = bpm_override if bpm_override is not None else fusion_summary.get("final_bpm")
+            if final_bpm is not None:
+                bpm_block["estimate"] = final_bpm
+                backend_payload.setdefault("rhythm", {}).setdefault("global_bpm", final_bpm)
+                backend_payload.setdefault("style", {}).setdefault("bpm", final_bpm)
 
             final_key = fusion_summary.get("final_key")
             if final_key is not None:
-                tonality_block = backend_payload.setdefault("tonality", {})
-                if isinstance(tonality_block, dict):
-                    tonality_block["key"] = final_key
-                style_block = backend_payload.setdefault("style", {})
-                if isinstance(style_block, dict):
-                    style_block["key"] = final_key
+                backend_payload.setdefault("tonality", {})["key"] = final_key
+                backend_payload.setdefault("style", {})["key"] = final_key
+                backend_payload.setdefault("tonality", {}).setdefault("source", "fusion_engine")
 
-            final_genre = fusion_summary.get("final_subgenre") or fusion_summary.get("final_genre")
+            final_genre = fusion_summary.get("final_genre") or fusion_summary.get("final_subgenre")
             if final_genre:
                 style_block = backend_payload.setdefault("style", {})
-                if isinstance(style_block, dict):
-                    style_block["genre"] = final_genre
-                    style_block.setdefault("subgenre", final_genre)
+                style_block["genre"] = final_genre
+                style_block.setdefault("subgenre", final_genre)
+
+        # Fallback: align genre with macro/subgenre cues when Fusion summary is absent
+        style_block = backend_payload.get("style")
+        if isinstance(style_block, dict):
+            macro_genre = style_block.get("macro_genre") or style_block.get("subgenre")
+            current_genre = style_block.get("genre")
+            if macro_genre and (not current_genre or macro_genre not in current_genre):
+                style_block["genre"] = macro_genre
         fanf_output = self.build_fanf_output(
             text=normalized_text,
             sections=self.section_parser.latest_sections,
