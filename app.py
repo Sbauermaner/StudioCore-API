@@ -498,7 +498,8 @@ def run_inline_tests():
     buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
     buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
-    tests_path = os.path.join(ROOT, "tests")
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    test_dir = os.path.join(BASE_DIR, "tests")
     pytest_missing = False
 
     try:
@@ -515,27 +516,27 @@ def run_inline_tests():
         buffer.write(message + "\n")
         return buffer.getvalue()
 
-    if not os.path.isdir(tests_path):
-        log.warning(f"Каталог тестов не найден: {tests_path}")
+    if not os.path.isdir(test_dir):
+        log.warning(f"Каталог тестов не найден: {test_dir}")
         buffer.write("ℹ️ Каталог tests/ отсутствует, тесты не запускались.\n")
         return buffer.getvalue()
 
     try:
-        log.info(f"🚀 Running pytest in {tests_path}")
-        buffer.write(f"🚀 Running pytest in {tests_path}\n\n")
+        log.info(f"🚀 Running pytest in {test_dir}")
+        buffer.write(f"🚀 Running pytest in {test_dir}\n\n")
 
-        process = subprocess.run(
-            ["pytest", "-q", os.path.join(BASE_DIR, "tests")],
+        result = subprocess.run(
+            ["pytest", "-q", test_dir],
             capture_output=True,
             text=True
         )
 
-        if process.stdout:
-            buffer.write(process.stdout)
+        if result.stdout:
+            buffer.write(result.stdout)
 
-        if process.stderr:
+        if result.stderr:
             buffer.write("\n--- STDERR ---\n")
-            buffer.write(process.stderr)
+            buffer.write(result.stderr)
 
     except subprocess.TimeoutExpired:
         log.error("Test runner: ТЕСТЫ ПРЕВЫСИЛИ ТАЙМАУТ (300с)!")

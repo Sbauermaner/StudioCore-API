@@ -134,18 +134,10 @@ class StudioCoreV6:
 
         self._legacy_core_cls = LegacyCore
         self._last_backend_payload: Dict[str, Any] = {}
-        self._last_fanf_context: Dict[str, Any] = {}
-        self._last_fanf_output: Dict[str, Any] = {}
-        self._last_text: str = ""
-        self._last_sections: list[str] = []
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         incoming_text = text or ""
         self._last_backend_payload = {}
-        self._last_fanf_context = {}
-        self._last_fanf_output = {}
-        self._last_text = incoming_text
-        self._last_sections = []
         self.text_engine.reset()
         params = self._merge_user_params(dict(kwargs))
         overrides: UserOverrides = params.get("user_overrides")
@@ -158,7 +150,7 @@ class StudioCoreV6:
             cleaned_text, language_info["language"]
         )
         language_info["was_translated"] = bool(was_translated)
-        self._last_text = translated_text
+        normalized_text = translated_text
         structure_context = self._build_structure_context(
             translated_text,
             params.get("semantic_hints"),
@@ -171,7 +163,11 @@ class StudioCoreV6:
             override_manager,
             text=translated_text,
         )
-        self._last_sections = list(structure_context.get("sections", []))
+        self.section_parser.latest_sections = list(structure_context.get("sections", []))
+        self.section_parser.latest_metadata = {
+            "section_metadata": structure_context.get("section_metadata", []),
+            "annotations": structure_context.get("annotations", []),
+        }
 
         backend_payload = self._backend_analyze(
             translated_text,
@@ -184,6 +180,12 @@ class StudioCoreV6:
             original_text=cleaned_text,
             command_bundle=command_bundle,
         )
+        fanf_output = self.build_fanf_output(
+            text=normalized_text,
+            sections=self.section_parser.latest_sections,
+            context=self.section_parser.latest_metadata,
+        )
+        backend_payload.setdefault("fanf", fanf_output)
         return self._finalize_result(backend_payload)
 
     def _merge_user_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -1299,7 +1301,6 @@ class StudioCoreV6:
             "instrumentation": instrumentation_payload,
             "rde": rde_summary,
         }
-        self._last_fanf_context = {"text": text, "sections": sections, "analysis": fanf_analysis_payload}
         try:
             fanf_annotation = self.fanf_engine.build_annotations(
                 text,
@@ -1322,7 +1323,6 @@ class StudioCoreV6:
                 "choir_active": False,
                 "error": str(exc),
             }
-        self._last_fanf_output = result.get("fanf", {})
         applied_overrides = self._apply_user_overrides_once(result, override_manager)
         result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(
             override_manager,
@@ -1433,33 +1433,31 @@ class StudioCoreV6:
         merged.pop("_overrides_applied", None)
         return merged
 
-    def build_fanf_output(self) -> Dict[str, Any]:
-        context = self._last_fanf_context or {}
-        text = context.get("text") or self._last_text or ""
-        sections = context.get("sections") or self._last_sections or []
-        analysis = context.get("analysis") or {}
-        try:
-            annotation = self.fanf_engine.build_annotations(text, sections, analysis)
-        except TypeError:
-            safe_sections = (
-                list(sections.values()) if isinstance(sections, dict) else list(sections or [])
-            )
-            annotation = self.fanf_engine.build_annotations(text, safe_sections, analysis)
-        self._last_fanf_output = {
-            "annotated_text_fanf": annotation.annotated_text_fanf,
-            "annotated_text_ui": annotation.annotated_text_ui,
-            "annotated_text_suno": annotation.annotated_text_suno,
-            "choir_active": annotation.choir_active,
-            "cinematic_header": annotation.cinematic_header,
-            "resonance_header": annotation.resonance_header,
+    def build_fanf_output(self, text: str, sections: list, context: dict):
+        """
+        Fully stateless FANF builder.
+        No cached fields, no instance state.
+        """
+        if not text or not sections:
+            return {
+                "fanf_text": "",
+                "fanf_sections": [],
+                "fanf_context": {},
+            }
+
+        return {
+            "fanf_text": text,
+            "fanf_sections": sections,
+            "fanf_context": context,
         }
-        return self._last_fanf_output
 
     def annotate_ui(self) -> str | None:
-        return (self._last_fanf_output or {}).get("annotated_text_ui")
+        fanf_block = self._last_backend_payload.get("fanf", {}) if isinstance(self._last_backend_payload, dict) else {}
+        return fanf_block.get("annotated_text_ui")
 
     def annotate_suno(self) -> str | None:
-        return (self._last_fanf_output or {}).get("annotated_text_suno")
+        fanf_block = self._last_backend_payload.get("fanf", {}) if isinstance(self._last_backend_payload, dict) else {}
+        return fanf_block.get("annotated_text_suno")
 
     def _apply_vocal_fusion(self, vocal_payload: Dict[str, Any], overrides: UserOverrides | None) -> Dict[str, Any]:
         payload = dict(vocal_payload)
