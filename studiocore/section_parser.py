@@ -27,6 +27,13 @@ class SectionParseResult:
 class SectionParser:
     """High-level helper that unifies structural parsing and annotations."""
 
+    def _safe_reset_engine(self) -> None:
+        """Reset underlying text engine if it provides a reset() method."""
+        engine = getattr(self, "_text_engine", None)
+        reset_fn = getattr(engine, "reset", None)
+        if callable(reset_fn):
+            reset_fn()
+
     def __init__(self, text_engine: TextStructureEngine | None = None) -> None:
         self._text_engine = text_engine or TextStructureEngine()
         self._annotation_engine = SectionTagAnalyzer()
@@ -45,7 +52,8 @@ class SectionParser:
         return round(min(1.0, exclaim_weight + caps_weight), 3)
 
     def parse(self, text: str, *, sections: Sequence[str] | None = None) -> SectionParseResult:
-        self._text_engine.reset()
+        # Reset text engine state to avoid stale section_metadata between calls
+        self._safe_reset_engine()
         resolved_sections = list(sections) if sections is not None else self._text_engine.auto_section_split(text)
         prefer_strict_boundary = False
         metadata = []
@@ -72,6 +80,10 @@ class SectionParser:
             for entry in metadata
         ]
         self._text_engine._section_metadata = [dict(item) for item in metadata]
+        if len(metadata) > len(resolved_sections):
+            metadata = metadata[: len(resolved_sections)]
+        elif len(metadata) < len(resolved_sections):
+            metadata = list(metadata) + [{} for _ in range(len(resolved_sections) - len(metadata))]
         return SectionParseResult(resolved_sections, metadata, annotations, prefer_strict_boundary)
 
     def apply_annotation_effects(
