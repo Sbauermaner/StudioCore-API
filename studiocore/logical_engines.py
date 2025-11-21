@@ -840,7 +840,9 @@ class StyleEngine:
         return f"{tone} {profile}"
 
     def visual_style(self, color_profile: Dict[str, Any]) -> str:
-        return f"{color_profile.get('primary_color', 'neutral light')} with {color_profile.get('accent_color', 'soft accents')}"
+        primary = color_profile.get("primary_color") or EMOTION_COLOR_MAP["neutral"][0]
+        accent = color_profile.get("accent_color") or EMOTION_COLOR_MAP["neutral"][-1]
+        return f"{primary} with {accent}"
 
     def tone_style(self, tonality: Dict[str, Any]) -> str:
         return f"{tonality.get('mode', 'major')} mood, keys {', '.join(tonality.get('section_keys', []))}"
