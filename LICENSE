@@ -11,14 +11,17 @@ in the Software exclusively under the following conditions:
 
 2. Use of the names "StudioCore", "StudioCore API", "StudioCore MAXI",
    the Author’s personal name, identity, style, brand, project structure,
-   documentation style, narrative logic, musical analysis logic,
-   or any project-related trademarks is prohibited for:
+   documentation style, narrative logic, musical analysis logic, **системная архитектура,
+   функциональный пайплайн, уникальные методологии анализа** (например, 63-осевой
+   эмоциональный анализ, Fusion Engine, TLP-RDE-синтез),
+   or any project-related trademarks **or for creating analogous or competing systems**, is prohibited for:
    • commercial use,
    • advertising,
    • SaaS,
    • promotion,
    • AI training,
    • derivative branding,
+   • **создание конкурирующих или аналогичных продуктов**,
    unless express written permission is granted by the Author.
 
 3. This license applies ONLY to the source-code portion of the Software.
