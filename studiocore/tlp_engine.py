@@ -31,9 +31,9 @@ class TruthLovePainEngine(_TruthLovePainEngine):
         love = profile.get("love", 0.0)
         pain = profile.get("pain", 0.0)
 
-        # Compute Valence and Arousal properly
-        valence = love - pain                      # positivity/negativity
-        arousal = (love + pain + truth) / 3.0      # intensity/energy
+        # Compute dynamic emotional parameters
+        valence = love - pain                       # positivity/negativity
+        arousal = (truth + love + pain) / 3.0       # emotional intensity
 
         weight = profile.get("conscious_frequency", 0.5)
 
