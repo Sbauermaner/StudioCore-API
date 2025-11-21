@@ -90,6 +90,93 @@ if STUDIOCORE_LICENSE_ENV == "":
 
 
 class StudioCoreV6:
+
+    # === Normalized snapshot helper ===
+    def _inject_normalized_snapshot(self, text_for_analysis: str, result: dict) -> dict:
+        """
+        Ensure normalized_text / normalized_sections / auto_context.normalized
+        are always present, even when translation is not configured.
+        This is a non-destructive helper: it only fills missing fields.
+        """
+        if result is None or not isinstance(result, dict):
+            return result
+
+        auto_ctx = result.get("auto_context") or {}
+        if not isinstance(auto_ctx, dict):
+            auto_ctx = {}
+
+        normalized = auto_ctx.get("normalized") or {}
+        if not isinstance(normalized, dict):
+            normalized = {}
+
+        # Base text
+        normalized_text = normalized.get("text") or text_for_analysis
+        normalized["text"] = normalized_text
+
+        # Sections: prefer normalized sections, then generic 'sections'
+        sections = normalized.get("sections") or result.get("sections")
+        if sections is not None:
+            normalized["sections"] = sections
+
+        auto_ctx["normalized"] = normalized
+        result["auto_context"] = auto_ctx
+
+        # Expose top-level normalized fields for external consumers
+        result.setdefault("normalized_text", normalized_text)
+        if sections is not None:
+            result.setdefault("normalized_sections", sections)
+
+        return result
+
+    # === Fusion + Suno integration helper ===
+    def _apply_fusion_and_suno(self, result: dict) -> dict:
+        """
+        Best-effort integration of FusionEngineV64 and Suno prompt builder.
+        Never raises: all errors are captured into diagnostics.fusion / diagnostics.suno.
+        """
+        if result is None or not isinstance(result, dict):
+            return result
+
+        diagnostics = result.get("diagnostics") or {}
+        if not isinstance(diagnostics, dict):
+            diagnostics = {}
+        result["diagnostics"] = diagnostics
+
+        try:
+            from .fusion_engine_v64 import FusionEngineV64
+        except Exception as e:
+            diagnostics.setdefault("fusion_warning", str(e))
+            FusionEngineV64 = None  # type: ignore
+
+        try:
+            from .adapter import build_suno_prompt
+        except Exception as e:
+            diagnostics.setdefault("suno_prompt_warning", str(e))
+            build_suno_prompt = None  # type: ignore
+
+        fusion_summary = None
+
+        # --- Fusion summary (optional) ---
+        if FusionEngineV64 is not None:
+            try:
+                fusion = FusionEngineV64()
+                fusion_summary = fusion.fuse(result)
+                if fusion_summary is not None:
+                    result["fusion_summary"] = fusion_summary
+            except Exception as e:
+                diagnostics["fusion_warning"] = f"FusionEngineV64 failed: {e}"
+
+        # --- Suno prompt (optional) ---
+        if build_suno_prompt is not None:
+            try:
+                suno_prompt = build_suno_prompt(result, fusion_summary=fusion_summary)
+                if suno_prompt:
+                    result["suno_prompt"] = suno_prompt
+            except Exception as e:
+                diagnostics["suno_prompt_warning"] = f"suno prompt build failed: {e}"
+
+        result["diagnostics"] = diagnostics
+        return result
     """Light-weight compatibility surface for the upcoming v6 engine."""
 
     def __init__(self) -> None:
@@ -180,6 +267,12 @@ class StudioCoreV6:
             original_text=cleaned_text,
             command_bundle=command_bundle,
         )
+
+        # Ensure normalized snapshot is always available
+        backend_payload = self._inject_normalized_snapshot(normalized_text, backend_payload)
+
+        # Best-effort FusionEngine + Suno prompt integration
+        backend_payload = self._apply_fusion_and_suno(backend_payload)
         fanf_output = self.build_fanf_output(
             text=normalized_text,
             sections=self.section_parser.latest_sections,
