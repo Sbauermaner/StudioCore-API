@@ -16,3 +16,12 @@
   * C: ERROR TypeError (EmotionVector.__init__() got an unexpected keyword argument 'extra')
 - analyze(): OK (dict with keys: engine, legacy, structure, emotion, color, vocal, breathing, bpm, meaning, tonality)
 - WARNINGS: TLP export_emotion_vector currently raises TypeError for all samples; valence/arousal/weight could not be verified.
+=== CORE DIAGNOSTICS ($(date -u '+%Y-%m-%d %H:%M') UTC) ===
+- StudioCoreV6 import/instantiation: OK (monolith_v4_3_1 loaded)
+- Pytest: 48 passed in 0.53s (tests)
+- TLP export_emotion_vector samples:
+  * A: TypeError (EmotionVector.__init__() got an unexpected keyword argument 'extra')
+  * B: TypeError (EmotionVector.__init__() got an unexpected keyword argument 'extra')
+  * C: TypeError (EmotionVector.__init__() got an unexpected keyword argument 'extra')
+- analyze(): returns dict; keys present -> style:True, bpm:True, key:False, diagnostics:True
+- WARNINGS: TLP export_emotion_vector still failing with TypeError; emotion vector values (valence/arousal/weight) not produced. analyze() missing 'key' field; translation adapter not configured (en locale).
