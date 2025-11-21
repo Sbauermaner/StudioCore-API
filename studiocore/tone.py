@@ -14,7 +14,12 @@ Unified color–resonance engine for emotional frequency visualization.
 """
 
 import math
-from typing import Dict, Any
+from typing import Any, Dict
+from studiocore.color_engine_adapter import (
+    EMOTION_COLOR_MAP,
+    KEY_COLOR_PALETTE,
+    get_emotion_colors,
+)
 from studiocore.emotion_profile import EmotionVector
 
 
@@ -30,18 +35,18 @@ class ToneSyncEngine:
     )
 
     BASE_COLOR_MAP = {
-        "C": "red",
-        "C#": "orange-red",
-        "D": "golden",
-        "D#": "amber",
-        "E": "yellow",
-        "F": "green",
-        "F#": "turquoise",
-        "G": "blue",
-        "G#": "indigo",
-        "A": "violet",
-        "A#": "magenta",
-        "B": "crimson",
+        "C": KEY_COLOR_PALETTE["red"],
+        "C#": KEY_COLOR_PALETTE["orange-red"],
+        "D": KEY_COLOR_PALETTE["golden"],
+        "D#": KEY_COLOR_PALETTE["amber"],
+        "E": KEY_COLOR_PALETTE["yellow"],
+        "F": KEY_COLOR_PALETTE["green"],
+        "F#": KEY_COLOR_PALETTE["turquoise"],
+        "G": KEY_COLOR_PALETTE["blue"],
+        "G#": KEY_COLOR_PALETTE["indigo"],
+        "A": KEY_COLOR_PALETTE["violet"],
+        "A#": KEY_COLOR_PALETTE["magenta"],
+        "B": KEY_COLOR_PALETTE["crimson"],
     }
 
     RESONANCE_MAP = {
@@ -80,10 +85,14 @@ class ToneSyncEngine:
         if not key or key == "auto":
             return "white"
         base = key.replace(" minor", "").replace(" major", "").replace(" modal", "").strip()
-        base_color = self.BASE_COLOR_MAP.get(base, "white")
+        base_color = self.BASE_COLOR_MAP.get(base, "#FFFFFF")
         # cf-modulated blend toward complementary hue
         if cf > 0.5:
-            blend_target = "violet" if base_color in ("red", "orange-red") else "red"
+            blend_target = (
+                KEY_COLOR_PALETTE["violet"]
+                if base_color in (KEY_COLOR_PALETTE["red"], KEY_COLOR_PALETTE["orange-red"])
+                else KEY_COLOR_PALETTE["red"]
+            )
             return f"{base_color}-{blend_target}"
         return base_color
 
@@ -111,15 +120,9 @@ class ToneSyncEngine:
         resonance = self._resonance_from_key(key, tlp)
         temp = self._derive_mood_temperature(tlp)
 
-        dom = max(emo, key=emo.get)
-        accent = {
-            "joy": "golden glow",
-            "sadness": "blue haze",
-            "anger": "red flash",
-            "fear": "gray mist",
-            "peace": "soft white aura",
-            "epic": "purple light",
-        }.get(dom, "silver reflection")
+        dom = max(emo, key=emo.get) if emo else "neutral"
+        accent_palette = get_emotion_colors(dom, default=EMOTION_COLOR_MAP["neutral"])
+        accent = accent_palette[-1]
 
         harmony_score = round(min(1.0, (tlp.get("love", 0) + tlp.get("truth", 0)) / 2), 3)
         brightness = round(0.5 + cf / 2, 2)
