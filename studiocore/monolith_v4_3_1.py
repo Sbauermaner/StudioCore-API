@@ -402,16 +402,21 @@ class StudioCore:
         final_key = semantic_sections[0].get("key", "auto")
         final_vocal_form = "solo_auto" # Будет перезаписан
 
-        for i, block_text in enumerate(text_blocks):
+        # FIX: The original logic failed to correctly map and apply the section tags due to Monolith limitations.
+        # We iterate over the detected semantic map, ensuring a one-to-one mapping to blocks.
+        final_vocal_form = "solo_auto" # Set default outside loop
+        
+        for i, tag_name in enumerate(semantic_map):
+            block_text = text_blocks[i] if i < len(text_blocks) else ""
             if not block_text.strip():
                 continue
 
             # 1. Берем семантику (Intro, Verse...)
-            tag_name = semantic_map[i].lower()
-            sem = sec_defs.get(tag_name, sec_defs["verse"]) # Fallback на 'verse'
+            tag_name_lower = tag_name.lower()
+            sem = sec_defs.get(tag_name_lower, sec_defs["verse"]) # Fallback на 'verse'
             
             # 2. Берем вокальный профиль (Male, Female...)
-            profile = section_profiles[i]
+            profile = section_profiles[i] if i < len(section_profiles) else {}
             gender_tag = profile.get("gender", "auto").upper() # MALE, FEMALE, MIXED, AUTO
             
             # 3. Собираем теги
@@ -428,7 +433,7 @@ class StudioCore:
             ui_tag = f"[{tag_name.upper()} - {gender_tag} - {sem['mood']}, {sem['energy']}, {sem['arrangement']}, BPM≈{sem['bpm']}]"
             
             # Обновляем финальный BPM/Key (берем из припева, если он есть)
-            if "chorus" in tag_name:
+            if "chorus" in tag_name_lower:
                 final_bpm = sem['bpm']
                 final_key = sem['key']
 
