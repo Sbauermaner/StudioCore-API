@@ -17,6 +17,7 @@ from collections import Counter
 from statistics import mean
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
+from .color_engine_adapter import EMOTION_COLOR_MAP, get_emotion_colors
 from .emotion import AutoEmotionalAnalyzer
 from .emotion_profile import EmotionVector
 from .instrument import (
@@ -251,30 +252,29 @@ class EmotionEngine:
 
 
 class ColorEmotionEngine:
-    """Translate emotions into colour palettes."""
-
-    COLOR_MAP = {
-        "joy": "golden",
-        "sadness": "deep blue",
-        "anger": "crimson",
-        "fear": "ashen gray",
-        "peace": "soft white",
-        "epic": "violet flare",
-        "awe": "iridescent teal",
-    }
+    """Translate emotions into colour palettes using a canonical map."""
 
     def assign_color_by_emotion(self, emotions: Dict[str, float]) -> Dict[str, Any]:
         if not emotions:
-            return {"primary_color": "neutral white", "confidence": 0.2}
+            palette = EMOTION_COLOR_MAP["neutral"]
+            return {"primary_color": palette[0], "accent_color": palette[-1], "confidence": 0.2}
         dominant = max(emotions, key=emotions.get)
-        color = self.COLOR_MAP.get(dominant, "ambient silver")
-        return {"primary_color": color, "accent_color": "prism glow", "confidence": round(emotions[dominant], 3)}
+        palette = get_emotion_colors(dominant, default=EMOTION_COLOR_MAP["neutral"])
+        return {
+            "primary_color": palette[0],
+            "accent_color": palette[-1],
+            "confidence": round(emotions.get(dominant, 0.0), 3),
+        }
 
     def generate_color_wave(self, emotions: Dict[str, float], *, steps: int = 5) -> List[str]:
         if not emotions:
-            return ["neutral white" for _ in range(steps)]
+            return [EMOTION_COLOR_MAP["neutral"][0] for _ in range(steps)]
         ordered = sorted(emotions.items(), key=lambda item: item[1], reverse=True)
-        palette = [self.COLOR_MAP.get(name, name) for name, _ in ordered]
+        palette = []
+        for name, _ in ordered:
+            palette.extend(get_emotion_colors(name, default=EMOTION_COLOR_MAP["neutral"]))
+            if len(palette) >= steps:
+                break
         if len(palette) >= steps:
             return palette[:steps]
         while len(palette) < steps:

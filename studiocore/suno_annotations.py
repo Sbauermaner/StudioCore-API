@@ -9,6 +9,8 @@ from __future__ import annotations
 import copy
 from typing import Any, Dict, List, Sequence
 
+from studiocore.color_engine_adapter import EMOTION_COLOR_MAP, get_emotion_colors
+
 
 class EmotionDrivenSunoAdapter:
     """
@@ -26,12 +28,14 @@ class EmotionDrivenSunoAdapter:
         vocal_profile = self._resolve_vocal_profile()
         instrumentation = self._resolve_instrumentation()
         section_annotations = self._build_section_annotations()
+        color_palette = self._resolve_color_palette()
 
         return {
             "style": style,
             "vocal_profile": vocal_profile,
             "instrumentation": instrumentation,
             "section_annotations": section_annotations,
+            "color_palette": color_palette,
         }
 
     # --- Internal helpers ---
@@ -82,6 +86,16 @@ class EmotionDrivenSunoAdapter:
             "narrative": "acoustic guitar, soft percussion",
         }
         return mapping.get(cluster, "hybrid adaptive instrumentation")
+
+    def _resolve_color_palette(self) -> List[str]:
+        cluster = (self.emotion_curve or {}).get("dominant_cluster") or ""
+        cluster_alias = {
+            "despair": "melancholy",
+            "tender": "love_soft",
+            "narrative": "neutral",
+        }
+        target = cluster_alias.get(cluster, cluster) or "neutral"
+        return get_emotion_colors(target, default=EMOTION_COLOR_MAP["neutral"])
 
     def _build_section_annotations(self) -> Dict[str, str]:
         annotations: Dict[str, str] = {}
