@@ -113,6 +113,7 @@ def build_suno_prompt(
     """
     log.debug(f"Вызов функции: build_suno_prompt (Variant: {prompt_variant})")
 
+    style_data = dict(style_data or {})
     genre = style_data.get("genre", "adaptive emotional")
     style = style_data.get("style", "free-form tonal flow")
     key = style_data.get("key", "auto")

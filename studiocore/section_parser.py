@@ -45,27 +45,33 @@ class SectionParser:
         return round(min(1.0, exclaim_weight + caps_weight), 3)
 
     def parse(self, text: str, *, sections: Sequence[str] | None = None) -> SectionParseResult:
+        self._text_engine.reset()
         resolved_sections = list(sections) if sections is not None else self._text_engine.auto_section_split(text)
-        metadata = [
-            {
+        prefer_strict_boundary = False
+        metadata = []
+        for section in resolved_sections:
+            lines = section.splitlines()
+            meta_entry = {
                 "tag": None,
-                "lines": section.splitlines(),
-                "line_count": len(section.splitlines()),
+                "lines": lines,
+                "line_count": len(lines),
             }
-            for section in resolved_sections
-        ]
-        self._text_engine._section_metadata = list(metadata)
+            metadata.append(meta_entry)
+        self._text_engine._section_metadata = [dict(item) for item in metadata]
         annotations = self._annotation_engine.parse(text)
         lyrical_density = self._estimate_lyrical_density("\n".join(resolved_sections) or text)
         rde_emotion_hint = self._estimate_rde_emotion(text)
         prefer_strict_boundary = lyrical_density > 0.85 or rde_emotion_hint > 0.6
-        metadata.append(
+        metadata = [
             {
+                **entry,
+                "strict_boundary": prefer_strict_boundary,
                 "lyrical_density": lyrical_density,
                 "rde_emotion_hint": rde_emotion_hint,
-                "prefer_strict_boundary": prefer_strict_boundary,
             }
-        )
+            for entry in metadata
+        ]
+        self._text_engine._section_metadata = [dict(item) for item in metadata]
         return SectionParseResult(resolved_sections, metadata, annotations, prefer_strict_boundary)
 
     def apply_annotation_effects(

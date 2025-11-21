@@ -17,7 +17,7 @@ import os
 import json
 
 # Canonical StudioCore version. Legacy labels kept for backward compatibility only.
-STUDIOCORE_VERSION = "v6.4.0-protected"
+STUDIOCORE_VERSION = "v6.4-maxi"
 # Deprecated: retained for older tooling that still expects the adaptive label.
 # STUDIOCORE_VERSION_LEGACY = "v4.3.1-adaptive"
 

@@ -77,7 +77,12 @@ class TextStructureEngine:
     def __init__(self) -> None:
         self._section_metadata: List[Dict[str, Any]] = []
 
+    def reset(self) -> None:
+        """Clear cached structural metadata to avoid cross-request bleed."""
+        self._section_metadata = []
+
     def auto_section_split(self, text: str) -> List[str]:
+        self.reset()
         structured = extract_sections(text)
         sections: List[str] = []
         metadata: List[Dict[str, Any]] = []
@@ -95,7 +100,14 @@ class TextStructureEngine:
             )
         if not sections and text.strip():
             sections = [text.strip()]
-        self._section_metadata = metadata
+        self._section_metadata = [
+            {
+                "tag": item.get("tag"),
+                "lines": list(item.get("lines", [])),
+                "line_count": item.get("line_count", len(item.get("lines", []))),
+            }
+            for item in metadata
+        ]
         return sections
 
     def _resolve_sections(self, text: str, sections: Sequence[str] | None) -> List[str]:
@@ -134,6 +146,9 @@ class TextStructureEngine:
                 "tag": item.get("tag"),
                 "lines": list(item.get("lines", [])),
                 "line_count": item.get("line_count", len(item.get("lines", []))),
+                "strict_boundary": item.get("strict_boundary"),
+                "lyrical_density": item.get("lyrical_density"),
+                "rde_emotion_hint": item.get("rde_emotion_hint"),
             }
             for item in self._section_metadata
         ]

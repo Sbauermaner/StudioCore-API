@@ -115,6 +115,8 @@ CORE_RELOAD_REQUIRED = False
 LAST_CORE_ERROR: str | None = None
 CORE_SUCCESSFUL_INITS = 0
 MAX_INPUT_LENGTH = 60000
+AUTO_HEALTHCHECK = os.getenv("AUTO_HEALTHCHECK")
+HEALTH_THREAD_ENABLED = (AUTO_HEALTHCHECK or "0").lower() in ("1", "true", "yes") or os.getenv("DISABLE_SELF_CHECK", "1") == "0"
 
 
 def _ensure_core_module(force_reload: bool = False):
@@ -334,8 +336,8 @@ def auto_core_check():
     log.debug("[Self-Check] Поток запущен, ожидание 5с...")
     time.sleep(5)
 
-    if os.environ.get("DISABLE_SELF_CHECK", "1") != "0":
-        log.info("[Self-Check] Проверка отключена (DISABLE_SELF_CHECK!=0).")
+    if not HEALTH_THREAD_ENABLED:
+        log.info("[Self-Check] Автопроверка отключена по умолчанию (AUTO_HEALTHCHECK=0).")
         return
 
     try:
@@ -357,10 +359,10 @@ def auto_core_check():
         log.error(f"❌ Self-Check ошибка: {e}")
 
 
-if os.environ.get("DISABLE_SELF_CHECK", "1") == "0":
+if HEALTH_THREAD_ENABLED:
     threading.Thread(target=auto_core_check, daemon=True).start()
 else:
-    log.info("[Self-Check] Автопроверка отключена по умолчанию (DISABLE_SELF_CHECK=1).")
+    log.info("[Self-Check] Автопроверка отключена по умолчанию (AUTO_HEALTHCHECK=0).")
 
 
 # === 8. АНАЛИЗ ТЕКСТА (Gradio) ===

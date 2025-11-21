@@ -134,10 +134,19 @@ class StudioCoreV6:
 
         self._legacy_core_cls = LegacyCore
         self._last_backend_payload: Dict[str, Any] = {}
+        self._last_fanf_context: Dict[str, Any] = {}
+        self._last_fanf_output: Dict[str, Any] = {}
+        self._last_text: str = ""
+        self._last_sections: list[str] = []
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         incoming_text = text or ""
         self._last_backend_payload = {}
+        self._last_fanf_context = {}
+        self._last_fanf_output = {}
+        self._last_text = incoming_text
+        self._last_sections = []
+        self.text_engine.reset()
         params = self._merge_user_params(dict(kwargs))
         overrides: UserOverrides = params.get("user_overrides")
         override_manager = UserOverrideManager(overrides)
@@ -149,6 +158,7 @@ class StudioCoreV6:
             cleaned_text, language_info["language"]
         )
         language_info["was_translated"] = bool(was_translated)
+        self._last_text = translated_text
         structure_context = self._build_structure_context(
             translated_text,
             params.get("semantic_hints"),
@@ -161,6 +171,7 @@ class StudioCoreV6:
             override_manager,
             text=translated_text,
         )
+        self._last_sections = list(structure_context.get("sections", []))
 
         backend_payload = self._backend_analyze(
             translated_text,
@@ -218,6 +229,7 @@ class StudioCoreV6:
         sections = self._resolve_sections_from_hints(text, hinted_sections, fallback_sections=auto_sections)
         section_result = self.section_parser.parse(text, sections=sections)
         metadata = [dict(item) for item in section_result.metadata]
+        strict_boundary = bool(getattr(section_result, "prefer_strict_boundary", False))
         generated_hints = {
             "section_count": len(sections),
             "section_lengths": [len(_ensure_tokens(section)) for section in sections],
@@ -242,6 +254,7 @@ class StudioCoreV6:
             "commands": detected_commands,
             "section_metadata": metadata,
             "section_headers": metadata,
+            "strict_boundary": strict_boundary,
             "annotations": section_result.annotations,
             "preserved_tags": list(preserved_tags or []),
         }
@@ -308,12 +321,9 @@ class StudioCoreV6:
         original_text: str | None = None,
         command_bundle: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
-        sections = list(structure_context.get("sections", []))
+        base_sections = list(structure_context.get("sections", []))
         hinted_sections = semantic_hints.get("sections")
-        if hinted_sections:
-            sections = self._resolve_sections_from_hints(text, hinted_sections) or sections
-        if not sections:
-            sections = self.text_engine.auto_section_split(text)
+        sections = self._resolve_sections_from_hints(text, hinted_sections, fallback_sections=base_sections)
         diagnostics: Dict[str, Any] = {
             "bpm": {},
             "tonality": {},
@@ -374,7 +384,7 @@ class StudioCoreV6:
             legacy_result = {"error": str(exc)}
 
         if isinstance(legacy_result, dict) and legacy_result.get("error"):
-            diagnostics["legacy_error"] = legacy_result.get("error")
+            diagnostics["legacy_error"] = {"message": legacy_result.get("error")}
 
         # 2. Structural analysis
         structure = {
@@ -392,6 +402,8 @@ class StudioCoreV6:
             structure["labels"] = list(semantic_hints["section_labels"])
         if structure_context.get("section_metadata"):
             structure["headers"] = structure_context["section_metadata"]
+        if structure_context.get("strict_boundary") is not None:
+            structure["strict_boundary"] = bool(structure_context.get("strict_boundary"))
         if structure_context.get("preserved_tags"):
             structure["preserved_tags"] = list(structure_context.get("preserved_tags", []))
         if language_info:
@@ -403,7 +415,21 @@ class StudioCoreV6:
 
         # 3. Emotional layers
         dominant_emotion = self._resolve_dominant_emotion(text, emotion_profile)
-        tlp_profile = self.tlp_engine.analyze(text)
+        tlp_profile = self.tlp_engine.analyze(text) or {}
+        if not isinstance(tlp_profile, dict):
+            tlp_profile = {}
+        tlp_profile = {
+            "truth": float(tlp_profile.get("truth", 0.0)),
+            "love": float(tlp_profile.get("love", 0.0)),
+            "pain": float(tlp_profile.get("pain", 0.0)),
+            "conscious_frequency": float(tlp_profile.get("conscious_frequency", tlp_profile.get("cf", 0.5) or 0.5)),
+            **{k: v for k, v in tlp_profile.items() if k not in {"truth", "love", "pain", "conscious_frequency"}},
+        }
+        if all(value == 0.0 for value in (tlp_profile.get("truth"), tlp_profile.get("love"), tlp_profile.get("pain"))):
+            tlp_profile.update({"truth": 0.33, "love": 0.33, "pain": 0.34})
+        tlp_profile.setdefault("base_hz", 432.1)
+        tlp_profile.setdefault("base_frequency", tlp_profile.get("base_hz"))
+        tlp_profile.setdefault("consciousness_level", tlp_profile.get("conscious_frequency", 0.5))
         if dominant_emotion:
             tlp_profile["dominant_name"] = dominant_emotion
             tlp_profile["emotion"] = dominant_emotion
@@ -570,6 +596,10 @@ class StudioCoreV6:
         )
         freq_profile["safe_band_hz"] = self.rns_safety.clamp_band(freq_profile.get("safe_band_hz", 0.0) or 0.0)
         diagnostics["freq_profile"] = dict(freq_profile)
+        diagnostics["rns_safety"] = {
+            "safe_band_hz": freq_profile.get("safe_band_hz"),
+            "octaves": list(freq_profile.get("recommended_octaves", [])),
+        }
 
         # 10. Instrumentation suggestions
         instrument_selection = self.instrumentation_engine.instrument_selection(
@@ -719,17 +749,21 @@ class StudioCoreV6:
 
         field = EmotionFieldEngine(window=4)
         smoothed_vectors = field.smooth(local_vectors)
+        if not smoothed_vectors and local_vectors:
+            smoothed_vectors = list(local_vectors)
+        if not smoothed_vectors:
+            smoothed_vectors = [EmotionVector(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)]
         result["_emotion_dynamic"] = [v.to_dict() for v in smoothed_vectors]
 
         try:
             global_vector = EmotionAggregator.aggregate(smoothed_vectors)
             emap = EmotionMapEngine()
-            emotion_map_output = emap.build_map(smoothed_vectors or [global_vector])
-            result["_emotion_map"] = emotion_map_output
-            result["_emotion_stub"] = global_vector.to_dict()
+            emotion_map_output = emap.build_map(list(smoothed_vectors))
+            result["_emotion_map"] = dict(emotion_map_output)
+            result["_emotion_stub"] = dict(global_vector.to_dict())
         except Exception:
             result["_emotion_map"] = {"wave": [], "global": "#000000"}
-            result["_emotion_stub"] = {}
+            result["_emotion_stub"] = {"error": "emotion_map_failed"}
 
         line_count = max(len(lines), 1)
         palette_items = [
@@ -946,6 +980,7 @@ class StudioCoreV6:
         elif domain_genre == "edm" and dramatic_bias > 0.25:
             domain_genre = "cinematic"
         genre_analysis = {"feature_map": feature_map, "domain_genre": domain_genre, "genre_source": genre_source}
+        diagnostics["genre_source"] = genre_source
 
         # 14. Style synthesis
         style_commands = command_payload.get("style") or {}
@@ -1337,12 +1372,12 @@ class StudioCoreV6:
             result["language"] = dict(language_info)
         result["consistency"] = {
             "instrumentation_consistency": rde_summary.get("instrumentation_consistency", "unknown"),
-            "vocal_consistency": True,
+            "vocal_consistency": bool(vocal_payload),
             "genre_alignment": rde_summary.get("genre_alignment", "unknown"),
-            "emotion_alignment": True,
-            "language_alignment": True,
-            "structure_alignment": True,
-            "zero_pulse_alignment": True,
+            "emotion_alignment": bool(emotion_profile),
+            "language_alignment": bool(language_info),
+            "structure_alignment": bool(structure.get("sections")),
+            "zero_pulse_alignment": not bool(zero_pulse_payload.get("has_zero_pulse")),
         }
         self._last_backend_payload = dict(result)
 
@@ -1446,9 +1481,6 @@ class StudioCoreV6:
             "user_mix": ["male", "female", "choir", "growl", "scream", "soft", "whisper", "raspy"],
         }
         if user_profile:
-            for field in ("gender", "type", "tone", "style", "dynamics"):
-                if user_profile.get(field):
-                    payload[field] = user_profile[field]
             if user_profile.get("mix"):
                 fusion_meta["user_mix"] = list(user_profile["mix"])
             fusion_meta["bias_applied"] = True
