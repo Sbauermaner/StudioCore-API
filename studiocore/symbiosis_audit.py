@@ -3,7 +3,6 @@
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
 # Hash: 22ae-df91-bc11-6c7e
 
-WRITE_FILE "studiocore/symbiosis_audit.py" << 'EOF'
 # -*- coding: utf-8 -*-
 """
 SymbiosisAudit v1.0 — полный аудит StudioCore.
@@ -22,11 +21,11 @@ SymbiosisAudit v1.0 — полный аудит StudioCore.
     python3 -m studiocore.symbiosis_audit
 """
 
+import importlib
 import os
 import sys
-import importlib
-from pathlib import Path
 import traceback
+from pathlib import Path
 
 
 class SymbiosisAudit:
@@ -75,9 +74,7 @@ class SymbiosisAudit:
     # =====================================
     def check_imports(self):
         for path in self.root.rglob("*.py"):
-            module = (
-                str(path).replace("/", ".").replace(".py", "")
-            )
+            module = str(path).replace("/", ".").replace(".py", "")
             try:
                 importlib.import_module(module)
                 self.log(f"[IMPORT OK] {module}")
@@ -105,12 +102,12 @@ class SymbiosisAudit:
             "tlp_engine",
         ]
 
-        for e in engines:
+        for engine in engines:
             try:
-                importlib.import_module(f"studiocore.{e}")
-                self.log(f"[ENGINE OK] {e}")
-            except:
-                self.err(f"Engine missing or broken: {e}")
+                importlib.import_module(f"studiocore.{engine}")
+                self.log(f"[ENGINE OK] {engine}")
+            except Exception as exc:
+                self.err(f"Engine missing or broken: {engine} ({exc})")
 
     # =====================================
     # CHECK CORE VERSIONS
@@ -121,12 +118,12 @@ class SymbiosisAudit:
             "core_v5",
             "core_v6",
         ]
-        for v in versions:
+        for version in versions:
             try:
-                importlib.import_module(f"studiocore.{v}")
-                self.log(f"[CORE OK] {v}")
-            except:
-                self.err(f"Core missing or broken: {v}")
+                importlib.import_module(f"studiocore.{version}")
+                self.log(f"[CORE OK] {version}")
+            except Exception as exc:
+                self.err(f"Core missing or broken: {version} ({exc})")
 
     # =====================================
     # GENERATE REPORT
@@ -157,9 +154,3 @@ class SymbiosisAudit:
 
 if __name__ == "__main__":
     SymbiosisAudit().execute()
-EOF
-
-# StudioCore Signature Block (Do Not Remove)
-# Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
