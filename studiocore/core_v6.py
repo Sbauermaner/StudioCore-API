@@ -1129,6 +1129,34 @@ class StudioCoreV6:
             key_hint=result.get("tone", {}).get("key"),
             suno_annotation=result.get("suno_annotation", {}),
         )
+        # === Inject emotion_matrix_v1 hints (fallback) ===
+        em_bpm = matrix.get("bpm", {}) if isinstance(matrix, dict) else {}
+        em_key = matrix.get("key", {}) if isinstance(matrix, dict) else {}
+        em_voc = matrix.get("vocals", {}) if isinstance(matrix, dict) else {}
+
+        # If legacy BPM is missing, use emotion_matrix_v1 recommended BPM
+        if not result.get("bpm") or not result["bpm"].get("estimate"):
+            result["bpm"] = {
+                "estimate": em_bpm.get("recommended"),
+                "source": em_bpm.get("source", "emotion_matrix_v1"),
+            }
+
+        # If tonality missing, use emotion_matrix_v1 key_hint
+        if not result.get("tone") or not result["tone"].get("key"):
+            result["tone"] = {
+                "key": em_key.get("recommended"),
+                "mode": em_key.get("mode"),
+                "source": em_key.get("source", "emotion_matrix_v1"),
+            }
+
+        # If vocal diagnostics missing, use matrix vocals
+        if not result.get("vocal"):
+            result["vocal"] = {
+                "gender": em_voc.get("gender"),
+                "notes": em_voc.get("notes"),
+                "intensity_curve": em_voc.get("intensity_curve"),
+                "source": "emotion_matrix_v1",
+            }
         result["emotion_matrix"] = matrix
         result["suno_annotation"] = build_suno_annotations(
             text=text,
