@@ -204,20 +204,21 @@ def extract_phrases_from_section(section_text: str) -> List[str]:
 # Эта функция была в monolith_v4_3_1.py, но monolith v6 вызывает ее отсюда.
 def extract_raw_blocks(text: str) -> List[str]:
     """
-    Разделяет текст на блоки по пустой строке, 
+    Разделяет текст на блоки по пустой строке,
     ИГНОРИРУЯ теги [Intro], (шепотом) и т.д.
     """
-    # Заменяем [Tag] и (hint) на заглушки, чтобы re.split их не видел
-    text_no_tags = re.sub(r"^\s*\[[^\]]+\]\s*$", "TAG_PLACEHOLDER", text, flags=re.MULTILINE)
-    text_no_tags = re.sub(r"^\s*\([^\)]+\)\s*$", "HINT_PLACEHOLDER", text_no_tags, flags=re.MULTILINE)
-    
+    # FIX: Structural integrity. We remove hints, but ensure section tags are preserved as block content.
+
+    # Удаляем ТОЛЬКО hints/commentary in parenthesis () as they are noise.
+    text_no_hints = re.sub(r"\s*\([^\)]+\)", "", text)
+
     # Разделяем по пустой строке
-    blocks = re.split(r"\n\s*\n", text_no_tags.strip())
-    
-    # Очищаем блоки от заглушек (на всякий случай) и пустых строк
+    blocks = re.split(r"\n\s*\n", text_no_hints.strip())
+
+    # Очищаем блоки от пустых строк и пробелов
     cleaned_blocks = []
     for block in blocks:
-        clean_block = block.replace("TAG_PLACEHOLDER", "").replace("HINT_PLACEHOLDER", "").strip()
+        clean_block = block.strip()
         if clean_block:
             cleaned_blocks.append(clean_block)
 

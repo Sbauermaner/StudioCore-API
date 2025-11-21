@@ -398,8 +398,10 @@ class StudioCore:
         sec_defs.setdefault("verse 2", sec_defs["verse"])
         # --- Конец логики мэппинга ---
 
-        final_bpm = semantic_sections[0].get("bpm", 120) # (BPM припева)
-        final_key = semantic_sections[0].get("key", "auto")
+        # FIX: Use the calculated Chorus BPM as the final tag BPM for consistency (semantic_sections[3] = Chorus)
+        chorus_section = semantic_sections[3] if len(semantic_sections) > 3 else semantic_sections[0]
+        final_bpm = chorus_section.get("bpm", 120) # (BPM припева)
+        final_key = chorus_section.get("key", "auto")
         final_vocal_form = "solo_auto" # Будет перезаписан
 
         # FIX: The original logic failed to correctly map and apply the section tags due to Monolith limitations.
