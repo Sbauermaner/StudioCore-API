@@ -274,6 +274,39 @@ class StudioCoreV6:
         # Best-effort FusionEngine + Suno prompt integration
         # This step is critical for final BPM/Key/Genre consolidation and Suno prompt generation.
         backend_payload = self._apply_fusion_and_suno(backend_payload)
+
+        # CRITICAL FIX: Propagate Fusion results to ensure final BPM/Key/Genre consistency
+        if fusion_summary := backend_payload.get("fusion_summary"):
+            if isinstance(backend_payload.get("bpm"), dict):
+                bpm_block = backend_payload["bpm"]
+            else:
+                bpm_block = backend_payload.setdefault("bpm", {})
+
+            bpm_override = None
+            manual_override = bpm_block.get("manual_override") if isinstance(bpm_block, dict) else None
+            if isinstance(manual_override, dict):
+                bpm_override = manual_override.get("bpm")
+
+            if bpm_block is not None and isinstance(bpm_block, dict):
+                final_bpm = bpm_override if bpm_override is not None else fusion_summary.get("final_bpm")
+                if final_bpm is not None:
+                    bpm_block["estimate"] = final_bpm
+
+            final_key = fusion_summary.get("final_key")
+            if final_key is not None:
+                tonality_block = backend_payload.setdefault("tonality", {})
+                if isinstance(tonality_block, dict):
+                    tonality_block["key"] = final_key
+                style_block = backend_payload.setdefault("style", {})
+                if isinstance(style_block, dict):
+                    style_block["key"] = final_key
+
+            final_genre = fusion_summary.get("final_subgenre") or fusion_summary.get("final_genre")
+            if final_genre:
+                style_block = backend_payload.setdefault("style", {})
+                if isinstance(style_block, dict):
+                    style_block["genre"] = final_genre
+                    style_block.setdefault("subgenre", final_genre)
         fanf_output = self.build_fanf_output(
             text=normalized_text,
             sections=self.section_parser.latest_sections,
