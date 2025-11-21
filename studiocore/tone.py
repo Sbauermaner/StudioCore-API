@@ -83,7 +83,7 @@ class ToneSyncEngine:
     # -------------------------------------------------------
     def _select_key_color(self, key: str, cf: float = 0.0) -> str:
         if not key or key == "auto":
-            return "white"
+            return KEY_COLOR_PALETTE["white"]
         base = key.replace(" minor", "").replace(" major", "").replace(" modal", "").strip()
         base_color = self.BASE_COLOR_MAP.get(base, "#FFFFFF")
         # cf-modulated blend toward complementary hue
