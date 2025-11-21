@@ -22,3 +22,31 @@
 - Двойная мутация вокального слоя плюс незадействованные fusion/suno шаги означают, что итоговая Suno-аннотация и жанровый матрикс не проходят финальную нормализацию: build_suno_safe_annotations строит строки на уже «сырых» diagnostics без fusion_summary, поэтому текстовый анализ может выдавать неполные или противоречивые подсказки Suno (например, bpm/key из разных источников).【F:studiocore/suno_annotations.py†L90-L129】【F:studiocore/core_v6.py†L430-L487】【F:studiocore/fusion_engine_v64.py†L1-L129】
 
 Отчёт фиксирует выявленные несоответствия; изменений кода не вносилось.
+
+=== POST-FIX AUDIT (2025-11-21 14:25 UTC) ===
+1) Runtime/import sanity
+- StudioCoreV6 imported and instantiated without ImportError/TypeError; loader reported monolith_v4_3_1 availability.
+
+2) Pytest regression
+- Command: pytest tests
+- Result: 48 passed, 0 failed, 0 skipped (duration ~0.6s).
+
+3) TLP Engine / export_emotion_vector
+- Positive text: EmotionVector(truth=0.0, love=1.0, pain=0.0, valence=1.0, arousal=0.333, weight=1.0)
+- Painful text: EmotionVector(truth=0.0, love=0.0, pain=1.0, valence=-1.0, arousal=0.333, weight=0.0)
+- Mixed text: EmotionVector(truth=0.333, love=0.333, pain=0.333, valence=0.0, arousal=0.333, weight=0.667)
+- Valence/arousal respond to text; weight follows conscious_frequency (not forced to 1.0).
+
+4) VocalEngine + ToneSync dynamic check
+- VocalEngine.detect_voice_tone returned varied tones: positive=intense, painful=cold, mixed=balanced.
+- ToneSyncEngine.detect_key + apply_emotion_modulation ran without exceptions; modulations differed by text (brighter_major vs darker_minor vs default).
+
+5) FANF statelessness
+- build_fanf_output produces fanf_text/sections/context strictly from inputs; second call with different text/sections/context returned its own values without residual data from first call.
+- Note: analyze() returned None for normalized text/sections/context due to missing translation configuration, but build_fanf_output remained stateless.
+
+6) Test runner path resolution
+- run_inline_tests resolves tests directory via BASE_DIR join -> /workspace/StudioCore-API/tests (no "//tests" prefix). Simulated path exists.
+
+Warnings/observations
+- analyze() path requires translation configuration to populate normalized text/sections/context; fallback paths return None.
