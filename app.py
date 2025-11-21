@@ -49,6 +49,39 @@ except ImportError:
 log = logging.getLogger(__name__)
 log.info(f"Запуск StudioCore v6.4 MAXI by @Sbauermaner... (PID: {os.getpid()})")
 
+def sanitize_for_json(obj, path="root"):
+    """Рекурсивно очищает объекты, делая их безопасными для JSON-сериализации."""
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+
+    if isinstance(obj, dict):
+        return {
+            str(k): sanitize_for_json(v, f"{path}.{k}")
+            for k, v in obj.items()
+        }
+
+    if isinstance(obj, (list, tuple, set)):
+        return [
+            sanitize_for_json(v, f"{path}[{i}]")
+            for i, v in enumerate(obj)
+        ]
+
+    if isinstance(obj, type):
+        log.error("Non-serializable object of type 'type' at %s: %r", path, obj)
+        return f"<type {obj.__name__} at {path}>"
+
+    if hasattr(obj, "__dict__"):
+        log.error(
+            "Non-serializable object with __dict__ at %s: %r (%s)",
+            path,
+            obj,
+            type(obj),
+        )
+        return sanitize_for_json(obj.__dict__, f"{path}.__dict__")
+
+    log.error("Non-serializable object at %s: %r (%s)", path, obj, type(obj))
+    return f"<non-serializable {type(obj).__name__} at {path}>"
+
 import gradio as gr
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -291,8 +324,9 @@ async def api_predict(request_data: PredictRequest):
         log.warning(f"API /api/predict: Ядро вернуло ошибку: {result['error']}")
         return JSONResponse(content=result, status_code=400)
 
-    log.debug("API /api/predict: Анализ успешен.")
-    return JSONResponse(content=result, status_code=200)
+    safe_result = sanitize_for_json(result)
+    log.debug("API /api/predict: Анализ успешен, результат очищен для JSON.")
+    return JSONResponse(content=safe_result, status_code=200)
 
 
 # === 7. SELF-CHECK ===
