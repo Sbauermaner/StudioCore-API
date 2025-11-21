@@ -15,6 +15,9 @@ from typing import Any, Dict, List, Tuple
 
 log = logging.getLogger(__name__)
 
+# Internal guard to avoid spamming the log with repeated translation warnings.
+_translation_warning_emitted = False
+
 # Разрешённые символы (для подсказок и визуальных тегов; сами по себе не используются для фильтрации)
 PUNCTUATION_SAFE = set(list(",.;:!?…—–()[]\"'“”‘’*•‧·_/|"))
 EMOJI_SAFE = set(list("♡♥❤❥❣☀☁☂☮☯☾☽★☆✨⚡☼⚔⚖⚙⚗⚛✝✟✞✡☠☢☣❄☃"))
@@ -246,9 +249,14 @@ def translate_text_for_analysis(text: str, language: str) -> Tuple[str, bool]:
     выполняется, `was_translated` устанавливается в ``False`` честно.
     """
 
-    log.warning(
-        "translate_text_for_analysis is not configured; returning source text for language '%s'", language
-    )
+    global _translation_warning_emitted
+
+    if not _translation_warning_emitted:
+        log.warning(
+            "translate_text_for_analysis is not configured; returning source text for language '%s'",
+            language,
+        )
+        _translation_warning_emitted = True
     return text, False
 
 # StudioCore Signature Block (Do Not Remove)
