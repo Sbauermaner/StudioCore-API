@@ -34,6 +34,7 @@ from dataclasses import asdict
 from typing import Optional
 
 # === 1. Исправление пути импорта ===
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(__file__)
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
@@ -524,13 +525,9 @@ def run_inline_tests():
         buffer.write(f"🚀 Running pytest in {tests_path}\n\n")
 
         process = subprocess.run(
-            [sys.executable, "-m", "pytest", "-q", tests_path],
-            cwd=ROOT,
+            ["pytest", "-q", os.path.join(BASE_DIR, "tests")],
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="ignore",
-            timeout=300,
+            text=True
         )
 
         if process.stdout:
