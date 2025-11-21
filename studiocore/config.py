@@ -16,7 +16,10 @@ StudioCore Configuration Loader
 import os
 import json
 
-STUDIOCORE_VERSION = "v4.3.1-adaptive"
+# Canonical StudioCore version. Legacy labels kept for backward compatibility only.
+STUDIOCORE_VERSION = "v6.4.0-protected"
+# Deprecated: retained for older tooling that still expects the adaptive label.
+# STUDIOCORE_VERSION_LEGACY = "v4.3.1-adaptive"
 
 VERSION_LIMITS = {
     "v3": 200,

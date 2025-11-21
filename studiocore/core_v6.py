@@ -21,7 +21,7 @@ from .bpm_engine import BPMEngine
 from .multimodal_emotion_matrix import MultimodalEmotionMatrixV1
 from .color_engine_adapter import ColorEngineAdapter
 from .emotion_field import EmotionFieldEngine
-from .emotion_profile import EmotionVector
+from .emotion_profile import EmotionAggregator, EmotionVector
 from .rde_engine import RhythmDynamicsEmotionEngine
 from .tone import ToneSyncEngine
 from .section_parser import SectionParser
@@ -50,6 +50,7 @@ from .logical_engines import (
 )
 from .emotion import EmotionEngine
 from .instrument_dynamics import InstrumentalDynamicsEngine
+from .integrity import IntegrityScanEngine
 from .genre_matrix_extended import GenreMatrixExtended
 from .section_intelligence import SectionIntelligenceEngine
 from .suno_annotations import (
@@ -69,6 +70,8 @@ from .text_utils import (
 from .user_override_manager import UserOverrideManager, UserOverrides
 from studiocore.emotion_map import EmotionMapEngine
 from studiocore.emotion_curve import build_global_emotion_curve
+from studiocore.frequency import RNSSafety, UniversalFrequencyEngine
+from studiocore.config import DEFAULT_CONFIG
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
@@ -122,19 +125,19 @@ class StudioCoreV6:
         self.genre_router = DynamicGenreRouter()
         self.genre_universe_adapter = GenreUniverseAdapter()
         self.emotion_matrix = MultimodalEmotionMatrixV1()
+        self.frequency_engine = UniversalFrequencyEngine()
+        self.rns_safety = RNSSafety(DEFAULT_CONFIG)
+        self.integrity_engine = IntegrityScanEngine()
 
         # Late import to avoid circular dependencies during module import time.
         from .monolith_v4_3_1 import StudioCore as LegacyCore  # pylint: disable=import-outside-toplevel
 
         self._legacy_core_cls = LegacyCore
         self._last_backend_payload: Dict[str, Any] = {}
-        self._last_fanf_output: Dict[str, Any] = {}
-        self._last_sections: Sequence[str] | None = None
-        self._last_text: str | None = None
-        self._last_fanf_context: Dict[str, Any] | None = None
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         incoming_text = text or ""
+        self._last_backend_payload = {}
         params = self._merge_user_params(dict(kwargs))
         overrides: UserOverrides = params.get("user_overrides")
         override_manager = UserOverrideManager(overrides)
@@ -311,14 +314,13 @@ class StudioCoreV6:
             sections = self._resolve_sections_from_hints(text, hinted_sections) or sections
         if not sections:
             sections = self.text_engine.auto_section_split(text)
-        self._last_sections = sections
-        self._last_text = text
-        diagnostics: Dict[str, Any] = {}
-        diagnostics.setdefault("bpm", {})
-        diagnostics.setdefault("tonality", {})
-        diagnostics.setdefault("vocal", {})
-        diagnostics.setdefault("instrumentation", {})
-        diagnostics.setdefault("emotion_matrix", {})
+        diagnostics: Dict[str, Any] = {
+            "bpm": {},
+            "tonality": {},
+            "vocal": {},
+            "instrumentation": {},
+            "emotion_matrix": {},
+        }
         emotion_profile = self.emotion_engine.emotion_detection(text)
         emotion_curve = self.emotion_engine.emotion_intensity_curve(text)
         dynamic_emotion_profile = self.dynamic_emotion_engine.emotion_profile(text)
@@ -371,6 +373,9 @@ class StudioCoreV6:
         except Exception as exc:  # pragma: no cover - defensive guard
             legacy_result = {"error": str(exc)}
 
+        if isinstance(legacy_result, dict) and legacy_result.get("error"):
+            diagnostics["legacy_error"] = legacy_result.get("error")
+
         # 2. Structural analysis
         structure = {
             "sections": sections,
@@ -402,6 +407,9 @@ class StudioCoreV6:
         if dominant_emotion:
             tlp_profile["dominant_name"] = dominant_emotion
             tlp_profile["emotion"] = dominant_emotion
+        else:
+            tlp_profile.setdefault("dominant_name", "neutral")
+            tlp_profile.setdefault("emotion", "neutral")
         emotion_payload = {
             "profile": emotion_profile,
             "dynamic_profile": dynamic_emotion_profile,
@@ -413,20 +421,6 @@ class StudioCoreV6:
         emotion_payload = self._merge_semantic_hints(emotion_payload, semantic_hints.get("emotion", {}))
 
         smoothed_vectors: list[EmotionVector] = []
-
-        try:
-            emap = EmotionMapEngine()
-            emotion_map_output = emap.build_map(smoothed_vectors)
-            result["_emotion_map"] = emotion_map_output
-        except Exception:
-            result["_emotion_map"] = {"wave": [], "global": "#000000"}
-
-        try:
-            from studiocore.emotion_profile import EmotionAggregator
-
-            result["_emotion_stub"] = EmotionAggregator
-        except Exception:
-            result["_emotion_stub"] = None
 
         # 4. Tonal colours and style hints
         color_profile = self.color_engine.assign_color_by_emotion(emotion_profile)
@@ -452,10 +446,11 @@ class StudioCoreV6:
             "average_intensity": round(sum(vocal_curve) / max(len(vocal_curve), 1), 3) if vocal_curve else 0.5,
         }
         vocal_payload = self._merge_semantic_hints(vocal_payload, semantic_hints.get("vocal", {}))
-        vocal_payload = self._apply_vocal_fusion(vocal_payload, override_manager.overrides)
-        vocal_for_instrumentation = self.override_engine.apply_to_vocals(
+        vocal_payload = self.override_engine.apply_to_vocals(
             vocal_payload, override_manager
         )
+        vocal_payload = self._apply_vocal_fusion(vocal_payload, override_manager.overrides)
+        vocal_for_instrumentation = dict(vocal_payload)
         diagnostics["vocal"] = dict(vocal_payload)
 
         # 6. Breathing cues
@@ -568,6 +563,13 @@ class StudioCoreV6:
             result["_tone_dynamic"] = local_tone_mod
         except Exception:
             result["_tone_dynamic"] = []
+
+        freq_profile = self.frequency_engine.resonance_profile(tlp_profile)
+        freq_profile["recommended_octaves"] = self.rns_safety.clamp_octaves(
+            freq_profile.get("recommended_octaves", [])
+        )
+        freq_profile["safe_band_hz"] = self.rns_safety.clamp_band(freq_profile.get("safe_band_hz", 0.0) or 0.0)
+        diagnostics["freq_profile"] = dict(freq_profile)
 
         # 10. Instrumentation suggestions
         instrument_selection = self.instrumentation_engine.instrument_selection(
@@ -718,6 +720,16 @@ class StudioCoreV6:
         field = EmotionFieldEngine(window=4)
         smoothed_vectors = field.smooth(local_vectors)
         result["_emotion_dynamic"] = [v.to_dict() for v in smoothed_vectors]
+
+        try:
+            global_vector = EmotionAggregator.aggregate(smoothed_vectors)
+            emap = EmotionMapEngine()
+            emotion_map_output = emap.build_map(smoothed_vectors or [global_vector])
+            result["_emotion_map"] = emotion_map_output
+            result["_emotion_stub"] = global_vector.to_dict()
+        except Exception:
+            result["_emotion_map"] = {"wave": [], "global": "#000000"}
+            result["_emotion_stub"] = {}
 
         line_count = max(len(lines), 1)
         palette_items = [
@@ -913,12 +925,16 @@ class StudioCoreV6:
         except Exception:  # pragma: no cover - fallback if loader fails
             universe = None
 
+        genre_source = "matrix"
         legacy_style_genre = legacy_result.get("style", {}).get("genre") if isinstance(legacy_result, dict) else None
         if legacy_style_genre and universe:
             resolved = universe.resolve(legacy_style_genre)
             domain_info = universe.detect_domain(resolved)
             if domain_info.get("domain") != "unknown":
                 domain_genre = resolved
+                genre_source = "legacy"
+            else:
+                genre_source = "mixed"
 
         gothic_bias = feature_map.get("gothic_factor", 0.0)
         poetic_bias = feature_map.get("poetic_density", 0.0)
@@ -929,7 +945,7 @@ class StudioCoreV6:
             domain_genre = "gothic_poetry" if gothic_bias >= max(poetic_bias, lyric_bias) else "lyrical_song"
         elif domain_genre == "edm" and dramatic_bias > 0.25:
             domain_genre = "cinematic"
-        genre_analysis = {"feature_map": feature_map, "domain_genre": domain_genre}
+        genre_analysis = {"feature_map": feature_map, "domain_genre": domain_genre, "genre_source": genre_source}
 
         # 14. Style synthesis
         style_commands = command_payload.get("style") or {}
@@ -1084,6 +1100,25 @@ class StudioCoreV6:
             instrumentation_payload=instrumentation_payload,
         )
         rde_summary = asdict(rde_snapshot)
+        bpm_variance = 0.0
+        if bpm_curve:
+            bpm_variance = float(max(bpm_curve) - min(bpm_curve))
+        instrumentation_consistency: str | bool = "unknown"
+        if bpm_curve:
+            instrumentation_consistency = bpm_variance < 40.0
+        genre_alignment: str | bool = "unknown"
+        if style_payload.get("genre") and genre_analysis.get("domain_genre"):
+            genre_alignment = bool(str(style_payload.get("genre")).lower() == str(genre_analysis.get("domain_genre")).lower())
+        rde_summary.update(
+            {
+                "instrumentation_consistency": instrumentation_consistency,
+                "genre_alignment": genre_alignment,
+                "bpm_variance": bpm_variance,
+            }
+        )
+
+        integrity_report = self.integrity_engine.analyze(text)
+        diagnostics["integrity"] = dict(integrity_report)
 
         # 15. Lyrics annotations
         annotations = {
@@ -1116,6 +1151,12 @@ class StudioCoreV6:
                 "zero_pulse": zero_pulse_payload,
                 "tlp": dict(tlp_profile),
                 "style": style_payload,
+                "freq_profile": freq_profile,
+                "rns_safety": {
+                    "safe_band_hz": freq_profile.get("safe_band_hz"),
+                    "octaves": freq_profile.get("recommended_octaves"),
+                },
+                "integrity": integrity_report,
                 "commands": command_payload,
                 "annotations": annotations,
                 "phrase_packets": section_intel_payload.get("phrase_packets", []),
@@ -1295,9 +1336,9 @@ class StudioCoreV6:
         if language_info:
             result["language"] = dict(language_info)
         result["consistency"] = {
-            "instrumentation_consistency": True,
+            "instrumentation_consistency": rde_summary.get("instrumentation_consistency", "unknown"),
             "vocal_consistency": True,
-            "genre_alignment": True,
+            "genre_alignment": rde_summary.get("genre_alignment", "unknown"),
             "emotion_alignment": True,
             "language_alignment": True,
             "structure_alignment": True,

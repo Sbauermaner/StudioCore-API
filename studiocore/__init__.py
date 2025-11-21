@@ -19,6 +19,7 @@ from .core_v6 import StudioCoreV6
 from .fallback import StudioCoreFallback
 
 # Version fingerprint linked to FINGERPRINT: StudioCore-FP-2025-SB-9fd72e27
+# NOTE: This is the canonical public version; config.py mirrors this value for consistency.
 STUDIOCORE_VERSION = "v6.4.0-protected"
 DEFAULT_MONOLITH = "monolith_v4_3_1"
 DEFAULT_LOADER_ORDER = ("v6", "v5", "monolith", "fallback")
@@ -179,8 +180,8 @@ if StudioCore is StudioCoreFallback and not _LOAD_ERROR:
 _LOADER_DIAGNOSTICS = LoaderDiagnostics(
     monolith_module=MONOLITH_NAME,
     monolith_version=MONOLITH_VERSION,
-    engine_variant="fallback" if StudioCore is StudioCoreFallback else ("v6" if StudioCore is StudioCoreV6 else "monolith"),
-    fallback_used=StudioCore is StudioCoreFallback,
+    engine_variant="unknown",
+    fallback_used=False,
     engine_order=_requested_loader_order(),
     errors=tuple(filter(None, [_LOAD_ERROR] if _LOAD_ERROR else [])),
     attempted=(),
