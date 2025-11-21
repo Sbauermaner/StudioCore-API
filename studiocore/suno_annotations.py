@@ -201,6 +201,11 @@ class SunoAnnotationEngine:
     """Wrap annotations with English parenthesised commands."""
 
     def build_suno_safe_annotations(self, sections: Sequence[str], diagnostics: Dict[str, Any]) -> List[str]:
+        # === Inject emotion_matrix so diagnostics can fill missing fields ===
+        result = diagnostics if isinstance(diagnostics, dict) else {}
+        if result.get("emotion_matrix"):
+            diagnostics.setdefault("emotion_matrix", result["emotion_matrix"])
+
         diagnostics = self._prepare_diagnostics(diagnostics)
         headers = self.generate_section_headers(sections, diagnostics)
         annotations = []
