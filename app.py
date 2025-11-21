@@ -490,66 +490,21 @@ def analyze_text(text: str, gender: str = "auto"):
 
 # === 9. INLINE TEST RUNNER ===
 def run_inline_tests():
-    log.info("=" * 30)
-    log.info("🚀 ЗАПУСК ВСТРОЕННЫХ ТЕСТОВ...")
-    log.info("=" * 30)
+    """Run pytest with absolute path resolution to avoid container path errors."""
+    import subprocess, sys, os, pathlib
 
-    buffer = io.StringIO()
-    buffer.write(f"🧩 StudioCore {STUDIOCORE_VERSION} — Inline Test Session\n")
-    buffer.write(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+    base_dir = pathlib.Path(__file__).resolve().parent.parent
+    tests_dir = base_dir / "tests"
 
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    test_dir = os.path.join(BASE_DIR, "tests")
-    pytest_missing = False
+    if not tests_dir.exists():
+        return f"Tests directory not found: {tests_dir}"
 
+    cmd = [sys.executable, "-m", "pytest", str(tests_dir)]
     try:
-        import pytest  # type: ignore
-    except Exception:
-        pytest_missing = True
-
-    if pytest_missing:
-        message = (
-            "⚠️ Pytest не установлен. Установите pytest (pip install pytest) "
-            "или запустите тесты локально."
-        )
-        log.warning(message)
-        buffer.write(message + "\n")
-        return buffer.getvalue()
-
-    if not os.path.isdir(test_dir):
-        log.warning(f"Каталог тестов не найден: {test_dir}")
-        buffer.write("ℹ️ Каталог tests/ отсутствует, тесты не запускались.\n")
-        return buffer.getvalue()
-
-    try:
-        log.info(f"🚀 Running pytest in {test_dir}")
-        buffer.write(f"🚀 Running pytest in {test_dir}\n\n")
-
-        result = subprocess.run(
-            ["pytest", "-q", test_dir],
-            capture_output=True,
-            text=True
-        )
-
-        if result.stdout:
-            buffer.write(result.stdout)
-
-        if result.stderr:
-            buffer.write("\n--- STDERR ---\n")
-            buffer.write(result.stderr)
-
-    except subprocess.TimeoutExpired:
-        log.error("Test runner: ТЕСТЫ ПРЕВЫСИЛИ ТАЙМАУТ (300с)!")
-        buffer.write(
-            "\n❌ КРИТИЧЕСКАЯ ОШИБКА: Тесты заняли слишком много времени (Timeout 300s).\n"
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.stdout + "\n" + result.stderr
     except Exception as e:
-        log.error(f"Test runner: КРИТИЧЕСКАЯ ОШИБКА: {e}")
-        buffer.write(f"❌ ОШИБКА ПРИ ЗАПУСКЕ ТЕСТОВ: {e}\n{traceback.format_exc()}\n")
-
-    log.info("🏁 ...Встроенные тесты завершены.")
-    buffer.write("\n✅ Inline test session complete.\n")
-    return buffer.getvalue()
+        return f"Error running tests: {e}"
 
 
 # === 10. PUBLIC UI (Gradio) — PRO ПАНЕЛЬ ===
