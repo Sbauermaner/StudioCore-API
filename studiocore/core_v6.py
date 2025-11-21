@@ -1431,6 +1431,28 @@ class StudioCoreV6:
                 "choir_active": False,
                 "error": str(exc),
             }
+
+        # FINAL STEP: Apply Fusion Engine (Task #1 Fix)
+        try:
+            from .fusion_engine_v64 import FusionEngineV64
+
+            fusion = FusionEngineV64()
+            fusion_summary = fusion.fuse(
+                result,
+                genre_route={
+                    "genre": macro_genre,
+                    "subgenre": style_payload.get("subgenre", macro_genre),
+                },
+            )
+            result["fusion_summary"] = fusion_summary
+        except Exception as exc:
+            result["fusion_summary"] = {
+                "annotated_text_fanf": "FANF generation unavailable.",
+                "annotated_text_ui": "FANF generation unavailable.",
+                "annotated_text_suno": "FANF generation unavailable.",
+                "choir_active": False,
+                "error": str(exc),
+            }
         applied_overrides = self._apply_user_overrides_once(result, override_manager)
         result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(
             override_manager,
