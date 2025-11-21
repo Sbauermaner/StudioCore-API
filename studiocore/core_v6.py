@@ -1130,11 +1130,12 @@ class StudioCoreV6:
             suno_annotation=result.get("suno_annotation", {}),
         )
         result["emotion_matrix"] = matrix
-        result["suno_annotation"] = build_suno_annotations(
+        suno_annotation_payload = build_suno_annotations(
             text=text,
             sections=section_intel_payload.get("section_emotions", []),
             emotion_curve=curve_dict,
         )
+        result["suno_annotation"] = suno_annotation_payload
         fanf_analysis_payload = {
             "emotion": {"profile": emotion_profile, "curve": emotion_curve},
             "bpm": bpm_payload,
@@ -1189,7 +1190,7 @@ class StudioCoreV6:
 
         result["style"] = style_block
 
-        suno_annotations = self.suno_engine.build_suno_safe_annotations(
+        suno_safe_annotations = self.suno_engine.build_suno_safe_annotations(
             sections,
             {
                 "bpm": result.get("bpm", {}),
@@ -1202,7 +1203,10 @@ class StudioCoreV6:
                 "emotion_matrix": result.get("emotion_matrix"),
             },
         )
-        result["suno_annotations"] = suno_annotations
+        result["suno_annotations"] = {
+            **suno_annotation_payload,
+            "safe_annotations": suno_safe_annotations,
+        }
         if language_info:
             result["language"] = dict(language_info)
         result["consistency"] = {
@@ -1232,7 +1236,7 @@ class StudioCoreV6:
         merged["auto_context"] = payload.get("auto_context", {})
         merged["instrument_dynamics"] = payload.get("instrument_dynamics", {})
         merged["tlp"] = payload.get("tlp", {})
-        merged["suno_annotations"] = payload.get("suno_annotations", [])
+        merged["suno_annotations"] = payload.get("suno_annotations", {})
         merged["suno_annotation"] = payload.get("suno_annotation")
         merged["symbiosis"] = payload.get("symbiosis", {})
         merged["override_debug"] = payload.get("override_debug", {})
