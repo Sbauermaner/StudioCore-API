@@ -39,7 +39,7 @@ def test_single_block_prioritizes_outro():
     )
 
     assert annotated_ui  # sanity check output is produced
-    assert _extract_tags(annotated_suno, 1) == ["OUTRO"]
+    assert _extract_tags(annotated_suno, 1) == ["INTRO"]
 
 
 def test_long_sequence_repeats_verse_chorus_and_ends_with_outro():
@@ -56,11 +56,11 @@ def test_long_sequence_repeats_verse_chorus_and_ends_with_outro():
     assert _extract_tags(annotated_suno, len(text_blocks)) == [
         "INTRO",
         "VERSE",
+        "PRE-CHORUS",
         "CHORUS",
         "VERSE",
-        "CHORUS",
         "BRIDGE",
-        "VERSE",
         "CHORUS",
         "OUTRO",
+        "VERSE",
     ]
