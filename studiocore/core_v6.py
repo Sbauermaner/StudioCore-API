@@ -484,6 +484,8 @@ class StudioCoreV6:
         legacy_error_detected = isinstance(legacy_result, dict) and legacy_result.get("error")
         if legacy_error_detected:
             diagnostics["legacy_error"] = {"message": legacy_result.get("error")}
+            # CRITICAL FIX: If legacy core failed, reset the entire result to prevent V6 from using faulty/stale legacy data.
+            legacy_result = {"error": legacy_result["error"]}
 
         # 2. Structural analysis
         structure = {
@@ -571,8 +573,8 @@ class StudioCoreV6:
             "average_intensity": round(sum(vocal_curve) / max(len(vocal_curve), 1), 3) if vocal_curve else 0.5,
         }
         vocal_payload = self._merge_semantic_hints(vocal_payload, semantic_hints.get("vocal", {}))
-        # Fix #2.2: Removed redundant override application (it will be applied once later in _apply_user_overrides_once)
-        vocal_payload = self._apply_vocal_fusion(vocal_payload, override_manager.overrides)
+        # FIX: Removed redundant mid-pipeline vocal fusion/mutation to comply with stateless architecture.
+        # vocal_payload = self._apply_vocal_fusion(vocal_payload, override_manager.overrides)
         vocal_for_instrumentation = dict(vocal_payload)
         diagnostics["vocal"] = dict(vocal_payload)
 
