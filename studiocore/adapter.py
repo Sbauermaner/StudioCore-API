@@ -117,8 +117,10 @@ def build_suno_prompt(
     style = style_data.get("style", "free-form tonal flow")
     key = style_data.get("key", "auto")
     atmosphere = style_data.get("atmosphere", "")
-    production = style_data.get("visual", "clean mix") # Используем 'visual' как 'production'
+    visual = style_data.get("visual", "clean mix")
+    production = visual  # Используем 'visual' как 'production'
     vocal_form = style_data.get("vocal_form", "solo_auto")
+    techniques = style_data.get("techniques", [])
     
     vocals = vocals or []
     instruments = instruments or []

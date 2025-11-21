@@ -334,8 +334,8 @@ def auto_core_check():
     log.debug("[Self-Check] Поток запущен, ожидание 5с...")
     time.sleep(5)
 
-    if os.environ.get("DISABLE_SELF_CHECK") == "1":
-        log.info("[Self-Check] Проверка отключена (DISABLE_SELF_CHECK=1).")
+    if os.environ.get("DISABLE_SELF_CHECK", "1") != "0":
+        log.info("[Self-Check] Проверка отключена (DISABLE_SELF_CHECK!=0).")
         return
 
     try:
@@ -357,7 +357,10 @@ def auto_core_check():
         log.error(f"❌ Self-Check ошибка: {e}")
 
 
-threading.Thread(target=auto_core_check, daemon=True).start()
+if os.environ.get("DISABLE_SELF_CHECK", "1") == "0":
+    threading.Thread(target=auto_core_check, daemon=True).start()
+else:
+    log.info("[Self-Check] Автопроверка отключена по умолчанию (DISABLE_SELF_CHECK=1).")
 
 
 # === 8. АНАЛИЗ ТЕКСТА (Gradio) ===

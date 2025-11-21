@@ -46,7 +46,15 @@ class SectionParser:
 
     def parse(self, text: str, *, sections: Sequence[str] | None = None) -> SectionParseResult:
         resolved_sections = list(sections) if sections is not None else self._text_engine.auto_section_split(text)
-        metadata = self._text_engine.section_metadata()
+        metadata = [
+            {
+                "tag": None,
+                "lines": section.splitlines(),
+                "line_count": len(section.splitlines()),
+            }
+            for section in resolved_sections
+        ]
+        self._text_engine._section_metadata = list(metadata)
         annotations = self._annotation_engine.parse(text)
         lyrical_density = self._estimate_lyrical_density("\n".join(resolved_sections) or text)
         rde_emotion_hint = self._estimate_rde_emotion(text)
