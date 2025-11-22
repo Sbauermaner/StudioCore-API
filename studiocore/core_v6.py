@@ -68,7 +68,7 @@ from .user_override_manager import UserOverrideManager, UserOverrides
 from studiocore.emotion_map import EmotionMapEngine
 from studiocore.emotion_curve import build_global_emotion_curve
 from studiocore.frequency import RNSSafety, UniversalFrequencyEngine
-from studiocore.config import DEFAULT_CONFIG
+from studiocore.config import DEFAULT_CONFIG, FORCED_GENRES, KEYWORD_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -1499,15 +1499,8 @@ class StudioCoreV6:
             or self.style_engine.genre_selection(emotion_profile, tlp_profile)
         )
         emotion_label = (tlp_profile.get("dominant_name") or tlp_profile.get("emotion") or "").lower()
-        forced_genres = {
-            "melancholy_dark": "gothic adaptive darkwave",
-            "rage_extreme": "ideological extreme adaptive rage",
-            "love_soft": "lyrical love adaptive classic",
-            "joy_bright": "pop adaptive light",
-            "confidence": "hiphop adaptive",
-        }
-        if not style_commands.get("genre") and emotion_label in forced_genres:
-            style_genre = forced_genres[emotion_label]
+        if not style_commands.get("genre") and emotion_label in FORCED_GENRES:
+            style_genre = FORCED_GENRES[emotion_label]
         style_mood = (
             style_commands.get("mood")
             or semantic_hints.get("style", {}).get("mood")
@@ -2263,14 +2256,7 @@ class StudioCoreV6:
 
     def _resolve_dominant_emotion(self, text: str, emotion_profile: Dict[str, float]) -> str:
         corpus = text.lower()
-        keyword_map = [
-            ("melancholy_dark", ["готик", "darkwave", "мрак", "тьма", "темн"]),
-            ("rage_extreme", ["убей", "уничтож", "ненавиж", "смерт", "rage"]),
-            ("love_soft", ["люб", "поцел", "неж", "ласк", "тепл"]),
-            ("joy_bright", ["солн", "чудо", "радост", "улыб", "свет"]),
-            ("confidence", ["бит", "улиц", "флоу", "правда", "силой", "hiphop", "рэп"]),
-        ]
-        for label, keywords in keyword_map:
+        for label, keywords in KEYWORD_MAP:
             if any(token in corpus for token in keywords):
                 return label
         if emotion_profile:
