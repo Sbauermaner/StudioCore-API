@@ -134,6 +134,151 @@ def _build_summary_block(diagnostics: dict) -> str:
     diagnostics["summary_block"] = summary_block
     return summary_block
 
+
+def _safe_float(value: object, default: float | None = None) -> float | None:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except Exception:  # noqa: BLE001
+        return default
+
+
+def _build_consistency_report(
+    diagnostics: dict,
+    payload: dict,
+) -> dict:
+    """
+    Build a semantic consistency report for the current analysis.
+
+    It compares:
+      - bpm in diagnostics vs bpm/style/fanf
+      - tlp vs conscious_frequency (if present)
+      - genre tags vs primary genre/style
+      - tone_profile vs key (if present)
+
+    Returns a dict with boolean flags and notes and also attaches it into diagnostics.
+    """
+    report: dict[str, object] = {
+        "ok": True,
+        "warnings": [],
+        "checks": {},
+    }
+
+    checks: dict[str, bool] = {}
+    warnings: list[str] = []
+
+    # -----------------------
+    # BPM consistency
+    # -----------------------
+    diag_bpm = _safe_float(diagnostics.get("bpm"))
+    fanf = payload.get("fanf") or {}
+    style_block = payload.get("style") or {}
+    # FanF may not carry bpm explicitly, so we try a few places.
+    fanf_bpm = _safe_float(fanf.get("bpm"))
+    style_bpm = _safe_float(style_block.get("bpm"))
+
+    bpm_values = [v for v in (diag_bpm, fanf_bpm, style_bpm) if v is not None]
+
+    bpm_consistent = True
+    if len(bpm_values) > 1:
+        # consider consistent if all are within ±3 BPM of each other
+        min_bpm = min(bpm_values)
+        max_bpm = max(bpm_values)
+        bpm_consistent = (max_bpm - min_bpm) <= 3.0
+
+    checks["bpm_consistent"] = bpm_consistent
+    if not bpm_consistent:
+        warnings.append("BPM mismatch between diagnostics/style/FANF.")
+
+    # -----------------------
+    # TLP / Conscious Frequency
+    # -----------------------
+    tlp_data = diagnostics.get("tlp") or diagnostics.get("tlp_vector")
+    cf_diag = _safe_float(
+        diagnostics.get("conscious_frequency")
+        or diagnostics.get("cf")
+    )
+
+    cf_recomputed: float | None = None
+    if isinstance(tlp_data, dict):
+        t = _safe_float(tlp_data.get("truth"), 0.0) or 0.0
+        l = _safe_float(tlp_data.get("love"), 0.0) or 0.0
+        p = _safe_float(tlp_data.get("pain"), 0.0) or 0.0
+        total = t + l + p
+        if total > 0:
+            # The precise formula can be adjusted, but we keep it simple and
+            # consistent with previous documentation.
+            cf_recomputed = (t * 0.4 + l * 0.3 + p * 0.5) / total
+
+    tlp_consistent = True
+    if cf_diag is not None and cf_recomputed is not None:
+        # small numeric tolerance
+        tlp_consistent = abs(cf_diag - cf_recomputed) <= 0.05
+
+    checks["tlp_consistent"] = tlp_consistent
+    if not tlp_consistent:
+        warnings.append("Conscious Frequency differs from TLP-derived value.")
+
+    # -----------------------
+    # Genre vs primary style
+    # -----------------------
+    primary_genre = None
+    if isinstance(style_block, dict):
+        primary_genre = style_block.get("genre") or style_block.get("primary_genre")
+
+    genre_tags = diagnostics.get("genre_universe_tags")
+    genre_consistent = True
+    if primary_genre and isinstance(genre_tags, (list, tuple)) and genre_tags:
+        # require at least one tag sharing a substring with primary genre
+        genre_consistent = any(
+            isinstance(tag, str)
+            and isinstance(primary_genre, str)
+            and (
+                primary_genre.lower() in tag.lower()
+                or tag.lower() in primary_genre.lower()
+            )
+            for tag in genre_tags
+        )
+
+    checks["genre_consistent"] = genre_consistent
+    if not genre_consistent:
+        warnings.append("Primary style/genre does not match GenreUniverse tags.")
+
+    # -----------------------
+    # Tone / key consistency
+    # -----------------------
+    tone_profile = diagnostics.get("tone_profile")
+    style_key = None
+    if isinstance(style_block, dict):
+        style_key = style_block.get("key")
+
+    tone_consistent = True
+    if tone_profile and isinstance(tone_profile, dict) and style_key:
+        # If tone_profile includes a key, check they match at least on note name
+        tone_key = tone_profile.get("key") or tone_profile.get("primary_key")
+        if isinstance(tone_key, str) and isinstance(style_key, str):
+            tone_consistent = tone_key.split()[0].upper() == style_key.split()[0].upper()
+
+    checks["tone_consistent"] = tone_consistent
+    if not tone_consistent:
+        warnings.append("ToneSync key/profile does not match style key.")
+
+    # -----------------------
+    # Final flags
+    # -----------------------
+    report["checks"] = checks
+    report["warnings"] = warnings
+    report["ok"] = all(checks.values())
+
+    diagnostics["consistency"] = report
+
+    # Do not raise, only log in debug mode so CI is not blocked.
+    if not report["ok"]:
+        logger.debug("StudioCore consistency report: %s", report)
+
+    return report
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
@@ -556,6 +701,9 @@ class StudioCoreV6:
 
         payload["summary"] = summary_block
         payload["fanf"] = fanf
+
+        # Run semantic consistency checks and attach report into diagnostics
+        _build_consistency_report(diagnostics, payload)
 
         payload["engine"] = "StudioCoreV6"
         payload.setdefault("ok", True)
