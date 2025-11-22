@@ -29,35 +29,63 @@ VERSION_LIMITS = {
     "v5": 1000
 }
 
-DEFAULT_CONFIG = {
-    "suno_version": "v5",
-    "MAX_INPUT_LENGTH": 16000,
-    "safety": {
-        "max_peak_db": -1.0,        # ограничение на пиковый уровень
-        "max_rms_db": -14.0,        # средний RMS-уровень
-        "avoid_freq_bands_hz": [18.0, 30.0],  # суб-НЧ диапазон, исключаемый из анализа
-        "safe_octaves": [2, 3, 4, 5],
-        "max_session_minutes": 20,
-        "fade_in_ms": 1000,
-        "fade_out_ms": 1500
-    },
-    "safety_rns": {                 # модуль Resonance–Nervous–Safety
-        "min_resonance_hz": 20.0,
-        "max_resonance_hz": 20000.0,
-        "safe_energy_threshold": 0.85
-    },
-    "integrity": {                  # структура IntegrityScanEngine
-        "max_repetition_ratio": 0.35,
-        "min_unique_lines": 3,
-        "enable_auto_repair": True
+class ConfigAccessor(dict):
+    """Dict helper that also exposes attribute access for config keys."""
+
+    def __getattr__(self, item):
+        try:
+            return self[item]
+        except KeyError as exc:  # pragma: no cover - attribute passthrough
+            raise AttributeError(item) from exc
+
+
+DEFAULT_CONFIG = ConfigAccessor(
+    {
+        "suno_version": "v5",
+        "MAX_INPUT_LENGTH": 16000,
+        "safety": {
+            "max_peak_db": -1.0,        # ограничение на пиковый уровень
+            "max_rms_db": -14.0,        # средний RMS-уровень
+            "avoid_freq_bands_hz": [18.0, 30.0],  # суб-НЧ диапазон, исключаемый из анализа
+            "safe_octaves": [2, 3, 4, 5],
+            "max_session_minutes": 20,
+            "fade_in_ms": 1000,
+            "fade_out_ms": 1500,
+        },
+        "safety_rns": {                 # модуль Resonance–Nervous–Safety
+            "min_resonance_hz": 20.0,
+            "max_resonance_hz": 20000.0,
+            "safe_energy_threshold": 0.85,
+        },
+        "integrity": {                  # структура IntegrityScanEngine
+            "max_repetition_ratio": 0.35,
+            "min_unique_lines": 3,
+            "enable_auto_repair": True,
+        },
+        # Fallback messages, avoids hardcoding inside core
+        "FALLBACK_STYLE": "cinematic narrative",
+        "FALLBACK_KEY": "C minor",
+        "FALLBACK_BPM": 85,
+        "FALLBACK_VISUAL": "soft light, calm atmosphere",
+        "FALLBACK_NARRATIVE": "introspection → tension → release",
+        "FALLBACK_STRUCTURE": "intro-verse-chorus-outro",
+        "FALLBACK_EMOTION": "neutral",
     }
-}
+)
 
 
 @dataclass
 class StudioCoreConfig:
     # Soft input protection
     MAX_INPUT_LENGTH: int = 16000
+    # Fallback messages, avoids hardcoding inside core
+    FALLBACK_STYLE: str = "cinematic narrative"
+    FALLBACK_KEY: str = "C minor"
+    FALLBACK_BPM: int = 85
+    FALLBACK_VISUAL: str = "soft light, calm atmosphere"
+    FALLBACK_NARRATIVE: str = "introspection → tension → release"
+    FALLBACK_STRUCTURE: str = "intro-verse-chorus-outro"
+    FALLBACK_EMOTION: str = "neutral"
 
 
 def load_config(path: str = "studio_config.json") -> dict:
