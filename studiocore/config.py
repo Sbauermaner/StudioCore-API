@@ -15,6 +15,7 @@ StudioCore Configuration Loader
 
 import os
 import json
+from dataclasses import dataclass
 
 # Canonical StudioCore version. Legacy labels kept for backward compatibility only.
 STUDIOCORE_VERSION = "v6.4-maxi"
@@ -30,6 +31,7 @@ VERSION_LIMITS = {
 
 DEFAULT_CONFIG = {
     "suno_version": "v5",
+    "MAX_INPUT_LENGTH": 16000,
     "safety": {
         "max_peak_db": -1.0,        # ограничение на пиковый уровень
         "max_rms_db": -14.0,        # средний RMS-уровень
@@ -50,6 +52,12 @@ DEFAULT_CONFIG = {
         "enable_auto_repair": True
     }
 }
+
+
+@dataclass
+class StudioCoreConfig:
+    # Soft input protection
+    MAX_INPUT_LENGTH: int = 16000
 
 
 def load_config(path: str = "studio_config.json") -> dict:
