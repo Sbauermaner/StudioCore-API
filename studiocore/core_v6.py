@@ -72,6 +72,34 @@ from studiocore.config import DEFAULT_CONFIG
 
 logger = logging.getLogger(__name__)
 
+_GENRE_UNIVERSE = None
+
+
+def get_genre_universe():
+    global _GENRE_UNIVERSE
+    if _GENRE_UNIVERSE is None:
+        from .genre_universe_loader import load_genre_universe
+
+        _GENRE_UNIVERSE = load_genre_universe()
+    return _GENRE_UNIVERSE
+
+
+_BRACKET_LINE_RE = re.compile(r"^\s*\[.*\]\s*$")
+
+
+def _extract_ui_text(from_block: str) -> str:
+    lines = from_block.splitlines()
+    clean_lines: list[str] = []
+    for ln in lines:
+        if _BRACKET_LINE_RE.match(ln.strip()):
+            continue
+        if not ln.strip():
+            clean_lines.append(ln)
+            continue
+        clean_lines.append(ln)
+    text = "\n".join(clean_lines).strip()
+    return text
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
@@ -236,34 +264,41 @@ class StudioCoreV6:
         self._legacy_core_cls = LegacyCore
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
+        diagnostics: dict[str, object] = {}
+        payload: dict[str, object] = {
+            "engine": "StudioCoreV6",
+            "ok": True,
+            "diagnostics": diagnostics,
+        }
+
         if not isinstance(text, str):
-            return {"error": DEFAULT_CONFIG.ERROR_INVALID_INPUT_TYPE, "engine": "StudioCoreV6"}
+            payload.update({"error": DEFAULT_CONFIG.ERROR_INVALID_INPUT_TYPE, "ok": False})
+            return payload
         if not text.strip():
-            return {"error": DEFAULT_CONFIG.ERROR_EMPTY_INPUT, "engine": "StudioCoreV6"}
+            payload.update({"error": DEFAULT_CONFIG.ERROR_EMPTY_INPUT, "ok": False})
+            return payload
 
         incoming_text = text or ""
         self.text_engine.reset()
 
-        # === MAX_INPUT_LENGTH ENFORCEMENT ===
         max_len = int(
             getattr(DEFAULT_CONFIG, "MAX_INPUT_LENGTH", 0)
             or (DEFAULT_CONFIG.get("MAX_INPUT_LENGTH") if isinstance(DEFAULT_CONFIG, dict) else 0)
             or 0
         )
         if max_len > 0 and len(incoming_text) > max_len:
-            truncated_text = incoming_text[:max_len]
-            diagnostics = {
-                "engine": "StudioCoreV6",
-                "input_truncated": True,
-                "max_input_length": max_len,
-                "original_length": len(incoming_text),
-            }
-            incoming_text = truncated_text
+            incoming_text = incoming_text[:max_len]
+            diagnostics.update(
+                {
+                    "engine": "StudioCoreV6",
+                    "input_truncated": True,
+                    "max_input_length": max_len,
+                    "original_length": len(text),
+                }
+            )
         else:
-            diagnostics = {
-                "engine": "StudioCoreV6",
-                "input_truncated": False,
-            }
+            diagnostics.update({"engine": "StudioCoreV6", "input_truncated": False})
+
         params = self._merge_user_params(dict(kwargs))
         overrides: UserOverrides = params.get("user_overrides")
         override_manager = UserOverrideManager(overrides)
@@ -288,8 +323,9 @@ class StudioCoreV6:
             override_manager,
             text=translated_text,
         )
-        self.section_parser.latest_sections = list(structure_context.get("sections", []))
-        self.section_parser.latest_metadata = {
+
+        sections = list(structure_context.get("sections", []))
+        section_metadata = {
             "section_metadata": structure_context.get("section_metadata", []),
             "annotations": structure_context.get("annotations", []),
         }
@@ -306,10 +342,7 @@ class StudioCoreV6:
             command_bundle=command_bundle,
         )
 
-        # Ensure normalized snapshot is always available
         backend_payload = self._inject_normalized_snapshot(normalized_text, backend_payload)
-
-        # Best-effort FusionEngine + Suno prompt integration
         backend_payload = self._apply_fusion_and_suno(backend_payload)
 
         from .emotion import EmotionEngineV2
@@ -323,9 +356,8 @@ class StudioCoreV6:
         tlp_engine = TruthLovePainEngine()
         tlp = tlp_engine.tlp_vector(incoming_text, emotion_matrix)
 
-        lines = incoming_text.splitlines()
         bpm_engine = BPMEngine()
-        bpm = bpm_engine.compute_bpm_v2(lines)
+        bpm_v2 = bpm_engine.compute_bpm_v2(incoming_text.splitlines())
 
         rde_engine = ResonanceDynamicsEngine()
         rde = {
@@ -334,18 +366,37 @@ class StudioCoreV6:
             "entropy": rde_engine.calc_entropy(incoming_text),
         }
 
+        tone_profile = None
+        try:  # Lazy import to prevent circular deps
+            from .tone import ToneSyncEngine
+
+            tse = ToneSyncEngine()
+            tone_profile = tse.build_profile(
+                key=backend_payload.get("style", {}).get("key") if isinstance(backend_payload.get("style"), dict) else None,
+                tlp=tlp,
+                emotions=emotion_matrix,
+            )
+        except Exception:
+            diagnostics.setdefault("errors", []).append("tone_sync_failed")
+
         diagnostics["emotion_matrix"] = emotion_matrix
         diagnostics["tlp"] = tlp
         diagnostics["rde"] = rde
+        diagnostics["bpm_v2"] = bpm_v2
+        if tone_profile is not None:
+            diagnostics["tone_profile"] = tone_profile
 
         backend_payload["emotion_matrix"] = emotion_matrix
         backend_payload["tlp"] = tlp
-        bpm_block = backend_payload.get("bpm") if isinstance(backend_payload.get("bpm"), dict) else {}
-        backend_payload["bpm"] = {**(bpm_block or {}), "flow_estimate": bpm}
         backend_payload["rde"] = rde
+        bpm_block = backend_payload.get("bpm") if isinstance(backend_payload.get("bpm"), dict) else {}
+        backend_payload["bpm"] = {**(bpm_block or {}), "flow_estimate": bpm_v2, "estimate": bpm_v2}
 
-        # CRITICAL FIX: Propagate Fusion results to ensure final BPM/Key/Genre consistency
-        if fusion_summary := backend_payload.get("fusion_summary"):
+        if tone_profile is not None:
+            backend_payload["tone_profile"] = tone_profile
+
+        fusion_summary = backend_payload.get("fusion_summary")
+        if fusion_summary:
             bpm_block = backend_payload.setdefault("bpm", {}) if isinstance(backend_payload.get("bpm"), dict) else backend_payload.setdefault("bpm", {})
             manual_override = bpm_block.get("manual_override") if isinstance(bpm_block, dict) else None
             bpm_override = manual_override.get("bpm") if isinstance(manual_override, dict) else None
@@ -368,22 +419,83 @@ class StudioCoreV6:
                 style_block["genre"] = final_genre
                 style_block.setdefault("subgenre", final_genre)
 
-        # Fallback: align genre with macro/subgenre cues when Fusion summary is absent
         style_block = backend_payload.get("style")
         if isinstance(style_block, dict):
             macro_genre = style_block.get("macro_genre") or style_block.get("subgenre")
             current_genre = style_block.get("genre")
             if macro_genre and (not current_genre or macro_genre not in current_genre):
                 style_block["genre"] = macro_genre
+
+        diagnostics_block = backend_payload.get("diagnostics") if isinstance(backend_payload.get("diagnostics"), dict) else {}
+        diagnostics = {**diagnostics_block, **diagnostics}
+        payload.update(backend_payload)
+        payload["diagnostics"] = diagnostics
+
+        genre_universe = get_genre_universe()
+        genre_info = None
+        if isinstance(style_block, dict) and style_block.get("genre"):
+            try:
+                genre_info = genre_universe.detect_domain(str(style_block.get("genre")))
+            except Exception:
+                genre_info = None
+        if genre_info:
+            diagnostics["genre_universe_tags"] = genre_info
+
+        color_diag = None
+        if isinstance(payload.get("style"), dict):
+            color_wave = payload.get("style", {}).get("color_wave")
+            if color_wave:
+                color_diag = {"color_wave": color_wave}
+        if color_diag:
+            diagnostics["color"] = color_diag
+
         fanf_output = self.build_fanf_output(
             text=normalized_text,
-            sections=self.section_parser.latest_sections,
-            context=self.section_parser.latest_metadata,
+            sections=sections,
+            context=section_metadata,
         )
-        backend_payload.setdefault("fanf", fanf_output)
-        diagnostics_block = backend_payload.get("diagnostics") if isinstance(backend_payload.get("diagnostics"), dict) else {}
-        backend_payload["diagnostics"] = {**diagnostics_block, **diagnostics}
-        return self._finalize_result(backend_payload)
+        fanf_block = {}
+        if isinstance(payload.get("fanf"), dict):
+            fanf_block.update(payload.get("fanf", {}))
+        fanf_block.setdefault("annotated_text_fanf", fanf_output.get("fanf_text", ""))
+
+        style_prompt = fanf_block.get("style_prompt") or payload.get("style_prompt")
+        if not style_prompt:
+            style_prompt = DEFAULT_CONFIG.FALLBACK_NEUTRAL_STYLE
+
+        lyrics_prompt = (
+            fanf_block.get("annotated_text_fanf")
+            or fanf_block.get("lyrics_prompt")
+            or "\n".join(section for section in sections if isinstance(section, str) and section.strip())
+            or normalized_text
+        )
+
+        ui_text = _extract_ui_text(lyrics_prompt or incoming_text)
+
+        summary = fanf_block.get("summary") or payload.get("summary") or ""
+        if not summary and isinstance(tlp, dict):
+            summary = (
+                f"[TLP: {tlp.get('truth', 0):.2f}/{tlp.get('love', 0):.2f}/{tlp.get('pain', 0):.2f}]"
+                f" [CF: {tlp.get('conscious_frequency', 0):.2f}]"
+            )
+
+        payload["fanf"] = {
+            "style_prompt": style_prompt,
+            "lyrics_prompt": lyrics_prompt,
+            "ui_text": ui_text,
+            "summary": summary,
+        }
+
+        payload.setdefault("ok", True)
+        payload.setdefault("diagnostics", diagnostics)
+        payload.setdefault("fanf", {})
+
+        final_result = self._finalize_result(payload)
+        final_result["engine"] = "StudioCoreV6"
+        final_result.setdefault("ok", True)
+        final_result.setdefault("diagnostics", diagnostics)
+        final_result.setdefault("fanf", payload.get("fanf", {}))
+        return final_result
 
     def _merge_user_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
         params = dict(params)
