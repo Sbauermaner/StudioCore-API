@@ -417,8 +417,31 @@ class StudioCoreV6:
             payload.update({"error": DEFAULT_CONFIG.ERROR_EMPTY_INPUT, "ok": False})
             return payload
 
+        # === STATELESS ENGINE FACTORY (isolated engines per request) ===
+        from .text_utils import TextStructureEngine
+        from .section_parser import SectionParser
+        from .emotion import EmotionEngine
+        from .bpm_engine import BPMEngine
+        from .frequency import UniversalFrequencyEngine
+        from .tlp_engine import TruthLovePainEngine
+        from .rde_engine import RDEEngine
+        from .genre_matrix_extended import GenreRouterExtended
+        from .tone import ToneSyncEngine
+        from .integrity import IntegrityEngine
+
+        text_engine = TextStructureEngine()
+        section_parser = SectionParser(text_engine)
+        emotion_engine = EmotionEngine()
+        bpm_engine = BPMEngine()
+        frequency_engine = UniversalFrequencyEngine()
+        tlp_engine = TruthLovePainEngine()
+        rde_engine = RDEEngine()
+        genre_router = GenreRouterExtended()
+        tone_engine = ToneSyncEngine()
+        integrity_engine = IntegrityEngine()
+
         incoming_text = text or ""
-        self.text_engine.reset()
+        text_engine.reset()
 
         max_len = int(
             getattr(DEFAULT_CONFIG, "MAX_INPUT_LENGTH", 0)
