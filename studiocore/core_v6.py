@@ -69,6 +69,7 @@ from studiocore.emotion_map import EmotionMapEngine
 from studiocore.emotion_curve import build_global_emotion_curve
 from studiocore.frequency import RNSSafety, UniversalFrequencyEngine
 from studiocore.config import DEFAULT_CONFIG, FORCED_GENRES, KEYWORD_MAP
+from studiocore.diagnostics_v8 import DiagnosticsBuilderV8
 
 logger = logging.getLogger(__name__)
 
@@ -695,7 +696,12 @@ class StudioCoreV6:
         final_result = self._finalize_result(payload)
         final_result["engine"] = "StudioCoreV6"
         final_result.setdefault("ok", True)
-        final_result.setdefault("diagnostics", diagnostics)
+        structured_diagnostics = DiagnosticsBuilderV8(
+            base=diagnostics,
+            payload=final_result,
+        ).build()
+
+        final_result["diagnostics"] = structured_diagnostics
         final_result.setdefault("fanf", fanf)
         return final_result
 
