@@ -394,53 +394,13 @@ class StudioCoreV6:
     """Light-weight compatibility surface for the upcoming v6 engine."""
 
     def __init__(self) -> None:
-        from .genre_matrix_extended import GenreMatrixExtended
-        from .rde_engine import RhythmDynamicsEmotionEngine
-        from .section_parser import SectionParser
-        from .style import StyleEngine
-        from .tlp_engine import TruthLovePainEngine
-        from .vocals import VocalEngine
+        """
+        Stateless constructor: only load static config.
+        No engines or parsers must be created here.
+        """
+        from .config import DEFAULT_CONFIG
 
-        self.text_engine = TextStructureEngine()
-        self.section_parser = SectionParser(self.text_engine)
-        self.emotion_engine = LegacyEmotionEngine()
-        self._emotion_engine = EmotionEngine()
-        self.color_engine = ColorEmotionEngine()
-        self.color_adapter = ColorEngineAdapter()
-        self.vocal_engine = VocalEngine()
-        self.breathing_engine = BreathingEngine()
-        self.bpm_engine = BPMEngine()
-        self.meaning_engine = MeaningVelocityEngine()
-        self.tonality_engine = TonalityEngine()
-        self.tone_engine = LegacyToneSyncEngine()
-        self.instrumentation_engine = InstrumentationEngine()
-        self.section_intelligence = SectionIntelligenceEngine()
-        self.instrument_dynamics = InstrumentalDynamicsEngine()
-        self.genre_matrix = GenreMatrixExtended()
-        self.rem_engine = REM_Synchronizer()
-        self.zero_pulse_engine = ZeroPulseEngine()
-        self.command_interpreter = CommandInterpreter()
-        self.style_engine = StyleEngine()
-        self.annotation_engine = LyricsAnnotationEngine()
-        self.compiler = FinalCompiler()
-        self.suno_engine = SunoAnnotationEngine()
-        self.fanf_engine = FANFAnnotationEngine()
-        self.override_engine = UserOverrideEngine()
-        self.symbiosis_engine = UserAdaptiveSymbiosisEngine()
-        self.tlp_engine = TruthLovePainEngine()
-        self.dynamic_emotion_engine = DynamicEmotionEngine(self.emotion_engine, self.tlp_engine)
-        self.rde_engine = RhythmDynamicsEmotionEngine()
-        self.genre_router = DynamicGenreRouter()
-        self.genre_universe_adapter = GenreUniverseAdapter()
-        self.emotion_matrix = MultimodalEmotionMatrixV1()
-        self.frequency_engine = UniversalFrequencyEngine()
-        self.rns_safety = RNSSafety(DEFAULT_CONFIG)
-        self.integrity_engine = IntegrityScanEngine()
-
-        # Late import to avoid circular dependencies during module import time.
-        from .monolith_v4_3_1 import StudioCore as LegacyCore  # pylint: disable=import-outside-toplevel
-
-        self._legacy_core_cls = LegacyCore
+        self.config = DEFAULT_CONFIG
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         diagnostics: dict[str, object] = {}
