@@ -220,12 +220,27 @@ class StudioCoreV6:
         from .monolith_v4_3_1 import StudioCore as LegacyCore  # pylint: disable=import-outside-toplevel
 
         self._legacy_core_cls = LegacyCore
-        self._last_backend_payload: Dict[str, Any] = {}
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         incoming_text = text or ""
-        self._last_backend_payload = {}
         self.text_engine.reset()
+
+        # === MAX_INPUT_LENGTH ENFORCEMENT ===
+        max_len = int(getattr(DEFAULT_CONFIG, "MAX_INPUT_LENGTH", 0) or 0)
+        if max_len > 0 and len(incoming_text) > max_len:
+            truncated_text = incoming_text[:max_len]
+            diagnostics = {
+                "engine": "StudioCoreV6",
+                "input_truncated": True,
+                "max_input_length": max_len,
+                "original_length": len(incoming_text),
+            }
+            incoming_text = truncated_text
+        else:
+            diagnostics = {
+                "engine": "StudioCoreV6",
+                "input_truncated": False,
+            }
         params = self._merge_user_params(dict(kwargs))
         overrides: UserOverrides = params.get("user_overrides")
         override_manager = UserOverrideManager(overrides)
@@ -267,6 +282,10 @@ class StudioCoreV6:
             original_text=cleaned_text,
             command_bundle=command_bundle,
         )
+
+        backend_diagnostics = backend_payload.get("diagnostics") if isinstance(backend_payload, dict) else {}
+        backend_diagnostics = backend_diagnostics if isinstance(backend_diagnostics, dict) else {}
+        backend_payload["diagnostics"] = {**diagnostics, **backend_diagnostics}
 
         # Ensure normalized snapshot is always available
         backend_payload = self._inject_normalized_snapshot(normalized_text, backend_payload)
@@ -1548,8 +1567,6 @@ class StudioCoreV6:
             "structure_alignment": bool(structure.get("sections")),
             "zero_pulse_alignment": not bool(zero_pulse_payload.get("has_zero_pulse")),
         }
-        self._last_backend_payload = dict(result)
-
         # === SAFE DIAGNOSTICS FALLBACK ===
         emotion_matrix = result.get("emotion_matrix", {})
         diagnostics.setdefault("bpm", result.get("bpm", {}))
@@ -1620,12 +1637,22 @@ class StudioCoreV6:
             "fanf_context": context,
         }
 
-    def annotate_ui(self) -> str | None:
-        fanf_block = self._last_backend_payload.get("fanf", {}) if isinstance(self._last_backend_payload, dict) else {}
+    def annotate_ui(self, payload: Dict[str, Any] | None = None) -> str | None:
+        """Functional, stateless: FANF → UI from payload."""
+        if not isinstance(payload, dict):
+            return None
+        fanf_block = payload.get("fanf") or {}
+        if not isinstance(fanf_block, dict):
+            return None
         return fanf_block.get("annotated_text_ui")
 
-    def annotate_suno(self) -> str | None:
-        fanf_block = self._last_backend_payload.get("fanf", {}) if isinstance(self._last_backend_payload, dict) else {}
+    def annotate_suno(self, payload: Dict[str, Any] | None = None) -> str | None:
+        """Functional, stateless: FANF → Suno from payload."""
+        if not isinstance(payload, dict):
+            return None
+        fanf_block = payload.get("fanf") or {}
+        if not isinstance(fanf_block, dict):
+            return None
         return fanf_block.get("annotated_text_suno")
 
     def _apply_vocal_fusion(self, vocal_payload: Dict[str, Any], overrides: UserOverrides | None) -> Dict[str, Any]:
