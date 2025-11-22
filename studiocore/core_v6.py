@@ -612,29 +612,6 @@ class StudioCoreV6:
         if color_diag:
             diagnostics["color"] = color_diag
 
-        fanf_output = self.build_fanf_output(
-            text=normalized_text,
-            sections=sections,
-            context=section_metadata,
-        )
-        fanf_block = {}
-        if isinstance(payload.get("fanf"), dict):
-            fanf_block.update(payload.get("fanf", {}))
-        fanf_block.setdefault("annotated_text_fanf", fanf_output.get("fanf_text", ""))
-
-        style_prompt = fanf_block.get("style_prompt") or payload.get("style_prompt")
-        if not style_prompt:
-            style_prompt = DEFAULT_CONFIG.FALLBACK_NEUTRAL_STYLE
-
-        lyrics_prompt = (
-            fanf_block.get("annotated_text_fanf")
-            or fanf_block.get("lyrics_prompt")
-            or "\n".join(section for section in sections if isinstance(section, str) and section.strip())
-            or normalized_text
-        )
-
-        ui_text = _extract_ui_text(lyrics_prompt) if lyrics_prompt else _extract_ui_text(incoming_text)
-
         tlp_data = diagnostics.get("tlp") if isinstance(diagnostics.get("tlp"), dict) else tlp
         if isinstance(tlp_data, dict):
             diagnostics["tlp_block"] = (
@@ -676,40 +653,67 @@ class StudioCoreV6:
         # Build unified summary block from diagnostics
         summary_block = _build_summary_block(diagnostics)
 
-        fanf = {
-            "style_prompt": style_prompt,
-            "lyrics_prompt": lyrics_prompt,
-            "ui_text": ui_text,
-            "summary": summary_block,
-        }
-
-        payload["summary"] = summary_block
-        payload["fanf"] = fanf
-
         # Run semantic consistency checks and attach report into diagnostics
         _build_consistency_report(diagnostics, payload)
 
         payload["engine"] = "StudioCoreV6"
         payload.setdefault("ok", True)
         payload.setdefault("diagnostics", diagnostics)
-        payload.setdefault("fanf", fanf)
 
-        final_result = self._finalize_result(payload)
-        final_result["engine"] = "StudioCoreV6"
-        final_result.setdefault("ok", True)
         # === Consistency Layer v8 ===
         try:
             consistency_block = ConsistencyLayerV8(diagnostics).build()
             diagnostics["consistency"] = consistency_block
         except Exception as e:  # noqa: BLE001
             diagnostics["consistency_error"] = str(e)
+
         structured_diagnostics = DiagnosticsBuilderV8(
             base=diagnostics,
-            payload=final_result,
+            payload=payload,
         ).build()
 
+        style = payload.get("style") if isinstance(payload.get("style"), dict) else {}
+        lyrics_sections: list[dict[str, Any]] = []
+        headers = structure_context.get("section_headers") or structure_context.get("section_metadata") or []
+        for idx, section in enumerate(sections or []):
+            header_label = None
+            if idx < len(headers) and isinstance(headers[idx], dict):
+                header_label = headers[idx].get("label") or headers[idx].get("name")
+            section_header = header_label or f"Section {idx + 1}"
+            lyrics_sections.append(
+                {
+                    "name": section_header,
+                    "mood": "neutral",
+                    "energy": "mid",
+                    "arrangement": "standard",
+                    "lines": [section] if isinstance(section, str) else [],
+                }
+            )
+
+        fanf_payload = build_fanf_output(
+            text=normalized_text,
+            style=style or {},
+            lyrics={"sections": lyrics_sections},
+            diagnostics=structured_diagnostics,
+        )
+
+        ui_text = _extract_ui_text(fanf_payload.get("lyrics_prompt", "")) if fanf_payload.get("lyrics_prompt") else _extract_ui_text(incoming_text)
+
+        fanf_block: dict[str, Any] = {}
+        if isinstance(payload.get("fanf"), dict):
+            fanf_block.update(payload.get("fanf", {}))
+        fanf_block.update(fanf_payload)
+        fanf_block.setdefault("ui_text", ui_text)
+
+        payload["summary"] = fanf_block.get("summary", summary_block)
+        payload["fanf"] = fanf_block
+
+        final_result = self._finalize_result(payload)
+        final_result["engine"] = "StudioCoreV6"
+        final_result.setdefault("ok", True)
+
         final_result["diagnostics"] = structured_diagnostics
-        final_result.setdefault("fanf", fanf)
+        final_result.setdefault("fanf", fanf_block)
         return final_result
 
     def _merge_user_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -2105,22 +2109,105 @@ class StudioCoreV6:
         merged.pop("_overrides_applied", None)
         return merged
 
-    def build_fanf_output(self, text: str, sections: list, context: dict):
-        """
-        Fully stateless FANF builder.
-        No cached fields, no instance state.
-        """
-        if not text or not sections:
-            return {
-                "fanf_text": "",
-                "fanf_sections": [],
-                "fanf_context": {},
-            }
+    # === FANF v8.1 Output Builder ===
+    def build_fanf_output(
+        self,
+        text: str,
+        style: Dict[str, Any],
+        lyrics: Dict[str, Any],
+        diagnostics: Dict[str, Any],
+    ) -> Dict[str, Any]:
 
+        # Extract structured blocks
+        engines = diagnostics.get("engines", {})
+        summary_blocks = diagnostics.get("summary_blocks", {})
+        consistency = diagnostics.get("consistency", {})
+        meta = diagnostics.get("meta", {})
+
+        bpm = engines.get("bpm")
+        tone = engines.get("tone")
+        tlp = engines.get("tlp")
+        genre = engines.get("genre")
+        freq = engines.get("frequency")
+
+        # --- STYLE PROMPT ---------------------------------------------------
+        style_prompt = [
+            f"[GENRE: {style.get('genre', 'adaptive')}]",
+            f"[MOOD: {style.get('mood', 'neutral')}]",
+            f"[BPM: {bpm}]",
+        ]
+
+        if tone:
+            key_str = tone.get("key_label") or tone.get("key") or "Unknown"
+            style_prompt.append(f"[KEY: {key_str}]")
+
+        if tlp:
+            cf = tlp.get("conscious_frequency") or 0
+            style_prompt.append(f"[CF: {cf:.3f}]")
+
+        if genre:
+            style_prompt.append(f"[GENRE_UNIVERSE: {genre}]")
+
+        if freq:
+            style_prompt.append(f"[FREQ: {freq}]")
+
+        style_prompt_str = " ".join(style_prompt)
+
+
+        # --- LYRICS PROMPT --------------------------------------------------
+        lyrics_prompt_lines = []
+        for section in lyrics.get("sections", []):
+            sec_name = section.get("name", "Section")
+            mood = section.get("mood", "neutral")
+            energy = section.get("energy", "mid")
+            arrangement = section.get("arrangement", "standard")
+
+            header = f"[{sec_name.upper()}: mood={mood}, energy={energy}, arr={arrangement}]"
+            lyrics_prompt_lines.append(header)
+
+            for line in section.get("lines", []):
+                lyrics_prompt_lines.append(line)
+
+        lyrics_prompt_str = "\n".join(lyrics_prompt_lines)
+
+
+        # --- UI TEXT CLEAN ---------------------------------------------------
+        ui_lines = []
+        for line in text.split("\n"):
+            s = line.strip()
+            if not s:
+                continue
+            if s.startswith("[") and s.endswith("]"):
+                continue
+            ui_lines.append(s)
+
+        ui_text_str = "\n".join(ui_lines)
+
+
+        # --- SUMMARY ---------------------------------------------------------
+        summary_lines = []
+
+        # Add summary blocks collected in diagnostics
+        for name, block in summary_blocks.items():
+            summary_lines.append(block)
+
+        # Add consistency layer
+        if consistency:
+            summary_lines.append(f"[Consistency: {consistency}]")
+
+        # Add meta
+        if meta:
+            summary_lines.append(f"[Meta: {meta}]")
+
+        summary_str = "\n".join(summary_lines)
+
+
+        # Final FANF payload
         return {
-            "fanf_text": text,
-            "fanf_sections": sections,
-            "fanf_context": context,
+            "style_prompt": style_prompt_str,
+            "lyrics_prompt": lyrics_prompt_str,
+            "ui_text": ui_text_str,
+            "summary": summary_str,
         }
 
     def annotate_ui(self, payload: Dict[str, Any] | None = None) -> str | None:
