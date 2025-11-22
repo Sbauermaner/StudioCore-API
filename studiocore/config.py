@@ -164,6 +164,23 @@ def load_config(path: str = "studio_config.json") -> dict:
 
     return data
 
+# === Imported from core_v6 (MAXI FIX v7 — Part 3) ===
+KEYWORD_MAP = [
+    ("melancholy_dark", ["готик", "darkwave", "мрак", "тьма", "темн"]),
+    ("rage_extreme", ["убей", "уничтож", "ненавиж", "смерт", "rage"]),
+    ("love_soft", ["люб", "поцел", "неж", "ласк", "тепл"]),
+    ("joy_bright", ["солн", "чудо", "радост", "улыб", "свет"]),
+    ("confidence", ["бит", "улиц", "флоу", "правда", "силой", "hiphop", "рэп"]),
+]
+
+FORCED_GENRES = {
+    "melancholy_dark": "gothic adaptive darkwave",
+    "rage_extreme": "ideological extreme adaptive rage",
+    "love_soft": "lyrical love adaptive classic",
+    "joy_bright": "pop adaptive light",
+    "confidence": "hiphop adaptive",
+}
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
