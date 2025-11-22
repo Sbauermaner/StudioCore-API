@@ -27,3 +27,10 @@ Thumbs.db
 
 # Local configs
 studio_config.json
+# StudioCore hygiene rules (v7.1)
+*.txt
+*.log
+main/analysis_outputs/*
+__pycache__/
+*.pyc
+!requirements.txt
