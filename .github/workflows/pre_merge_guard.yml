@@ -9,20 +9,21 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt || true
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pyyaml
 
       - name: Run full diagnostics
-        run: bash ${{ github.workspace }}/run_full_diag.sh
+        run: bash run_full_diag.sh
 
       - name: Clean logs
         run: python3 main/auto_log_cleaner.py
