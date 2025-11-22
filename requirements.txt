@@ -1,0 +1,6 @@
+numpy
+regex
+pydantic
+gradio
+python-dotenv
+PyYAML
