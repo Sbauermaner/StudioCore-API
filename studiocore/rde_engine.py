@@ -86,7 +86,52 @@ class RhythmDynamicsEmotionEngine:
         return round(min(1.0, unique / total), 4)
 
 
-__all__ = ["RDESnapshot", "RhythmDynamicsEmotionEngine"]
+class ResonanceDynamicsEngine:
+    # keep existing code but add:
+
+    def calc_resonance(self, text: str) -> float:
+        """Псевдо-резонанс: повторяемость ключевых слов и ритмических паттернов."""
+        low = text.lower()
+        repeats = 0
+        tokens = low.split()
+        seen: Dict[str, int] = {}
+        for t in tokens:
+            seen[t] = seen.get(t, 0) + 1
+        for cnt in seen.values():
+            if cnt > 1:
+                repeats += cnt - 1
+
+        resonance = min(1.0, repeats / max(len(tokens), 1))
+        return round(resonance, 4)
+
+    def calc_fracture(self, text: str) -> float:
+        """Грубая фрактурность: скачки длины строк и пунктуации."""
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        if len(lines) < 2:
+            return 0.1
+
+        lens = [len(ln) for ln in lines]
+        avg = sum(lens) / len(lens)
+        variance = sum((l - avg) ** 2 for l in lens) / len(lens)
+        fracture = min(1.0, variance / max(avg**2, 1.0))
+        return round(fracture, 4)
+
+    def calc_entropy(self, text: str) -> float:
+        """Символная энтропия (очень упрощённая)."""
+        low = text.lower()
+        length = max(len(low), 1)
+        freq: Dict[str, int] = {}
+        for ch in low:
+            freq[ch] = freq.get(ch, 0) + 1
+        entropy = 0.0
+        for cnt in freq.values():
+            p = cnt / length
+            entropy -= p * (0 if p <= 0 else (p).bit_length())  # дешёвый суррогат логарифма
+        entropy = min(1.0, max(0.0, entropy / 10.0))
+        return round(entropy, 4)
+
+
+__all__ = ["RDESnapshot", "RhythmDynamicsEmotionEngine", "ResonanceDynamicsEngine"]
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)

@@ -8,16 +8,20 @@ StudioCore Emotion Engines (v15 - Имена ИСПРАВЛЕНЫ)
 Быстрый эвристический анализ (не ИИ) + Расширенные словари v3.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
 import math
+from dataclasses import dataclass
 from typing import Dict, Any, Optional
 import logging
 
 from studiocore.emotion_profile import EmotionVector, EmotionAggregator
 from studiocore.emotion_dictionary_extended import EmotionLexiconExtended
 from studiocore.structures import PhraseEmotionPacket
+from .config import DEFAULT_CONFIG
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
@@ -224,6 +228,109 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
             arousal=0.0,
             weight=1.0,
         )
+
+
+@dataclass
+class EmotionSignal:
+    joy: float = 0.0
+    sadness: float = 0.0
+    anger: float = 0.0
+    fear: float = 0.0
+    hope: float = 0.0
+    despair: float = 0.0
+    calm: float = 0.0
+    tension: float = 0.0
+
+
+class EmotionEngineV2:
+    """Heuristic, stateless emotion engine. No ML, only lexicons + normalization."""
+
+    def __init__(self) -> None:
+        # Минимальные словари; могут расширяться в патчах.
+        self.lexicon: Dict[str, Dict[str, float]] = {
+            "joy": {
+                "радость": 1.0,
+                "счастье": 1.0,
+                "улыбка": 0.8,
+                "смех": 0.9,
+                "joy": 1.0,
+                "happy": 1.0,
+                "smile": 0.8,
+            },
+            "sadness": {
+                "грусть": 1.0,
+                "печаль": 1.0,
+                "слёзы": 1.0,
+                "одиночество": 0.8,
+                "sad": 1.0,
+                "tears": 1.0,
+            },
+            "anger": {
+                "злость": 1.0,
+                "ярость": 1.0,
+                "ненависть": 1.0,
+                "гнев": 1.0,
+                "anger": 1.0,
+                "hate": 1.0,
+            },
+            "fear": {
+                "страх": 1.0,
+                "ужас": 1.0,
+                "паника": 0.9,
+                "боюсь": 0.8,
+                "fear": 1.0,
+                "scared": 1.0,
+            },
+            "hope": {
+                "надежда": 1.0,
+                "верю": 0.8,
+                "свет": 0.7,
+                "рассвет": 0.7,
+                "hope": 1.0,
+            },
+            "despair": {
+                "безнадёжность": 1.0,
+                "бессилие": 0.9,
+                "крах": 0.8,
+                "я устал": 0.7,
+                "despair": 1.0,
+            },
+            "calm": {
+                "тихо": 0.8,
+                "спокойно": 1.0,
+                "тишина": 0.9,
+                "calm": 1.0,
+                "silence": 0.9,
+            },
+            "tension": {
+                "напряжение": 1.0,
+                "нервы": 0.8,
+                "давление": 0.8,
+                "тревога": 0.9,
+                "tension": 1.0,
+                "anxiety": 1.0,
+            },
+        }
+
+    def analyze(self, text: str) -> Dict[str, float]:
+        text_low = text.lower()
+        scores: Dict[str, float] = {k: 0.0 for k in EmotionSignal().__dict__.keys()}
+
+        for channel, words in self.lexicon.items():
+            for w, weight in words.items():
+                if w in text_low:
+                    scores[channel] += weight
+
+        # Нормализация
+        total = sum(scores.values())
+        if total > 0:
+            scores = {k: v / total for k, v in scores.items()}
+
+        # Подстраховка от шума
+        min_signal = DEFAULT_CONFIG.EMOTION_MIN_SIGNAL
+        scores = {k: (v if v >= min_signal else 0.0) for k, v in scores.items()}
+
+        return scores
 
 
 # =====================================================
@@ -467,6 +574,16 @@ class EmotionEngine:
         if legacy_context:
             profile["legacy"] = legacy_context
         return profile
+
+
+__all__ = [
+    "TruthLovePainEngine",
+    "AutoEmotionalAnalyzer",
+    "EmotionEngine",
+    "EmotionEngineV2",
+    "EmotionSignal",
+    "load_emotion_model",
+]
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)

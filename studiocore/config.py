@@ -43,6 +43,25 @@ DEFAULT_CONFIG = ConfigAccessor(
     {
         "suno_version": "v5",
         "MAX_INPUT_LENGTH": 16000,
+        "EMOTION_MIN_SIGNAL": 0.05,
+        "EMOTION_HIGH_SIGNAL": 0.65,
+        "TLP_CLAMP_MIN": 0.0,
+        "TLP_CLAMP_MAX": 1.0,
+        "AGGRESSION_KEYWORDS": (
+            "убей",
+            "убивать",
+            "расстрелять",
+            "зарежь",
+            "уничтожь",
+            "kill",
+            "murder",
+            "slaughter",
+            "execute",
+        ),
+        "FALLBACK_NEUTRAL_TEXT": "Конфликт описывается в тексте, но мы выбираем говорить о примирении и выходе из насилия.",
+        "FALLBACK_NEUTRAL_STYLE": "cinematic narrative",
+        "ERROR_INVALID_INPUT_TYPE": "invalid_input_type",
+        "ERROR_EMPTY_INPUT": "empty_input",
         "safety": {
             "max_peak_db": -1.0,        # ограничение на пиковый уровень
             "max_rms_db": -14.0,        # средний RMS-уровень
@@ -78,6 +97,32 @@ DEFAULT_CONFIG = ConfigAccessor(
 class StudioCoreConfig:
     # Soft input protection
     MAX_INPUT_LENGTH: int = 16000
+    # Emotion & TLP thresholds
+    EMOTION_MIN_SIGNAL: float = 0.05
+    EMOTION_HIGH_SIGNAL: float = 0.65
+    TLP_CLAMP_MIN: float = 0.0
+    TLP_CLAMP_MAX: float = 1.0
+
+    # Aggression / violence lexicon (for filters, not for prompts)
+    AGGRESSION_KEYWORDS: tuple[str, ...] = (
+        "убей",
+        "убивать",
+        "расстрелять",
+        "зарежь",
+        "уничтожь",
+        "kill",
+        "murder",
+        "slaughter",
+        "execute",
+    )
+
+    # Neutral fallback phrases (instead of aggressive ones)
+    FALLBACK_NEUTRAL_TEXT: str = "Конфликт описывается в тексте, но мы выбираем говорить о примирении и выходе из насилия."
+    FALLBACK_NEUTRAL_STYLE: str = "cinematic narrative"
+
+    # Error messages
+    ERROR_INVALID_INPUT_TYPE: str = "invalid_input_type"
+    ERROR_EMPTY_INPUT: str = "empty_input"
     # Fallback messages, avoids hardcoding inside core
     FALLBACK_STYLE: str = "cinematic narrative"
     FALLBACK_KEY: str = "C minor"
