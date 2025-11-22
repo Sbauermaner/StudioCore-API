@@ -402,9 +402,161 @@ class StudioCoreV6:
         No engines or parsers must be created here.
         """
 
-        self.config = DEFAULT_CONFIG
+        self.config = copy.deepcopy(DEFAULT_CONFIG)
+        self._engine_bundle: dict[str, object] = {}
+
+    def __getattr__(self, name: str):
+        bundle = self.__dict__.get("_engine_bundle", {})
+        if name in bundle:
+            return bundle[name]
+        raise AttributeError(f"{self.__class__.__name__} has no attribute {name}")
+
+    def _build_engine_bundle(self) -> dict[str, object]:
+        """Create a fresh set of engines for a single analyze() call.
+
+        All engines are request-scoped and stored only in a transient bundle to
+        avoid any cross-request leakage.
+        """
+
+        # Lazy imports keep the module safe from circular dependencies.
+        from .text_utils import TextStructureEngine
+        from .section_parser import SectionParser
+        from .emotion import EmotionEngine, EmotionEngineV2
+        from .bpm_engine import BPMEngine
+        from .frequency import UniversalFrequencyEngine
+        from .tlp_engine import TruthLovePainEngine
+        from .rde_engine import RDEEngine, ResonanceDynamicsEngine
+        from .genre_matrix_extended import GenreRouterExtended
+        from .tone import ToneSyncEngine
+        from .integrity import IntegrityEngine
+        from .dynamic_emotion_engine import DynamicEmotionEngine
+        from .section_intelligence import SectionIntelligenceEngine
+        from .meaning_velocity_engine import MeaningVelocityEngine
+        from .instrument_dynamics import InstrumentalDynamicsEngine
+        from .color_engine_adapter import ColorEngineAdapter
+        from .color_wave import ColorWaveEngine
+        from .instrumentation import InstrumentationEngine
+        from .command_interpreter import CommandInterpreter
+        from .rem_engine import REM_Synchronizer
+        from .zero_pulse_engine import ZeroPulseEngine
+        from .annotation_engine import LyricsAnnotationEngine
+        from .genre_matrix import GenreMatrixEngine
+        from .style_engine import StyleEngine
+        from .genre_router import DynamicGenreRouter
+        from .genre_universe_adapter import GenreUniverseAdapter
+        from .emotion_profile import EmotionAggregator
+        from .vocal_engine import VocalEngine
+        from .instrumentation_engine import InstrumentationSelector
+        from .rns_safety import RNSSafety
+        from .emotion import EmotionEngine as LegacyEmotionEngine
+        from .tone import ToneSyncEngine as LegacyToneSyncEngine
+        from .multimodal_emotion_matrix import MultimodalEmotionMatrixV1
+        from .color_engine import ColorEmotionEngine
+        from .breathing_engine import BreathingEngine
+        from .consistency_v8 import ConsistencyLayerV8
+        from .diagnostics_v8 import DiagnosticsBuilderV8
+        from .adapter import build_suno_prompt
+        from .fusion_engine_v64 import FusionEngineV64
+        from .integrity import IntegrityScanEngine
+        from .user_override_manager import UserOverrideManager
+        from .suno_annotations import SunoAnnotationEngine
+        from .fanf_annotation import FANFAnnotationEngine
+        from .genre_universe_loader import load_genre_universe
+
+        text_engine = TextStructureEngine()
+        section_parser = SectionParser(text_engine)
+        emotion_engine = EmotionEngine()
+        bpm_engine = BPMEngine()
+        frequency_engine = UniversalFrequencyEngine()
+        tlp_engine = TruthLovePainEngine()
+        rde_engine = RDEEngine()
+        genre_router_ext = GenreRouterExtended()
+        tone_engine = ToneSyncEngine()
+        integrity_engine = IntegrityEngine()
+        dynamic_emotion_engine = DynamicEmotionEngine()
+        section_intelligence = SectionIntelligenceEngine()
+        meaning_engine = MeaningVelocityEngine()
+        instrument_dynamics = InstrumentalDynamicsEngine()
+        color_adapter = ColorEngineAdapter()
+        color_wave_engine = ColorWaveEngine()
+        instrumentation_engine = InstrumentationEngine()
+        command_interpreter = CommandInterpreter()
+        rem_engine = REM_Synchronizer()
+        zero_pulse_engine = ZeroPulseEngine()
+        annotation_engine = LyricsAnnotationEngine()
+        genre_matrix = GenreMatrixEngine()
+        style_engine = StyleEngine()
+        genre_router = DynamicGenreRouter()
+        genre_universe_adapter = GenreUniverseAdapter(load_genre_universe())
+        emotion_aggregator = EmotionAggregator()
+        vocal_engine = VocalEngine()
+        instrumentation_selector = InstrumentationSelector()
+        rns_safety = RNSSafety()
+        legacy_emotion_engine = LegacyEmotionEngine()
+        legacy_tone_engine = LegacyToneSyncEngine()
+        multimodal_matrix = MultimodalEmotionMatrixV1()
+        color_emotion_engine = ColorEmotionEngine()
+        breathing_engine = BreathingEngine()
+        consistency_layer = ConsistencyLayerV8()
+        diagnostics_builder = DiagnosticsBuilderV8()
+        suno_engine = SunoAnnotationEngine()
+        fanf_engine = FANFAnnotationEngine()
+
+        return {
+            "text_engine": text_engine,
+            "section_parser": section_parser,
+            "emotion_engine": emotion_engine,
+            "bpm_engine": bpm_engine,
+            "frequency_engine": frequency_engine,
+            "tlp_engine": tlp_engine,
+            "rde_engine": rde_engine,
+            "genre_router_ext": genre_router_ext,
+            "tone_engine": tone_engine,
+            "integrity_engine": integrity_engine,
+            "dynamic_emotion_engine": dynamic_emotion_engine,
+            "section_intelligence": section_intelligence,
+            "meaning_engine": meaning_engine,
+            "instrument_dynamics": instrument_dynamics,
+            "color_adapter": color_adapter,
+            "color_wave_engine": color_wave_engine,
+            "instrumentation_engine": instrumentation_engine,
+            "command_interpreter": command_interpreter,
+            "rem_engine": rem_engine,
+            "zero_pulse_engine": zero_pulse_engine,
+            "annotation_engine": annotation_engine,
+            "genre_matrix": genre_matrix,
+            "style_engine": style_engine,
+            "genre_router": genre_router,
+            "genre_universe_adapter": genre_universe_adapter,
+            "_emotion_engine": emotion_aggregator,
+            "vocal_engine": vocal_engine,
+            "instrumentation_selector": instrumentation_selector,
+            "rns_safety": rns_safety,
+            "legacy_emotion_engine": legacy_emotion_engine,
+            "legacy_tone_engine": legacy_tone_engine,
+            "multimodal_matrix": multimodal_matrix,
+            "color_emotion_engine": color_emotion_engine,
+            "breathing_engine": breathing_engine,
+            "consistency_layer": consistency_layer,
+            "diagnostics_builder": diagnostics_builder,
+            "suno_engine": suno_engine,
+            "fanf_engine": fanf_engine,
+            "resonance_engine": ResonanceDynamicsEngine(),
+            "fusion_builder": FusionEngineV64,
+            "suno_prompt_builder": build_suno_prompt,
+            "integrity_scan_engine": IntegrityScanEngine(),
+            "emotion_engine_v2": EmotionEngineV2(),
+            "user_override_manager_cls": UserOverrideManager,
+        }
+
+    def _reset_state(self) -> None:
+        """Remove any transient state after analyze()."""
+
+        self.__dict__ = {"config": copy.deepcopy(self.config)}
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
+        engines = self._build_engine_bundle()
+        self._engine_bundle = engines
         diagnostics: dict[str, object] = {}
         payload: dict[str, object] = {
             "engine": "StudioCoreV6",
@@ -419,314 +571,301 @@ class StudioCoreV6:
             payload.update({"error": DEFAULT_CONFIG.ERROR_EMPTY_INPUT, "ok": False})
             return payload
 
-        # === STATELESS ENGINE FACTORY (isolated engines per request) ===
-        from .text_utils import TextStructureEngine
-        from .section_parser import SectionParser
-        from .emotion import EmotionEngine
-        from .bpm_engine import BPMEngine
-        from .frequency import UniversalFrequencyEngine
-        from .tlp_engine import TruthLovePainEngine
-        from .rde_engine import RDEEngine
-        from .genre_matrix_extended import GenreRouterExtended
-        from .tone import ToneSyncEngine
-        from .integrity import IntegrityEngine
+        try:
+            text_engine = engines["text_engine"]
+            section_parser = engines["section_parser"]
+            emotion_engine = engines["emotion_engine"]
+            bpm_engine = engines["bpm_engine"]
+            frequency_engine = engines["frequency_engine"]
+            tlp_engine = engines["tlp_engine"]
+            rde_engine = engines["rde_engine"]
+            genre_router = engines["genre_router_ext"]
+            tone_engine = engines["tone_engine"]
+            integrity_engine = engines["integrity_engine"]
 
-        text_engine = TextStructureEngine()
-        section_parser = SectionParser(text_engine)
-        emotion_engine = EmotionEngine()
-        bpm_engine = BPMEngine()
-        frequency_engine = UniversalFrequencyEngine()
-        tlp_engine = TruthLovePainEngine()
-        rde_engine = RDEEngine()
-        genre_router = GenreRouterExtended()
-        tone_engine = ToneSyncEngine()
-        integrity_engine = IntegrityEngine()
+            incoming_text = text or ""
+            text_engine.reset()
 
-        incoming_text = text or ""
-        text_engine.reset()
-
-        max_len = int(
-            getattr(DEFAULT_CONFIG, "MAX_INPUT_LENGTH", 0)
-            or (DEFAULT_CONFIG.get("MAX_INPUT_LENGTH") if isinstance(DEFAULT_CONFIG, dict) else 0)
-            or 0
-        )
-        if max_len > 0 and len(incoming_text) > max_len:
-            incoming_text = incoming_text[:max_len]
-            diagnostics.update(
-                {
-                    "engine": "StudioCoreV6",
-                    "input_truncated": True,
-                    "max_input_length": max_len,
-                    "original_length": len(text),
-                }
+            max_len = int(
+                getattr(DEFAULT_CONFIG, "MAX_INPUT_LENGTH", 0)
+                or (DEFAULT_CONFIG.get("MAX_INPUT_LENGTH") if isinstance(DEFAULT_CONFIG, dict) else 0)
+                or 0
             )
-        else:
-            diagnostics.update({"engine": "StudioCoreV6", "input_truncated": False})
+            if max_len > 0 and len(incoming_text) > max_len:
+                incoming_text = incoming_text[:max_len]
+                diagnostics.update(
+                    {
+                        "engine": "StudioCoreV6",
+                        "input_truncated": True,
+                        "max_input_length": max_len,
+                        "original_length": len(text),
+                    }
+                )
+            else:
+                diagnostics.update({"engine": "StudioCoreV6", "input_truncated": False})
 
-        params = self._merge_user_params(dict(kwargs))
-        overrides: UserOverrides = params.get("user_overrides")
-        override_manager = UserOverrideManager(overrides)
-        cleaned_text, command_bundle, preserved_tags = extract_commands_and_tags(incoming_text)
-        commands = list(command_bundle.get("detected", []))
-        language_info = detect_language(cleaned_text)
-        language_info["original_text_preview"] = cleaned_text[:500]
-        translated_text, was_translated = translate_text_for_analysis(
-            cleaned_text, language_info["language"]
-        )
-        language_info["was_translated"] = bool(was_translated)
-        normalized_text = translated_text
-        structure_context = self._build_structure_context(
-            translated_text,
-            params.get("semantic_hints"),
-            commands=commands,
-            preserved_tags=preserved_tags,
-            language_info=language_info,
-        )
-        structure_context = self._apply_overrides_to_context(
-            structure_context,
-            override_manager,
-            text=translated_text,
-        )
-
-        sections = list(structure_context.get("sections", []))
-        section_metadata = {
-            "section_metadata": structure_context.get("section_metadata", []),
-            "annotations": structure_context.get("annotations", []),
-        }
-
-        backend_payload = self._backend_analyze(
-            translated_text,
-            preferred_gender=params.get("preferred_gender", "auto"),
-            version=params.get("version"),
-            semantic_hints=structure_context.get("semantic_hints", {}),
-            structure_context=structure_context,
-            override_manager=override_manager,
-            language_info=language_info,
-            original_text=cleaned_text,
-            command_bundle=command_bundle,
-        )
-
-        backend_payload = self._inject_normalized_snapshot(normalized_text, backend_payload)
-        backend_payload = self._apply_fusion_and_suno(backend_payload)
-
-        from .emotion import EmotionEngineV2
-        from .tlp_engine import TruthLovePainEngine
-        from .bpm_engine import BPMEngine
-        from .rde_engine import ResonanceDynamicsEngine
-
-        emotion_engine = EmotionEngineV2()
-        emotion_matrix = emotion_engine.analyze(incoming_text)
-
-        tlp_engine = TruthLovePainEngine()
-        tlp = tlp_engine.tlp_vector(incoming_text, emotion_matrix)
-
-        bpm_engine = BPMEngine()
-        bpm_v2 = bpm_engine.compute_bpm_v2(incoming_text.splitlines())
-
-        rde_engine = ResonanceDynamicsEngine()
-        rde = {
-            "resonance": rde_engine.calc_resonance(incoming_text),
-            "fracture": rde_engine.calc_fracture(incoming_text),
-            "entropy": rde_engine.calc_entropy(incoming_text),
-        }
-
-        tone_profile = None
-        try:  # Lazy import to prevent circular deps
-            from .tone import ToneSyncEngine
-
-            tse = ToneSyncEngine()
-            tone_profile = tse.build_profile(
-                key=backend_payload.get("style", {}).get("key") if isinstance(backend_payload.get("style"), dict) else None,
-                tlp=tlp,
-                emotions=emotion_matrix,
+            params = self._merge_user_params(dict(kwargs))
+            overrides: UserOverrides = params.get("user_overrides")
+            override_manager = engines["user_override_manager_cls"](overrides)
+            cleaned_text, command_bundle, preserved_tags = extract_commands_and_tags(incoming_text)
+            commands = list(command_bundle.get("detected", []))
+            language_info = detect_language(cleaned_text)
+            language_info["original_text_preview"] = cleaned_text[:500]
+            translated_text, was_translated = translate_text_for_analysis(
+                cleaned_text, language_info["language"]
             )
-        except Exception:
-            diagnostics.setdefault("errors", []).append("tone_sync_failed")
+            language_info["was_translated"] = bool(was_translated)
+            normalized_text = translated_text
+            structure_context = self._build_structure_context(
+                translated_text,
+                params.get("semantic_hints"),
+                commands=commands,
+                preserved_tags=preserved_tags,
+                language_info=language_info,
+            )
+            structure_context = self._apply_overrides_to_context(
+                structure_context,
+                override_manager,
+                text=translated_text,
+            )
 
-        diagnostics["emotion_matrix"] = emotion_matrix
-        diagnostics["tlp"] = tlp
-        diagnostics["rde"] = rde
-        diagnostics["bpm_v2"] = bpm_v2
-        if tone_profile is not None:
-            diagnostics["tone_profile"] = tone_profile
+            sections = list(structure_context.get("sections", []))
+            section_metadata = {
+                "section_metadata": structure_context.get("section_metadata", []),
+                "annotations": structure_context.get("annotations", []),
+            }
 
-        backend_payload["emotion_matrix"] = emotion_matrix
-        backend_payload["tlp"] = tlp
-        backend_payload["rde"] = rde
-        bpm_block = backend_payload.get("bpm") if isinstance(backend_payload.get("bpm"), dict) else {}
-        backend_payload["bpm"] = {**(bpm_block or {}), "flow_estimate": bpm_v2, "estimate": bpm_v2}
+            backend_payload = self._backend_analyze(
+                translated_text,
+                preferred_gender=params.get("preferred_gender", "auto"),
+                version=params.get("version"),
+                semantic_hints=structure_context.get("semantic_hints", {}),
+                structure_context=structure_context,
+                override_manager=override_manager,
+                language_info=language_info,
+                original_text=cleaned_text,
+                command_bundle=command_bundle,
+                engines=engines,
+            )
 
-        if tone_profile is not None:
-            backend_payload["tone_profile"] = tone_profile
+            backend_payload = self._inject_normalized_snapshot(normalized_text, backend_payload)
+            backend_payload = self._apply_fusion_and_suno(backend_payload)
 
-        fusion_summary = backend_payload.get("fusion_summary")
-        if fusion_summary:
-            bpm_block = backend_payload.setdefault("bpm", {}) if isinstance(backend_payload.get("bpm"), dict) else backend_payload.setdefault("bpm", {})
-            manual_override = bpm_block.get("manual_override") if isinstance(bpm_block, dict) else None
-            bpm_override = manual_override.get("bpm") if isinstance(manual_override, dict) else None
+            emotion_engine_v2 = engines["emotion_engine_v2"]
+            emotion_matrix = emotion_engine_v2.analyze(incoming_text)
 
-            final_bpm = bpm_override if bpm_override is not None else fusion_summary.get("final_bpm")
-            if final_bpm is not None:
-                bpm_block["estimate"] = final_bpm
-                backend_payload.setdefault("rhythm", {}).setdefault("global_bpm", final_bpm)
-                backend_payload.setdefault("style", {}).setdefault("bpm", final_bpm)
+            tlp_engine = engines["tlp_engine"]
+            tlp = tlp_engine.tlp_vector(incoming_text, emotion_matrix)
 
-            final_key = fusion_summary.get("final_key")
-            if final_key is not None:
-                backend_payload.setdefault("tonality", {})["key"] = final_key
-                backend_payload.setdefault("style", {})["key"] = final_key
-                backend_payload.setdefault("tonality", {}).setdefault("source", "fusion_engine")
+            bpm_engine = engines["bpm_engine"]
+            bpm_v2 = bpm_engine.compute_bpm_v2(incoming_text.splitlines())
 
-            final_genre = fusion_summary.get("final_genre") or fusion_summary.get("final_subgenre")
-            if final_genre:
-                style_block = backend_payload.setdefault("style", {})
-                style_block["genre"] = final_genre
-                style_block.setdefault("subgenre", final_genre)
+            resonance_engine = engines["resonance_engine"]
+            rde = {
+                "resonance": resonance_engine.calc_resonance(incoming_text),
+                "fracture": resonance_engine.calc_fracture(incoming_text),
+                "entropy": resonance_engine.calc_entropy(incoming_text),
+            }
 
-        style_block = backend_payload.get("style")
-        if isinstance(style_block, dict):
-            macro_genre = style_block.get("macro_genre") or style_block.get("subgenre")
-            current_genre = style_block.get("genre")
-            if macro_genre and (not current_genre or macro_genre not in current_genre):
-                style_block["genre"] = macro_genre
-
-        diagnostics_block = backend_payload.get("diagnostics") if isinstance(backend_payload.get("diagnostics"), dict) else {}
-        diagnostics = {**diagnostics_block, **diagnostics}
-        payload.update(backend_payload)
-        payload["diagnostics"] = diagnostics
-
-        genre_universe = get_genre_universe()
-        genre_info = None
-        if isinstance(style_block, dict) and style_block.get("genre"):
-            try:
-                genre_info = genre_universe.detect_domain(str(style_block.get("genre")))
+            tone_profile = None
+            try:  # Lazy import to prevent circular deps
+                from .tone import ToneSyncEngine
+    
+                tse = ToneSyncEngine()
+                tone_profile = tse.build_profile(
+                    key=backend_payload.get("style", {}).get("key") if isinstance(backend_payload.get("style"), dict) else None,
+                    tlp=tlp,
+                    emotions=emotion_matrix,
+                )
             except Exception:
-                genre_info = None
-        if genre_info:
-            diagnostics["genre_universe_tags"] = genre_info
-
-        color_diag = None
-        if isinstance(payload.get("style"), dict):
-            color_wave = payload.get("style", {}).get("color_wave")
+                diagnostics.setdefault("errors", []).append("tone_sync_failed")
+    
+            diagnostics["emotion_matrix"] = emotion_matrix
+            diagnostics["tlp"] = tlp
+            diagnostics["rde"] = rde
+            diagnostics["bpm_v2"] = bpm_v2
+            if tone_profile is not None:
+                diagnostics["tone_profile"] = tone_profile
+    
+            backend_payload["emotion_matrix"] = emotion_matrix
+            backend_payload["tlp"] = tlp
+            backend_payload["rde"] = rde
+            bpm_block = backend_payload.get("bpm") if isinstance(backend_payload.get("bpm"), dict) else {}
+            backend_payload["bpm"] = {**(bpm_block or {}), "flow_estimate": bpm_v2, "estimate": bpm_v2}
+    
+            if tone_profile is not None:
+                backend_payload["tone_profile"] = tone_profile
+    
+            fusion_summary = backend_payload.get("fusion_summary")
+            if fusion_summary:
+                bpm_block = backend_payload.setdefault("bpm", {}) if isinstance(backend_payload.get("bpm"), dict) else backend_payload.setdefault("bpm", {})
+                manual_override = bpm_block.get("manual_override") if isinstance(bpm_block, dict) else None
+                bpm_override = manual_override.get("bpm") if isinstance(manual_override, dict) else None
+    
+                final_bpm = bpm_override if bpm_override is not None else fusion_summary.get("final_bpm")
+                if final_bpm is not None:
+                    bpm_block["estimate"] = final_bpm
+                    backend_payload.setdefault("rhythm", {}).setdefault("global_bpm", final_bpm)
+                    backend_payload.setdefault("style", {}).setdefault("bpm", final_bpm)
+    
+                final_key = fusion_summary.get("final_key")
+                if final_key is not None:
+                    backend_payload.setdefault("tonality", {})["key"] = final_key
+                    backend_payload.setdefault("style", {})["key"] = final_key
+                    backend_payload.setdefault("tonality", {}).setdefault("source", "fusion_engine")
+    
+                final_genre = fusion_summary.get("final_genre") or fusion_summary.get("final_subgenre")
+                if final_genre:
+                    style_block = backend_payload.setdefault("style", {})
+                    style_block["genre"] = final_genre
+                    style_block.setdefault("subgenre", final_genre)
+    
+            style_block = backend_payload.get("style")
+            if isinstance(style_block, dict):
+                macro_genre = style_block.get("macro_genre") or style_block.get("subgenre")
+                current_genre = style_block.get("genre")
+                if macro_genre and (not current_genre or macro_genre not in current_genre):
+                    style_block["genre"] = macro_genre
+    
+            diagnostics_block = backend_payload.get("diagnostics") if isinstance(backend_payload.get("diagnostics"), dict) else {}
+            diagnostics = {**diagnostics_block, **diagnostics}
+            payload.update(backend_payload)
+            payload["diagnostics"] = diagnostics
+    
+            genre_universe = get_genre_universe()
+            genre_info = None
+            if isinstance(style_block, dict) and style_block.get("genre"):
+                try:
+                    genre_info = genre_universe.detect_domain(str(style_block.get("genre")))
+                except Exception:
+                    genre_info = None
+            if genre_info:
+                diagnostics["genre_universe_tags"] = genre_info
+    
+            color_diag = None
+            if isinstance(payload.get("style"), dict):
+                color_wave = payload.get("style", {}).get("color_wave")
+                if color_wave:
+                    color_diag = {"color_wave": color_wave}
+            if color_diag:
+                diagnostics["color"] = color_diag
+    
+            tlp_data = diagnostics.get("tlp") if isinstance(diagnostics.get("tlp"), dict) else tlp
+            if isinstance(tlp_data, dict):
+                diagnostics["tlp_block"] = (
+                    f"[TLP: {tlp_data.get('truth', 0):.2f}/{tlp_data.get('love', 0):.2f}/{tlp_data.get('pain', 0):.2f} | CF {tlp_data.get('conscious_frequency', 0):.2f}]"
+                )
+    
+            rde_diag = diagnostics.get("rde") or rde
+            if isinstance(rde_diag, dict):
+                diagnostics["rde_block"] = (
+                    f"[RDE: resonance={rde_diag.get('resonance')}, fracture={rde_diag.get('fracture')}, entropy={rde_diag.get('entropy')}]"
+                )
+    
+            macro_genre = None
+            if isinstance(payload.get("style"), dict):
+                macro_genre = (
+                    payload.get("style", {}).get("macro_genre")
+                    or payload.get("style", {}).get("genre")
+                    or payload.get("style", {}).get("subgenre")
+                )
+            if macro_genre:
+                diagnostics["genre_block"] = f"[Genre: {macro_genre}]"
+    
+            zero_pulse_info = payload.get("zero_pulse") if isinstance(payload.get("zero_pulse"), dict) else diagnostics.get("zero_pulse")
+            if isinstance(zero_pulse_info, dict):
+                status = zero_pulse_info.get("status", zero_pulse_info.get("has_zero_pulse"))
+                diagnostics["zeropulse_block"] = f"[ZeroPulse: {status}]"
+    
+            color_wave = None
+            if isinstance(payload.get("style"), dict):
+                color_wave = payload.get("style", {}).get("color_wave")
             if color_wave:
-                color_diag = {"color_wave": color_wave}
-        if color_diag:
-            diagnostics["color"] = color_diag
-
-        tlp_data = diagnostics.get("tlp") if isinstance(diagnostics.get("tlp"), dict) else tlp
-        if isinstance(tlp_data, dict):
-            diagnostics["tlp_block"] = (
-                f"[TLP: {tlp_data.get('truth', 0):.2f}/{tlp_data.get('love', 0):.2f}/{tlp_data.get('pain', 0):.2f} | CF {tlp_data.get('conscious_frequency', 0):.2f}]"
+                color_repr = ", ".join(color_wave) if isinstance(color_wave, list) else str(color_wave)
+                diagnostics["color_wave_block"] = f"[ColorWave: {color_repr}]"
+    
+            integrity_diag = diagnostics.get("integrity")
+            if integrity_diag:
+                diagnostics["integrity_block"] = f"[Integrity: {integrity_diag}]"
+    
+            # Build unified summary block from diagnostics
+            summary_block = _build_summary_block(diagnostics)
+    
+            # Run semantic consistency checks and attach report into diagnostics
+            _build_consistency_report(diagnostics, payload)
+    
+            payload["engine"] = "StudioCoreV6"
+            payload.setdefault("ok", True)
+            payload.setdefault("diagnostics", diagnostics)
+    
+            # === Consistency Layer v8 ===
+            try:
+                consistency_block = ConsistencyLayerV8(diagnostics).build()
+                diagnostics["consistency"] = consistency_block
+            except Exception as e:  # noqa: BLE001
+                diagnostics["consistency_error"] = str(e)
+    
+            structured_diagnostics = DiagnosticsBuilderV8(
+                base=diagnostics,
+                payload=payload,
+            ).build()
+    
+            style = payload.get("style") if isinstance(payload.get("style"), dict) else {}
+            lyrics_sections: list[dict[str, Any]] = []
+            headers = structure_context.get("section_headers") or structure_context.get("section_metadata") or []
+            for idx, section in enumerate(sections or []):
+                header_label = None
+                if idx < len(headers) and isinstance(headers[idx], dict):
+                    header_label = headers[idx].get("label") or headers[idx].get("name")
+                section_header = header_label or f"Section {idx + 1}"
+                lyrics_sections.append(
+                    {
+                        "name": section_header,
+                        "mood": "neutral",
+                        "energy": "mid",
+                        "arrangement": "standard",
+                        "lines": [section] if isinstance(section, str) else [],
+                    }
+                )
+    
+            fanf_payload = build_fanf_output(
+                text=normalized_text,
+                style=style or {},
+                lyrics={"sections": lyrics_sections},
+                diagnostics=structured_diagnostics,
             )
-
-        rde_diag = diagnostics.get("rde") or rde
-        if isinstance(rde_diag, dict):
-            diagnostics["rde_block"] = (
-                f"[RDE: resonance={rde_diag.get('resonance')}, fracture={rde_diag.get('fracture')}, entropy={rde_diag.get('entropy')}]"
-            )
-
-        macro_genre = None
-        if isinstance(payload.get("style"), dict):
-            macro_genre = (
-                payload.get("style", {}).get("macro_genre")
-                or payload.get("style", {}).get("genre")
-                or payload.get("style", {}).get("subgenre")
-            )
-        if macro_genre:
-            diagnostics["genre_block"] = f"[Genre: {macro_genre}]"
-
-        zero_pulse_info = payload.get("zero_pulse") if isinstance(payload.get("zero_pulse"), dict) else diagnostics.get("zero_pulse")
-        if isinstance(zero_pulse_info, dict):
-            status = zero_pulse_info.get("status", zero_pulse_info.get("has_zero_pulse"))
-            diagnostics["zeropulse_block"] = f"[ZeroPulse: {status}]"
-
-        color_wave = None
-        if isinstance(payload.get("style"), dict):
-            color_wave = payload.get("style", {}).get("color_wave")
-        if color_wave:
-            color_repr = ", ".join(color_wave) if isinstance(color_wave, list) else str(color_wave)
-            diagnostics["color_wave_block"] = f"[ColorWave: {color_repr}]"
-
-        integrity_diag = diagnostics.get("integrity")
-        if integrity_diag:
-            diagnostics["integrity_block"] = f"[Integrity: {integrity_diag}]"
-
-        # Build unified summary block from diagnostics
-        summary_block = _build_summary_block(diagnostics)
-
-        # Run semantic consistency checks and attach report into diagnostics
-        _build_consistency_report(diagnostics, payload)
-
-        payload["engine"] = "StudioCoreV6"
-        payload.setdefault("ok", True)
-        payload.setdefault("diagnostics", diagnostics)
-
-        # === Consistency Layer v8 ===
-        try:
-            consistency_block = ConsistencyLayerV8(diagnostics).build()
-            diagnostics["consistency"] = consistency_block
-        except Exception as e:  # noqa: BLE001
-            diagnostics["consistency_error"] = str(e)
-
-        structured_diagnostics = DiagnosticsBuilderV8(
-            base=diagnostics,
-            payload=payload,
-        ).build()
-
-        style = payload.get("style") if isinstance(payload.get("style"), dict) else {}
-        lyrics_sections: list[dict[str, Any]] = []
-        headers = structure_context.get("section_headers") or structure_context.get("section_metadata") or []
-        for idx, section in enumerate(sections or []):
-            header_label = None
-            if idx < len(headers) and isinstance(headers[idx], dict):
-                header_label = headers[idx].get("label") or headers[idx].get("name")
-            section_header = header_label or f"Section {idx + 1}"
-            lyrics_sections.append(
-                {
-                    "name": section_header,
-                    "mood": "neutral",
-                    "energy": "mid",
-                    "arrangement": "standard",
-                    "lines": [section] if isinstance(section, str) else [],
-                }
-            )
-
-        fanf_payload = build_fanf_output(
-            text=normalized_text,
-            style=style or {},
-            lyrics={"sections": lyrics_sections},
-            diagnostics=structured_diagnostics,
-        )
-
-        ui_text = _extract_ui_text(fanf_payload.get("lyrics_prompt", "")) if fanf_payload.get("lyrics_prompt") else _extract_ui_text(incoming_text)
-
-        fanf_block: dict[str, Any] = {}
-        if isinstance(payload.get("fanf"), dict):
-            fanf_block.update(payload.get("fanf", {}))
-        fanf_block.update(fanf_payload)
-        fanf_block.setdefault("ui_text", ui_text)
-
-        payload["summary"] = fanf_block.get("summary", summary_block)
-        payload["fanf"] = fanf_block
-
-        final_result = self._finalize_result(payload)
-        final_result["engine"] = "StudioCoreV6"
-        final_result.setdefault("ok", True)
-
-        final_result["diagnostics"] = structured_diagnostics
-        final_result.setdefault("fanf", fanf_block)
-
-        # === RUNTIME LOGGING ===================================================
-        try:
-            write_runtime_log({
-                "text_preview": text[:200],
-                "diagnostics": final_result.get("diagnostics"),
-                "fanf": final_result.get("fanf"),
-            })
-        except Exception as e:
-            # Logging must never break execution
-            pass
-        return final_result
+    
+            ui_text = _extract_ui_text(fanf_payload.get("lyrics_prompt", "")) if fanf_payload.get("lyrics_prompt") else _extract_ui_text(incoming_text)
+    
+            fanf_block: dict[str, Any] = {}
+            if isinstance(payload.get("fanf"), dict):
+                fanf_block.update(payload.get("fanf", {}))
+            fanf_block.update(fanf_payload)
+            fanf_block.setdefault("ui_text", ui_text)
+    
+            payload["summary"] = fanf_block.get("summary", summary_block)
+            payload["fanf"] = fanf_block
+    
+            final_result = self._finalize_result(payload)
+            final_result["engine"] = "StudioCoreV6"
+            final_result.setdefault("ok", True)
+    
+            final_result["diagnostics"] = structured_diagnostics
+            final_result.setdefault("fanf", fanf_block)
+    
+            # === RUNTIME LOGGING ===================================================
+            try:
+                write_runtime_log({
+                    "text_preview": text[:200],
+                    "diagnostics": final_result.get("diagnostics"),
+                    "fanf": final_result.get("fanf"),
+                })
+            except Exception as e:
+                # Logging must never break execution
+                pass
+            return final_result
+        finally:
+            self._reset_state()
 
     def _merge_user_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
         params = dict(params)
@@ -862,6 +1001,7 @@ class StudioCoreV6:
         language_info: Dict[str, Any] | None = None,
         original_text: str | None = None,
         command_bundle: Dict[str, Any] | None = None,
+        engines: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         base_sections = list(structure_context.get("sections", []))
         hinted_sections = semantic_hints.get("sections")
