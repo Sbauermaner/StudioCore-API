@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, Sequence
 
@@ -60,6 +61,29 @@ class RhythmDynamicsEmotionEngine:
         Passive hook. Returns a neutral EmotionVector until dynamic mode is enabled.
         """
         return TruthLovePainEngine().export_emotion_vector(text)  # Delegate to TLP Engine
+
+    def calc_resonance(self, text: str) -> float:
+        if not text:
+            return 0.0
+        sentences = re.split(r"[.!?]+", text)
+        density = sum(len(s.strip()) for s in sentences if s.strip())
+        normalized = min(1.0, max(0.0, density / 500.0))
+        return round(normalized, 4)
+
+    def calc_fracture(self, text: str) -> float:
+        if not text:
+            return 0.0
+        fractures = len(re.findall(r"(\.{3}|--|—)", text)) + text.count("!")
+        tokens = max(1, len(re.findall(r"\b\w+\b", text)))
+        return round(min(1.0, fractures / tokens), 4)
+
+    def calc_entropy(self, text: str) -> float:
+        if not text:
+            return 0.0
+        tokens = re.findall(r"\b\w+\b", text.lower())
+        unique = len(set(tokens))
+        total = max(1, len(tokens))
+        return round(min(1.0, unique / total), 4)
 
 
 __all__ = ["RDESnapshot", "RhythmDynamicsEmotionEngine"]

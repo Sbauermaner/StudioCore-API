@@ -26,6 +26,15 @@ class TruthLovePainEngine(_TruthLovePainEngine):
         profile["balance"] = round((profile.get("truth", 0.0) + profile.get("love", 0.0)) - profile.get("pain", 0.0), 3)
         return profile
 
+    def truth_score(self, text: str) -> float:
+        return float(self.analyze(text).get("truth", 0.0))
+
+    def love_score(self, text: str) -> float:
+        return float(self.analyze(text).get("love", 0.0))
+
+    def pain_score(self, text: str) -> float:
+        return float(self.analyze(text).get("pain", 0.0))
+
     def export_emotion_vector(self, text: str) -> EmotionVector:
         """
         Calculates dynamic Valence and Arousal based on TLP scores.

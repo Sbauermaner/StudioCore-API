@@ -12,7 +12,6 @@ StudioCore v4.3.11 — Monolith (v6 - Suno Аннотации)
 
 from __future__ import annotations
 import re
-import json
 from statistics import mean
 from typing import Dict, Any, List, Tuple, Optional
 import logging
@@ -26,13 +25,12 @@ import logging
 # AI_TRAINING_PROHIBITED: Redistribution or training of AI models on this codebase
 # without explicit written permission from the Author is prohibited.
 
-from .config import load_config
+from .config import DEFAULT_CONFIG, load_config
 # v16: ИСПРАВЛЕН ImportError
 from .text_utils import normalize_text_preserve_symbols, extract_raw_blocks
 # v15: Исправлен ImportError (возвращаем оригинальные имена)
 from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 from .tone import ToneSyncEngine
-from .adapter import build_suno_prompt
 from .vocals import VocalProfileRegistry
 from .integrity import IntegrityScanEngine as FullIntegrityScanEngine  # Импорт движка V6
 from .rhythm import LyricMeter
@@ -445,125 +443,55 @@ class StudioCore:
         version: Optional[str] = None,
         semantic_hints: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        
+
         log.debug(f"--- ЗАПУСК АНАЛИЗА (v{STUDIOCORE_VERSION}) ---")
         log.debug(f"Preferred Gender: {preferred_gender}, Text: {text[:40]}...")
-        
-        if not self.style:
-            return {"error": "StyleMatrix не загружен."}
 
-        version = version or self.cfg.get("suno_version", "v5")
-        
-        # 1. Базовый анализ
-        log.debug("Вызов: normalize_text_preserve_symbols")
         raw = normalize_text_preserve_symbols(text)
-        
-        log.debug("Вызов: self.emotion.analyze")
-        emo = self.emotion.analyze(raw)
-        log.debug(f"Результат EMO: {emo}")
-        
-        log.debug("Вызов: self.tlp.analyze")
-        tlp = self.tlp.analyze(raw)
-        log.debug(f"Результат TLP: {tlp}")
-        
-        log.debug("Вызов: self.rhythm.analyze")
-        rhythm_analysis = self.rhythm.analyze(
-            raw,
-            emotions=emo,
-            tlp=tlp,
-            cf=tlp.get("conscious_frequency"),
-        )
-        bpm_base = int(round(rhythm_analysis.get("global_bpm", 120)))
+        text_blocks = extract_raw_blocks(raw)
+
+        emotions = self.emotion.analyze(raw)
+        log.debug(f"Результат EMO: {emotions}")
+
+        rhythm_analysis = self.rhythm.analyze(raw, emotions=emotions, tlp=None, cf=None)
+        bpm = int(round(rhythm_analysis.get("global_bpm", DEFAULT_CONFIG.FALLBACK_BPM)))
         log.debug(
             "Базовый BPM: %s (header=%s, estimated=%s)",
-            bpm_base,
+            bpm,
             rhythm_analysis.get("header_bpm"),
             rhythm_analysis.get("estimated_bpm"),
         )
 
-        # 2. Анализ вокала по секциям
-        log.debug("Вызов: self._analyze_sections")
-        text_blocks = extract_raw_blocks(raw) # (из text_utils)
-        vocal_analysis = self._analyze_sections(text_blocks, preferred_gender)
-        
-        final_gender_preference = vocal_analysis["final_gender_preference"]
-        user_voice_hint = vocal_analysis["user_voice_hint"]
-        
-        log.debug(f"Статус вокального выбора: {'USER-DEFINED' if user_voice_hint else 'AUTO-DETECT'}")
+        tone_hint = self.tone.detect_key(raw)
+        key = tone_hint.get("key") if tone_hint else DEFAULT_CONFIG.FALLBACK_KEY
+        if not key or key == "auto":
+            key = DEFAULT_CONFIG.FALLBACK_KEY
 
-        # 3. Стиль (Style)
-        log.debug("Вызов: self.style.build")
-        # Передаем хинт в style.build
-        style = self.style.build(emo, tlp, raw, bpm_base, semantic_hints, user_voice_hint)
-        log.debug(f"Результат Style: Genre={style['genre']}, Style={style['style']}")
+        structure = {
+            "sections": text_blocks,
+            "section_count": len(text_blocks),
+            "layout": DEFAULT_CONFIG.FALLBACK_STRUCTURE,
+        }
 
-        # 4. Семантические секции (Suno)
-        # (Используем BPM из style.build и ключ из style.build)
-        log.debug("Вызов: self._build_semantic_layers")
-        semantic_layers = self._build_semantic_layers(emo, tlp, style.get('bpm', bpm_base), style.get('key'))
-        bpm_adj = semantic_layers["bpm_suggested"]
-        semantic_sections = semantic_layers["layers"]["sections"]
-        
-        # 5. Вокал и Инструменты
-        log.debug("Вызов: self.vocals.get")
-        vox, inst, vocal_form = self.vocals.get(
-            style["genre"],
-            final_gender_preference,
-            raw,
-            [], # (sections больше не нужны, используем vocal_profile_tags)
-            vocal_analysis["section_profiles"]
-        )
-        style["vocal_form"] = vocal_form # Обновляем стиль финальной формой
-        style["vocal_count"] = vocal_analysis.get("vocal_count", 1) # (из allocator, если он есть)
-        
-        log.debug(f"Результат Vocals: Form={vocal_form}, Vox={vox}, Inst={inst}, Count={style['vocal_count']}")
-
-        # 6. Остальные движки
-        log.debug("Вызов: self.freq.resonance_profile")
-        freq = self.freq.resonance_profile(tlp)
-        freq["recommended_octaves"] = self.safety.clamp_octaves(freq["recommended_octaves"])
-        
-        log.debug("Вызов: self.integrity.analyze")
-        integ = self.integrity.analyze(raw)
-        
-        log.debug("Вызов: self.tone.colors_for_primary")
-        tone = self.tone.colors_for_primary(emo, tlp, style.get("key", "auto"))
-        
-        philosophy = (f"T={tlp.get('truth', 0):.2f}, L={tlp.get('love', 0):.2f}, "
-                      f"P={tlp.get('pain', 0):.2f}, CF={tlp.get('conscious_frequency', 0):.2f}")
-
-        # 7. Аннотация (v6 - Suno)
-        log.debug("Вызов: self.annotate_text")
-        annotated_text_ui, annotated_text_suno = self.annotate_text(
-            text_blocks, 
-            vocal_analysis["section_profiles"], 
-            semantic_sections
-        )
-
-        # 8. Финальные Промпты
-        log.debug("Вызов: build_suno_prompt (STYLE)")
-        prompt_suno_style = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, prompt_variant="suno_style")
-
-        log.debug("Вызов: build_suno_prompt (LYRICS)")
-        prompt_suno_lyrics = build_suno_prompt(style, vox, inst, bpm_adj, philosophy, version, prompt_variant="suno_lyrics")
+        style = {
+            "genre": DEFAULT_CONFIG.FALLBACK_STYLE,
+            "style": DEFAULT_CONFIG.FALLBACK_STYLE,
+            "bpm": bpm,
+            "key": key,
+            "visual": DEFAULT_CONFIG.FALLBACK_VISUAL,
+            "narrative": DEFAULT_CONFIG.FALLBACK_NARRATIVE,
+            "structure": DEFAULT_CONFIG.FALLBACK_STRUCTURE,
+            "emotion": emotions.get("dominant") or DEFAULT_CONFIG.FALLBACK_EMOTION,
+        }
 
         log.debug("--- АНАЛИЗ УСПЕШНО ЗАВЕРШЕН ---")
 
         return {
-            "emotions": emo, "tlp": tlp, "bpm": bpm_adj, "frequency": freq,
-            "style": style, "vocals": vox, "instruments": inst,
-            "vocal_form": vocal_form, "final_gender_preference": final_gender_preference,
-            "integrity": integ, "tone_sync": tone,
-            "rhythm": rhythm_analysis,
-
-            "annotated_text_ui": annotated_text_ui,     # v6: Для Gradio UI
-            "annotated_text_suno": annotated_text_suno, # v6: Для Suno Lyrics
-            "prompt_suno_style": prompt_suno_style,   # v6: Для Suno Style
-            "prompt_suno_lyrics": prompt_suno_lyrics, # v6: (Legacy)
-
-            "semantic_layers": semantic_layers,
-            "version": version,
-            "vocal_detection_state": "AUTO-DETECT" if not user_voice_hint else "USER-DEFINED",
+            "emotions": emotions,
+            "bpm": bpm,
+            "key": key,
+            "structure": structure,
+            "style": style,
         }
 
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 import copy
 import os
 import re
-from dataclasses import asdict
 from typing import Any, Dict, Iterable, List, Sequence
 
 from .bpm_engine import BPMEngine
@@ -22,10 +21,10 @@ from .multimodal_emotion_matrix import MultimodalEmotionMatrixV1
 from .color_engine_adapter import ColorEngineAdapter
 from .emotion_field import EmotionFieldEngine
 from .emotion_profile import EmotionAggregator, EmotionVector
-from .rde_engine import RhythmDynamicsEmotionEngine
+# Lazy imports moved inside functions to avoid circular dependencies
+# (per StudioCore Constitution)
+# Imports now occur inside method bodies only when needed.
 from .tone import ToneSyncEngine
-from .section_parser import SectionParser
-from .tlp_engine import TruthLovePainEngine
 from .genre_router import DynamicGenreRouter
 from .genre_universe_adapter import GenreUniverseAdapter
 from .dynamic_emotion_engine import DynamicEmotionEngine
@@ -40,18 +39,15 @@ from .logical_engines import (
     LyricsAnnotationEngine,
     MeaningVelocityEngine,
     REM_Synchronizer,
-    StyleEngine,
     TextStructureEngine,
     TonalityEngine,
     UserAdaptiveSymbiosisEngine,
     UserOverrideEngine,
-    VocalEngine,
     ZeroPulseEngine,
 )
 from .emotion import EmotionEngine
 from .instrument_dynamics import InstrumentalDynamicsEngine
 from .integrity import IntegrityScanEngine
-from .genre_matrix_extended import GenreMatrixExtended
 from .section_intelligence import SectionIntelligenceEngine
 from .suno_annotations import (
     SunoAnnotationEngine,
@@ -180,6 +176,13 @@ class StudioCoreV6:
     """Light-weight compatibility surface for the upcoming v6 engine."""
 
     def __init__(self) -> None:
+        from .genre_matrix_extended import GenreMatrixExtended
+        from .rde_engine import RhythmDynamicsEmotionEngine
+        from .section_parser import SectionParser
+        from .style import StyleEngine
+        from .tlp_engine import TruthLovePainEngine
+        from .vocals import VocalEngine
+
         self.text_engine = TextStructureEngine()
         self.section_parser = SectionParser(self.text_engine)
         self.emotion_engine = LegacyEmotionEngine()
@@ -222,6 +225,11 @@ class StudioCoreV6:
         self._legacy_core_cls = LegacyCore
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
+        if not isinstance(text, str):
+            return {"error": "invalid_input_type", "engine": "StudioCoreV6"}
+        if not text.strip():
+            return {"error": "empty_input", "engine": "StudioCoreV6"}
+
         incoming_text = text or ""
         self.text_engine.reset()
 
@@ -568,16 +576,14 @@ class StudioCoreV6:
 
         # 3. Emotional layers
         dominant_emotion = self._resolve_dominant_emotion(text, emotion_profile)
-        tlp_profile = self.tlp_engine.analyze(text) or {}
-        if not isinstance(tlp_profile, dict):
-            tlp_profile = {}
         tlp_profile = {
-            "truth": float(tlp_profile.get("truth", 0.0)),
-            "love": float(tlp_profile.get("love", 0.0)),
-            "pain": float(tlp_profile.get("pain", 0.0)),
-            "conscious_frequency": float(tlp_profile.get("conscious_frequency", tlp_profile.get("cf", 0.5) or 0.5)),
-            **{k: v for k, v in tlp_profile.items() if k not in {"truth", "love", "pain", "conscious_frequency"}},
+            "truth": float(min(1, max(0, self.tlp_engine.truth_score(text)))),
+            "love": float(min(1, max(0, self.tlp_engine.love_score(text)))),
+            "pain": float(min(1, max(0, self.tlp_engine.pain_score(text)))),
         }
+        tlp_profile["conscious_frequency"] = round(
+            (tlp_profile["truth"] + tlp_profile["love"] + tlp_profile["pain"]) / 3, 4
+        )
         if all(value == 0.0 for value in (tlp_profile.get("truth"), tlp_profile.get("love"), tlp_profile.get("pain"))):
             tlp_profile.update({"truth": 0.33, "love": 0.33, "pain": 0.34})
         tlp_profile.setdefault("base_hz", 432.1)
@@ -587,8 +593,8 @@ class StudioCoreV6:
             tlp_profile["dominant_name"] = dominant_emotion
             tlp_profile["emotion"] = dominant_emotion
         else:
-            tlp_profile.setdefault("dominant_name", "neutral")
-            tlp_profile.setdefault("emotion", "neutral")
+            tlp_profile.setdefault("dominant_name", DEFAULT_CONFIG.FALLBACK_EMOTION)
+            tlp_profile.setdefault("emotion", DEFAULT_CONFIG.FALLBACK_EMOTION)
         emotion_payload = {
             "profile": emotion_profile,
             "dynamic_profile": dynamic_emotion_profile,
@@ -1298,29 +1304,11 @@ class StudioCoreV6:
 
         diagnostics["tonality"] = dict(tonality_payload)
 
-        rde_snapshot = self.rde_engine.compose(
-            bpm_payload=bpm_payload,
-            breathing_profile={**breathing_profile, "sync_score": breath_sync},
-            emotion_profile=emotion_profile,
-            instrumentation_payload=instrumentation_payload,
-        )
-        rde_summary = asdict(rde_snapshot)
-        bpm_variance = 0.0
-        if bpm_curve:
-            bpm_variance = float(max(bpm_curve) - min(bpm_curve))
-        instrumentation_consistency: str | bool = "unknown"
-        if bpm_curve:
-            instrumentation_consistency = bpm_variance < 40.0
-        genre_alignment: str | bool = "unknown"
-        if style_payload.get("genre") and genre_analysis.get("domain_genre"):
-            genre_alignment = bool(str(style_payload.get("genre")).lower() == str(genre_analysis.get("domain_genre")).lower())
-        rde_summary.update(
-            {
-                "instrumentation_consistency": instrumentation_consistency,
-                "genre_alignment": genre_alignment,
-                "bpm_variance": bpm_variance,
-            }
-        )
+        rde_summary = {
+            "resonance": self.rde_engine.calc_resonance(text),
+            "fracture": self.rde_engine.calc_fracture(text),
+            "entropy": self.rde_engine.calc_entropy(text),
+        }
 
         integrity_report = self.integrity_engine.analyze(text)
         diagnostics["integrity"] = dict(integrity_report)
@@ -1391,6 +1379,29 @@ class StudioCoreV6:
         )
         emotion_matrix = matrix if isinstance(matrix, dict) else {}
         diagnostics["emotion_matrix"] = emotion_matrix
+
+        bpm = max(
+            40,
+            min(
+                200,
+                int(
+                    80
+                    + (emotion_matrix.get("joy", 0) * 30)
+                    - (emotion_matrix.get("sadness", 0) * 20)
+                    + (emotion_matrix.get("anger", 0) * 25)
+                )
+            ),
+        )
+
+        bpm_block = result.get("bpm") if isinstance(result.get("bpm"), dict) else {}
+        bpm_block = dict(bpm_block)
+        bpm_block["estimate"] = bpm
+        result["bpm"] = bpm_block
+        diagnostics.setdefault("bpm", {})["estimate"] = bpm
+
+        style_block = result.get("style") if isinstance(result.get("style"), dict) else {}
+        style_block.setdefault("bpm", bpm)
+        result["style"] = style_block
         # === Inject emotion_matrix_v1 hints (fallback) ===
         em_bpm = emotion_matrix.get("bpm", {}) if isinstance(emotion_matrix, dict) else {}
         em_key = emotion_matrix.get("key", {}) if isinstance(emotion_matrix, dict) else {}
@@ -1724,7 +1735,7 @@ class StudioCoreV6:
     ) -> tuple[list[str], str, str]:
         manual_key = getattr(overrides, "key", None)
         keys = [key for key in (detected_keys or []) if key]
-        base_key = manual_key or (keys[0] if keys else None) or "C minor"
+        base_key = manual_key or (keys[0] if keys else None) or DEFAULT_CONFIG.FALLBACK_KEY
         section_count = len(sections)
         normalized: list[str] = []
         if section_count:
