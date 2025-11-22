@@ -70,6 +70,7 @@ from studiocore.emotion_curve import build_global_emotion_curve
 from studiocore.frequency import RNSSafety, UniversalFrequencyEngine
 from studiocore.config import DEFAULT_CONFIG, FORCED_GENRES, KEYWORD_MAP
 from studiocore.diagnostics_v8 import DiagnosticsBuilderV8
+from studiocore.consistency_v8 import ConsistencyLayerV8
 
 logger = logging.getLogger(__name__)
 
@@ -696,6 +697,12 @@ class StudioCoreV6:
         final_result = self._finalize_result(payload)
         final_result["engine"] = "StudioCoreV6"
         final_result.setdefault("ok", True)
+        # === Consistency Layer v8 ===
+        try:
+            consistency_block = ConsistencyLayerV8(diagnostics).build()
+            diagnostics["consistency"] = consistency_block
+        except Exception as e:  # noqa: BLE001
+            diagnostics["consistency_error"] = str(e)
         structured_diagnostics = DiagnosticsBuilderV8(
             base=diagnostics,
             payload=final_result,
