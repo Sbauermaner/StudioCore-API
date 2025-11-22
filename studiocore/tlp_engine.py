@@ -10,6 +10,8 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, List, Tuple
 
+from .config import DEFAULT_CONFIG
+
 from studiocore.emotion_profile import EmotionVector, EmotionAggregator
 
 from .emotion import TruthLovePainEngine as _TruthLovePainEngine
@@ -34,6 +36,50 @@ class TruthLovePainEngine(_TruthLovePainEngine):
 
     def pain_score(self, text: str) -> float:
         return float(self.analyze(text).get("pain", 0.0))
+
+    def tlp_vector(self, text: str, emotion_matrix: Dict[str, float]) -> Dict[str, float]:
+        """Return normalized TLP axis."""
+        low = text.lower()
+
+        truth_score = 0.0
+        love_score = 0.0
+        pain_score = 0.0
+
+        # Простые эвристики (можно расширять)
+        truth_keywords = ("правда", "честно", "искренне", "правдивый", "honest", "truth")
+        love_keywords = ("любовь", "люблю", "сердце", "обнимаю", "love", "dear")
+        pain_keywords = ("боль", "страдание", "рана", "кровь", "слёзы", "pain", "hurt")
+
+        for w in truth_keywords:
+            if w in low:
+                truth_score += 1.0
+        for w in love_keywords:
+            if w in low:
+                love_score += 1.0
+        for w in pain_keywords:
+            if w in low:
+                pain_score += 1.0
+
+        # Эмоции подмешиваем к осям
+        love_score += emotion_matrix.get("joy", 0.0) * 0.6 + emotion_matrix.get("hope", 0.0) * 0.4
+        pain_score += emotion_matrix.get("sadness", 0.0) * 0.6 + emotion_matrix.get("anger", 0.0) * 0.4
+
+        # Нормализация
+        maximum = max(truth_score, love_score, pain_score, 1e-6)
+        truth = truth_score / maximum
+        love = love_score / maximum
+        pain = pain_score / maximum
+
+        cmin = DEFAULT_CONFIG.TLP_CLAMP_MIN
+        cmax = DEFAULT_CONFIG.TLP_CLAMP_MAX
+
+        tlp = {
+            "truth": float(min(cmax, max(cmin, truth))),
+            "love": float(min(cmax, max(cmin, love))),
+            "pain": float(min(cmax, max(cmin, pain))),
+        }
+        tlp["conscious_frequency"] = round((tlp["truth"] + tlp["love"] + tlp["pain"]) / 3.0, 4)
+        return tlp
 
     def export_emotion_vector(self, text: str) -> EmotionVector:
         """

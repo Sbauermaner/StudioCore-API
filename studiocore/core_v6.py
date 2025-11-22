@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import os
 import re
+import logging
 from typing import Any, Dict, Iterable, List, Sequence
 
 from .bpm_engine import BPMEngine
@@ -68,6 +69,8 @@ from studiocore.emotion_map import EmotionMapEngine
 from studiocore.emotion_curve import build_global_emotion_curve
 from studiocore.frequency import RNSSafety, UniversalFrequencyEngine
 from studiocore.config import DEFAULT_CONFIG
+
+logger = logging.getLogger(__name__)
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
@@ -141,13 +144,17 @@ class StudioCoreV6:
         try:
             from .fusion_engine_v64 import FusionEngineV64
         except Exception as e:
+            logger.exception("FusionEngineV64 import failed: %s", e)
             diagnostics.setdefault("fusion_warning", str(e))
+            diagnostics.setdefault("errors", []).append("fusion_import_failed")
             FusionEngineV64 = None  # type: ignore
 
         try:
             from .adapter import build_suno_prompt
         except Exception as e:
+            logger.exception("Suno prompt adapter import failed: %s", e)
             diagnostics.setdefault("suno_prompt_warning", str(e))
+            diagnostics.setdefault("errors", []).append("suno_prompt_import_failed")
             build_suno_prompt = None  # type: ignore
 
         fusion_summary = None
@@ -160,6 +167,8 @@ class StudioCoreV6:
                 if fusion_summary is not None:
                     result["fusion_summary"] = fusion_summary
             except Exception as e:
+                logger.exception("Fusion generate failed: %s", e)
+                diagnostics.setdefault("errors", []).append("fusion_generate_failed")
                 diagnostics["fusion_warning"] = f"FusionEngineV64 failed: {e}"
 
         # --- Suno prompt (optional) ---
@@ -169,6 +178,8 @@ class StudioCoreV6:
                 if suno_prompt:
                     result["suno_prompt"] = suno_prompt
             except Exception as e:
+                logger.exception("Suno prompt build failed: %s", e)
+                diagnostics.setdefault("errors", []).append("suno_prompt_build_failed")
                 diagnostics["suno_prompt_warning"] = f"suno prompt build failed: {e}"
 
         result["diagnostics"] = diagnostics
@@ -226,9 +237,9 @@ class StudioCoreV6:
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         if not isinstance(text, str):
-            return {"error": "invalid_input_type", "engine": "StudioCoreV6"}
+            return {"error": DEFAULT_CONFIG.ERROR_INVALID_INPUT_TYPE, "engine": "StudioCoreV6"}
         if not text.strip():
-            return {"error": "empty_input", "engine": "StudioCoreV6"}
+            return {"error": DEFAULT_CONFIG.ERROR_EMPTY_INPUT, "engine": "StudioCoreV6"}
 
         incoming_text = text or ""
         self.text_engine.reset()
@@ -300,6 +311,38 @@ class StudioCoreV6:
 
         # Best-effort FusionEngine + Suno prompt integration
         backend_payload = self._apply_fusion_and_suno(backend_payload)
+
+        from .emotion import EmotionEngineV2
+        from .tlp_engine import TruthLovePainEngine
+        from .bpm_engine import BPMEngine
+        from .rde_engine import ResonanceDynamicsEngine
+
+        emotion_engine = EmotionEngineV2()
+        emotion_matrix = emotion_engine.analyze(incoming_text)
+
+        tlp_engine = TruthLovePainEngine()
+        tlp = tlp_engine.tlp_vector(incoming_text, emotion_matrix)
+
+        lines = incoming_text.splitlines()
+        bpm_engine = BPMEngine()
+        bpm = bpm_engine.compute_bpm_v2(lines)
+
+        rde_engine = ResonanceDynamicsEngine()
+        rde = {
+            "resonance": rde_engine.calc_resonance(incoming_text),
+            "fracture": rde_engine.calc_fracture(incoming_text),
+            "entropy": rde_engine.calc_entropy(incoming_text),
+        }
+
+        diagnostics["emotion_matrix"] = emotion_matrix
+        diagnostics["tlp"] = tlp
+        diagnostics["rde"] = rde
+
+        backend_payload["emotion_matrix"] = emotion_matrix
+        backend_payload["tlp"] = tlp
+        bpm_block = backend_payload.get("bpm") if isinstance(backend_payload.get("bpm"), dict) else {}
+        backend_payload["bpm"] = {**(bpm_block or {}), "flow_estimate": bpm}
+        backend_payload["rde"] = rde
 
         # CRITICAL FIX: Propagate Fusion results to ensure final BPM/Key/Genre consistency
         if fusion_summary := backend_payload.get("fusion_summary"):
@@ -1478,11 +1521,16 @@ class StudioCoreV6:
         diagnostics["instrumentation"] = instr_diag
 
         result["emotion_matrix"] = matrix
-        result["suno_annotation"] = build_suno_annotations(
-            text=text,
-            sections=section_intel_payload.get("section_emotions", []),
-            emotion_curve=curve_dict,
-        )
+        try:
+            result["suno_annotation"] = build_suno_annotations(
+                text=text,
+                sections=section_intel_payload.get("section_emotions", []),
+                emotion_curve=curve_dict,
+            )
+        except Exception as exc:  # pragma: no cover - external integration guard
+            logger.exception("Suno annotation build failed: %s", exc)
+            diagnostics.setdefault("errors", []).append("suno_annotation_failed")
+            result["suno_annotation"] = {}
         fanf_analysis_payload = {
             "emotion": {"profile": emotion_profile, "curve": emotion_curve},
             "bpm": bpm_payload,
@@ -1531,6 +1579,8 @@ class StudioCoreV6:
             )
             result["fusion_summary"] = fusion_summary
         except Exception as exc:
+            logger.exception("FusionEngineV64 failed during final fusion: %s", exc)
+            diagnostics.setdefault("errors", []).append("fusion_generate_failed")
             result["fusion_summary"] = {
                 "annotated_text_fanf": "FANF generation unavailable.",
                 "annotated_text_ui": "FANF generation unavailable.",
@@ -1578,10 +1628,15 @@ class StudioCoreV6:
             instrumentation_diag = {**instrumentation_diag, "fractures": fractures}
         diagnostics["instrumentation"] = instrumentation_diag
 
-        suno_annotations = self.suno_engine.build_suno_safe_annotations(
-            sections,
-            {**diagnostics, "commands": command_payload},
-        ) or []
+        suno_annotations: list[Any] = []
+        try:
+            suno_annotations = self.suno_engine.build_suno_safe_annotations(
+                sections,
+                {**diagnostics, "commands": command_payload},
+            ) or []
+        except Exception as exc:
+            logger.exception("Suno safe annotations failed: %s", exc)
+            diagnostics.setdefault("errors", []).append("suno_safe_annotations_failed")
         result["suno_annotations"] = suno_annotations
         if language_info:
             result["language"] = dict(language_info)
