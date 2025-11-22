@@ -137,6 +137,54 @@ class GenreWeightsEngine:
             "soft": "folk",
         }
 
+        self.genre_profiles: Dict[str, Dict[str, float]] = getattr(self, "genre_profiles", {})
+        self.genre_profiles.update(
+            {
+                "баллада": {
+                    "structure_weight": 0.35,
+                    "emotion_weight": 0.40,
+                    "lexicon_weight": 0.15,
+                    "narrative_weight": 0.10,
+                },
+                "ода": {
+                    "structure_weight": 0.30,
+                    "emotion_weight": 0.35,
+                    "lexicon_weight": 0.25,
+                    "narrative_weight": 0.10,
+                },
+                "сонет": {
+                    "structure_weight": 0.45,
+                    "emotion_weight": 0.30,
+                    "lexicon_weight": 0.15,
+                    "narrative_weight": 0.10,
+                },
+                "притча": {
+                    "structure_weight": 0.25,
+                    "emotion_weight": 0.25,
+                    "lexicon_weight": 0.20,
+                    "narrative_weight": 0.30,
+                },
+                "реп_текст": {
+                    "structure_weight": 0.20,
+                    "emotion_weight": 0.40,
+                    "lexicon_weight": 0.30,
+                    "narrative_weight": 0.10,
+                },
+                "spoken_word": {
+                    "structure_weight": 0.20,
+                    "emotion_weight": 0.45,
+                    "lexicon_weight": 0.25,
+                    "narrative_weight": 0.10,
+                },
+                "верлибр": {
+                    "structure_weight": 0.15,
+                    "emotion_weight": 0.45,
+                    "lexicon_weight": 0.25,
+                    "narrative_weight": 0.15,
+                },
+            }
+        )
+
         self._universe_domain_cache: Dict[str, List[str]] = {}
 
     # ---------- Внутренняя логика ----------

@@ -42,11 +42,15 @@ class GenreUniverse:
         self.music: List[str] = self.music_genres
         self.literature_styles: List[str] = self.literary_schools
         self.literature: List[str] = self.literary_schools
+        self.literary: List[str] = self.literary_schools
         self.stage: List[str] = self.dramatic_genres
+        self.drama: List[str] = self.dramatic_genres
         self.comedy_genres: List[str] = self.comedy_forms
         self.edm_genres: List[str] = self.edm_styles
         self.gothic_styles: List[str] = self.gothic_directions
+        self.gothic: List[str] = self.gothic_directions
         self.ethnic_schools: List[str] = self.ethnic_music_schools
+        self.ethnic: List[str] = self.ethnic_music_schools
 
     # === UTILS ===
     @staticmethod

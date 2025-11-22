@@ -24,7 +24,7 @@ from .emotion_profile import EmotionAggregator, EmotionVector
 # Lazy imports moved inside functions to avoid circular dependencies
 # (per StudioCore Constitution)
 # Imports now occur inside method bodies only when needed.
-from .tone import ToneSyncEngine
+from .tone import ToneSyncEngine as LegacyToneSyncEngine
 from .genre_router import DynamicGenreRouter
 from .genre_universe_adapter import GenreUniverseAdapter
 from .dynamic_emotion_engine import DynamicEmotionEngine
@@ -194,7 +194,7 @@ class StudioCoreV6:
         self.bpm_engine = BPMEngine()
         self.meaning_engine = MeaningVelocityEngine()
         self.tonality_engine = TonalityEngine()
-        self.tone_engine = ToneSyncEngine()
+        self.tone_engine = LegacyToneSyncEngine()
         self.instrumentation_engine = InstrumentationEngine()
         self.section_intelligence = SectionIntelligenceEngine()
         self.instrument_dynamics = InstrumentalDynamicsEngine()
@@ -1418,6 +1418,20 @@ class StudioCoreV6:
                 }
         diagnostics["bpm"] = bpm_diag
 
+        musical_key = key_hint or (tonality_payload.get("key") if isinstance(tonality_payload, dict) else None)
+        from .tone_sync import ToneSyncEngine
+
+        tone_engine = ToneSyncEngine()
+        tone_profile = tone_engine.pick_profile(
+            bpm=bpm,
+            key=musical_key,
+            tlp=tlp_profile,
+            emotion_matrix=emotion_matrix,
+        )
+
+        result["tone_profile"] = tone_profile
+        diagnostics["tone_profile"] = tone_profile
+
         tonality_diag = diagnostics.get("tonality", {}) if isinstance(diagnostics.get("tonality"), dict) else {}
         key_mode = em_key.get("mode")
         if tonality_diag.get("key") in (None, "auto") and key_mode:
@@ -1629,6 +1643,7 @@ class StudioCoreV6:
         merged["summary"] = payload.get("style", {}).get("prompt") or payload.get("summary") or ""
         merged["section_emotions"] = payload.get("section_emotions", [])
         merged["emotion_curve"] = payload.get("emotion_curve", {})
+        merged["tone_profile"] = payload.get("tone_profile", {})
         merged["diagnostics"] = payload.get("diagnostics", {})
         merged.pop("_overrides_applied", None)
         return merged
