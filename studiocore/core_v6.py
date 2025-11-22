@@ -1668,6 +1668,88 @@ class StudioCoreV6:
 
         result["diagnostics"] = diagnostics
 
+        # =============================================================
+        # FANF OUTPUT LAYER (NEW)
+        # Builds 4 fields strictly for Gradio interface:
+        # 1) style_prompt
+        # 2) lyrics_prompt
+        # 3) ui_text
+        # 4) summary
+        # =============================================================
+
+        def _safe(value: Any, default: str = "") -> str:
+            return value if isinstance(value, str) and value.strip() else default
+
+        fanf_block = result.get("fanf") if isinstance(result.get("fanf"), dict) else {}
+        style_block = result.get("style") if isinstance(result.get("style"), dict) else {}
+        instrumentation_block = result.get("instrumentation") if isinstance(result.get("instrumentation"), dict) else {}
+
+        bpm_value = bpm_payload.get("estimate") or bpm_payload.get("flow_estimate") or bpm_payload.get("bpm")
+        key_hint = tonality_payload.get("key") or tonality_payload.get("key_hint")
+        cf_value = tlp_profile.get("conscious_frequency")
+        macro_genre = style_block.get("macro_genre") or style_block.get("genre") or style_block.get("subgenre")
+        tone_label = style_block.get("tone") or style_block.get("vibe")
+        palette = instrumentation_block.get("palette") if isinstance(instrumentation_block, dict) else None
+
+        style_line_1 = (
+            f"[{_safe(macro_genre, 'adaptive style')} | {bpm_value or '120'} BPM | {key_hint or 'N/A'} | CF {cf_value or '0.00'}]"
+        )
+        style_line_2 = (
+            f"[{_safe(tone_label, 'soft vocal tone')}, {', '.join(palette) if palette else 'minimal instrumentation'}]"
+        )
+
+        style_prompt = f"{_safe(style_line_1)}\n{_safe(style_line_2)}".strip()
+
+        if not style_prompt:
+            style_prompt = (
+                "[adaptive minimalistic style | 120 BPM | A minor | A=440 Hz | CF 0.50]\n"
+                "[soft male vocal, piano + strings, warm ambiance]"
+            )
+
+        lyric_lines: list[str] = []
+        headers = structure_context.get("section_headers") or structure_context.get("section_metadata") or []
+        for idx, section in enumerate(sections or []):
+            header_label = None
+            if idx < len(headers) and isinstance(headers[idx], dict):
+                header_label = headers[idx].get("label") or headers[idx].get("name")
+            section_header = header_label or f"Section {idx + 1}"
+            lyric_lines.append(f"[{section_header}] {section.strip() if isinstance(section, str) else ''}".strip())
+
+        lyrics_prompt = "\n".join(line for line in lyric_lines if line.strip())
+        if not lyrics_prompt:
+            lyrics_prompt = "[Intro: soft ambience]\n(no lyrical structure detected)"
+
+        ui_text = "\n".join(section for section in sections if isinstance(section, str) and section.strip()) or text
+        ui_text = _safe(ui_text)
+
+        summary_parts: list[str] = []
+        if tlp_profile:
+            summary_parts.append(
+                f"[TLP: {tlp_profile.get('truth', 0):.2f}/{tlp_profile.get('love', 0):.2f}/{tlp_profile.get('pain', 0):.2f} | CF {tlp_profile.get('conscious_frequency', 0):.2f}]"
+            )
+        if rde_summary:
+            summary_parts.append(f"[RDE: resonance={rde_summary.get('resonance')}, fracture={rde_summary.get('fracture')}, entropy={rde_summary.get('entropy')}]")
+        if macro_genre:
+            summary_parts.append(f"[Genre: {macro_genre}]")
+        if zero_pulse_payload:
+            summary_parts.append(f"[ZeroPulse: {zero_pulse_payload.get('status', zero_pulse_payload.get('has_zero_pulse'))}]")
+        if color_wave:
+            summary_parts.append(f"[ColorWave: {', '.join(color_wave) if isinstance(color_wave, list) else color_wave}]")
+        if diagnostics.get("integrity"):
+            summary_parts.append(str(diagnostics.get("integrity")))
+
+        summary = "\n".join(part for part in summary_parts if part).strip()
+        if not summary:
+            summary = "[TLP: 0/0/0 | CF 0.0]\n[RDE: no rhythm detected]\n[Integrity: undefined]"
+
+        result["fanf"] = {
+            **fanf_block,
+            "style_prompt": style_prompt,
+            "lyrics_prompt": lyrics_prompt,
+            "ui_text": ui_text,
+            "summary": summary,
+        }
+
         return result
 
     def _finalize_result(self, payload: Dict[str, Any]) -> Dict[str, Any]:
