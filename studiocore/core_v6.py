@@ -100,6 +100,40 @@ def _extract_ui_text(from_block: str) -> str:
     text = "\n".join(clean_lines).strip()
     return text
 
+
+def _build_summary_block(diagnostics: dict) -> str:
+    """
+    Build a single human-readable summary block from diagnostics fields.
+
+    Expected keys (if present):
+      - tlp_block
+      - rde_block
+      - genre_block
+      - zeropulse_block
+      - color_wave_block
+      - integrity_block
+    """
+    parts: list[str] = []
+
+    for key in (
+        "tlp_block",
+        "rde_block",
+        "genre_block",
+        "zeropulse_block",
+        "color_wave_block",
+        "integrity_block",
+    ):
+        value = diagnostics.get(key)
+        if isinstance(value, str) and value.strip():
+            parts.append(value.strip())
+
+    summary_block = "\n".join(parts).strip()
+    if not summary_block:
+        summary_block = "[TLP: 0/0/0 | CF 0.0]\n[RDE: no rhythm detected]\n[Integrity: undefined]"
+
+    diagnostics["summary_block"] = summary_block
+    return summary_block
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
@@ -470,31 +504,69 @@ class StudioCoreV6:
             or normalized_text
         )
 
-        ui_text = _extract_ui_text(lyrics_prompt or incoming_text)
+        ui_text = _extract_ui_text(lyrics_prompt) if lyrics_prompt else _extract_ui_text(incoming_text)
 
-        summary = fanf_block.get("summary") or payload.get("summary") or ""
-        if not summary and isinstance(tlp, dict):
-            summary = (
-                f"[TLP: {tlp.get('truth', 0):.2f}/{tlp.get('love', 0):.2f}/{tlp.get('pain', 0):.2f}]"
-                f" [CF: {tlp.get('conscious_frequency', 0):.2f}]"
+        tlp_data = diagnostics.get("tlp") if isinstance(diagnostics.get("tlp"), dict) else tlp
+        if isinstance(tlp_data, dict):
+            diagnostics["tlp_block"] = (
+                f"[TLP: {tlp_data.get('truth', 0):.2f}/{tlp_data.get('love', 0):.2f}/{tlp_data.get('pain', 0):.2f} | CF {tlp_data.get('conscious_frequency', 0):.2f}]"
             )
 
-        payload["fanf"] = {
+        rde_diag = diagnostics.get("rde") or rde
+        if isinstance(rde_diag, dict):
+            diagnostics["rde_block"] = (
+                f"[RDE: resonance={rde_diag.get('resonance')}, fracture={rde_diag.get('fracture')}, entropy={rde_diag.get('entropy')}]"
+            )
+
+        macro_genre = None
+        if isinstance(payload.get("style"), dict):
+            macro_genre = (
+                payload.get("style", {}).get("macro_genre")
+                or payload.get("style", {}).get("genre")
+                or payload.get("style", {}).get("subgenre")
+            )
+        if macro_genre:
+            diagnostics["genre_block"] = f"[Genre: {macro_genre}]"
+
+        zero_pulse_info = payload.get("zero_pulse") if isinstance(payload.get("zero_pulse"), dict) else diagnostics.get("zero_pulse")
+        if isinstance(zero_pulse_info, dict):
+            status = zero_pulse_info.get("status", zero_pulse_info.get("has_zero_pulse"))
+            diagnostics["zeropulse_block"] = f"[ZeroPulse: {status}]"
+
+        color_wave = None
+        if isinstance(payload.get("style"), dict):
+            color_wave = payload.get("style", {}).get("color_wave")
+        if color_wave:
+            color_repr = ", ".join(color_wave) if isinstance(color_wave, list) else str(color_wave)
+            diagnostics["color_wave_block"] = f"[ColorWave: {color_repr}]"
+
+        integrity_diag = diagnostics.get("integrity")
+        if integrity_diag:
+            diagnostics["integrity_block"] = f"[Integrity: {integrity_diag}]"
+
+        # Build unified summary block from diagnostics
+        summary_block = _build_summary_block(diagnostics)
+
+        fanf = {
             "style_prompt": style_prompt,
             "lyrics_prompt": lyrics_prompt,
             "ui_text": ui_text,
-            "summary": summary,
+            "summary": summary_block,
         }
 
+        payload["summary"] = summary_block
+        payload["fanf"] = fanf
+
+        payload["engine"] = "StudioCoreV6"
         payload.setdefault("ok", True)
         payload.setdefault("diagnostics", diagnostics)
-        payload.setdefault("fanf", {})
+        payload.setdefault("fanf", fanf)
 
         final_result = self._finalize_result(payload)
         final_result["engine"] = "StudioCoreV6"
         final_result.setdefault("ok", True)
         final_result.setdefault("diagnostics", diagnostics)
-        final_result.setdefault("fanf", payload.get("fanf", {}))
+        final_result.setdefault("fanf", fanf)
         return final_result
 
     def _merge_user_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
