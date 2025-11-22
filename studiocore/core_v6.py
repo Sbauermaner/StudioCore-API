@@ -71,6 +71,7 @@ from studiocore.frequency import RNSSafety, UniversalFrequencyEngine
 from studiocore.config import DEFAULT_CONFIG, FORCED_GENRES, KEYWORD_MAP
 from studiocore.diagnostics_v8 import DiagnosticsBuilderV8
 from studiocore.consistency_v8 import ConsistencyLayerV8
+from studiocore.logger_runtime import write_runtime_log
 
 logger = logging.getLogger(__name__)
 
@@ -714,6 +715,17 @@ class StudioCoreV6:
 
         final_result["diagnostics"] = structured_diagnostics
         final_result.setdefault("fanf", fanf_block)
+
+        # === RUNTIME LOGGING ===================================================
+        try:
+            write_runtime_log({
+                "text_preview": text[:200],
+                "diagnostics": final_result.get("diagnostics"),
+                "fanf": final_result.get("fanf"),
+            })
+        except Exception as e:
+            # Logging must never break execution
+            pass
         return final_result
 
     def _merge_user_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
