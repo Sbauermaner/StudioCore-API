@@ -709,24 +709,23 @@ class StudioCoreV6:
         payload["summary"] = fanf_block.get("summary", summary_block)
         payload["fanf"] = fanf_block
 
-        final_result = self._finalize_result(payload)
-        final_result["engine"] = "StudioCoreV6"
-        final_result.setdefault("ok", True)
+        result = self._finalize_result(payload)
+        result["engine"] = "StudioCoreV6"
+        result.setdefault("ok", True)
 
-        final_result["diagnostics"] = structured_diagnostics
-        final_result.setdefault("fanf", fanf_block)
+        result["diagnostics"] = structured_diagnostics
+        result.setdefault("fanf", fanf_block)
 
         # === RUNTIME LOGGING ===================================================
         try:
             write_runtime_log({
                 "text_preview": text[:200],
-                "diagnostics": final_result.get("diagnostics"),
-                "fanf": final_result.get("fanf"),
+                "diagnostics": result.get("diagnostics"),
+                "fanf": result.get("fanf"),
             })
-        except Exception as e:
-            # Logging must never break execution
+        except Exception:
             pass
-        return final_result
+        return result
 
     def _merge_user_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
         params = dict(params)
