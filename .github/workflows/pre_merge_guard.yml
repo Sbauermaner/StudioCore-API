@@ -19,10 +19,12 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install requirements only if file exists
+          # Install project requirements if file exists
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           # Ensure PyYAML exists for diagnostics (import yaml)
           pip install pyyaml
+          # Install pytest so pre-merge guard can run tests
+          pip install pytest
 
       - name: Run full diagnostics
         run: bash run_full_diag.sh
