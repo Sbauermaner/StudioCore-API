@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import traceback
 from typing import Any, Dict, List, Tuple
+import gradio
 import gradio as gr
 
 from studiocore.core_v6 import StudioCoreV6
@@ -230,7 +231,11 @@ def run_raw_diagnostics(text):
     except Exception as e:
         return {"error": str(e), "traceback": traceback.format_exc()}
 
-with gr.Blocks(theme=gr.themes.Soft(), title="StudioCore IMMORTAL v7 – Impulse Analysis") as demo:
+theme_kwargs = {}
+if gradio.__version__ >= "4.0.0":
+    theme_kwargs["theme"] = gr.themes.Soft()
+
+with gr.Blocks(title="StudioCore IMMORTAL v7 – Impulse Analysis", **theme_kwargs) as demo:
 
     gr.Markdown("# StudioCore IMMORTAL v7.0 — Impulse Analysis Engine")
 
