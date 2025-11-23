@@ -17,6 +17,15 @@ from studiocore.emotion_profile import EmotionVector, EmotionAggregator
 from .emotion import TruthLovePainEngine as _TruthLovePainEngine
 
 
+def _harmonic_mean(x: float, y: float, z: float) -> float:
+    """Return harmonic mean with zero-protection fallback."""
+
+    if x <= 0.01 or y <= 0.01 or z <= 0.01:
+        return (x + y + z) / 3.0
+
+    return 3.0 / (1.0 / x + 1.0 / y + 1.0 / z)
+
+
 class TruthLovePainEngine(_TruthLovePainEngine):
     """Adds convenience helpers on top of the base TLP engine."""
 
@@ -78,7 +87,14 @@ class TruthLovePainEngine(_TruthLovePainEngine):
             "love": float(min(cmax, max(cmin, love))),
             "pain": float(min(cmax, max(cmin, pain))),
         }
-        tlp["conscious_frequency"] = round((tlp["truth"] + tlp["love"] + tlp["pain"]) / 3.0, 4)
+        tlp["conscious_frequency"] = max(
+            0.0,
+            min(1.0, round(_harmonic_mean(tlp["truth"], tlp["love"], tlp["pain"]), 4)),
+        )
+        tlp["dominant_axis"] = max(("truth", "love", "pain"), key=lambda axis: tlp[axis])
+        values = (tlp["truth"], tlp["love"], tlp["pain"])
+        mean = sum(values) / 3.0
+        tlp["balance"] = round(math.sqrt(sum((v - mean) ** 2 for v in values) / 3.0), 4)
         return tlp
 
     def export_emotion_vector(self, text: str) -> EmotionVector:
