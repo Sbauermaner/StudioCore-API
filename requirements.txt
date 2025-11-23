@@ -1,6 +1,6 @@
 numpy
 regex
 pydantic
-gradio
+gradio>=4.12.0
 python-dotenv
 PyYAML
