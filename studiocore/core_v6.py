@@ -68,7 +68,7 @@ from .user_override_manager import UserOverrideManager, UserOverrides
 from studiocore.emotion_map import EmotionMapEngine
 from studiocore.emotion_curve import build_global_emotion_curve
 from studiocore.frequency import RNSSafety, UniversalFrequencyEngine
-from studiocore.config import DEFAULT_CONFIG, FORCED_GENRES, KEYWORD_MAP
+from studiocore.config import DEFAULT_CONFIG, FORCED_GENRES
 from studiocore.diagnostics_v8 import DiagnosticsBuilderV8
 from studiocore.consistency_v8 import ConsistencyLayerV8
 from studiocore.logger_runtime import write_runtime_log
@@ -2529,10 +2529,6 @@ class StudioCoreV6:
         }
 
     def _resolve_dominant_emotion(self, text: str, emotion_profile: Dict[str, float]) -> str:
-        corpus = text.lower()
-        for label, keywords in KEYWORD_MAP:
-            if any(token in corpus for token in keywords):
-                return label
         if emotion_profile:
             dominant = max(emotion_profile.items(), key=lambda item: item[1])[0]
             fallback_map = {
