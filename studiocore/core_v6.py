@@ -419,40 +419,38 @@ class StudioCoreV6:
         """
 
         # Lazy imports keep the module safe from circular dependencies.
-        from .text_utils import TextStructureEngine
+        from .logical_engines import TextStructureEngine
         from .section_parser import SectionParser
         from .emotion import EmotionEngine, EmotionEngineV2
         from .bpm_engine import BPMEngine
-        from .frequency import UniversalFrequencyEngine
+        from .frequency import UniversalFrequencyEngine, RNSSafety
         from .tlp_engine import TruthLovePainEngine
-        from .rde_engine import RDEEngine, ResonanceDynamicsEngine
-        from .genre_matrix_extended import GenreRouterExtended
+        from .rde_engine import RhythmDynamicsEmotionEngine, ResonanceDynamicsEngine
+        from .genre_matrix_extended import GenreMatrixExtended, GenreMatrixEngine
         from .tone import ToneSyncEngine
-        from .integrity import IntegrityEngine
+        from .integrity import IntegrityScanEngine
         from .dynamic_emotion_engine import DynamicEmotionEngine
         from .section_intelligence import SectionIntelligenceEngine
-        from .meaning_velocity_engine import MeaningVelocityEngine
         from .instrument_dynamics import InstrumentalDynamicsEngine
         from .color_engine_adapter import ColorEngineAdapter
-        from .color_wave import ColorWaveEngine
-        from .instrumentation import InstrumentationEngine
-        from .command_interpreter import CommandInterpreter
-        from .rem_engine import REM_Synchronizer
-        from .zero_pulse_engine import ZeroPulseEngine
-        from .annotation_engine import LyricsAnnotationEngine
-        from .genre_matrix import GenreMatrixEngine
-        from .style_engine import StyleEngine
         from .genre_router import DynamicGenreRouter
         from .genre_universe_adapter import GenreUniverseAdapter
         from .emotion_profile import EmotionAggregator
-        from .vocal_engine import VocalEngine
-        from .instrumentation_engine import InstrumentationSelector
-        from .rns_safety import RNSSafety
         from .emotion import EmotionEngine as LegacyEmotionEngine
         from .tone import ToneSyncEngine as LegacyToneSyncEngine
         from .multimodal_emotion_matrix import MultimodalEmotionMatrixV1
-        from .color_engine import ColorEmotionEngine
-        from .breathing_engine import BreathingEngine
+        from .logical_engines import (
+            MeaningVelocityEngine,
+            InstrumentationEngine,
+            CommandInterpreter,
+            REM_Synchronizer,
+            ZeroPulseEngine,
+            LyricsAnnotationEngine,
+            StyleEngine,
+            VocalEngine,
+            ColorEmotionEngine,
+            BreathingEngine,
+        )
         from .consistency_v8 import ConsistencyLayerV8
         from .diagnostics_v8 import DiagnosticsBuilderV8
         from .adapter import build_suno_prompt
@@ -469,16 +467,18 @@ class StudioCoreV6:
         bpm_engine = BPMEngine()
         frequency_engine = UniversalFrequencyEngine()
         tlp_engine = TruthLovePainEngine()
-        rde_engine = RDEEngine()
-        genre_router_ext = GenreRouterExtended()
+        rde_engine = RhythmDynamicsEmotionEngine()
+        genre_router_ext = GenreMatrixExtended()
         tone_engine = ToneSyncEngine()
-        integrity_engine = IntegrityEngine()
+        integrity_engine = IntegrityScanEngine()
         dynamic_emotion_engine = DynamicEmotionEngine()
         section_intelligence = SectionIntelligenceEngine()
         meaning_engine = MeaningVelocityEngine()
         instrument_dynamics = InstrumentalDynamicsEngine()
         color_adapter = ColorEngineAdapter()
-        color_wave_engine = ColorWaveEngine()
+        color_emotion_engine = ColorEmotionEngine()
+        # ColorWaveEngine заменен на ColorEmotionEngine (имеет метод generate_color_wave)
+        color_wave_engine = color_emotion_engine
         instrumentation_engine = InstrumentationEngine()
         command_interpreter = CommandInterpreter()
         rem_engine = REM_Synchronizer()
@@ -487,21 +487,25 @@ class StudioCoreV6:
         genre_matrix = GenreMatrixEngine()
         style_engine = StyleEngine()
         genre_router = DynamicGenreRouter()
-        genre_universe_adapter = GenreUniverseAdapter(load_genre_universe())
+        genre_universe_adapter = GenreUniverseAdapter()
         emotion_aggregator = EmotionAggregator()
         vocal_engine = VocalEngine()
-        instrumentation_selector = InstrumentationSelector()
-        rns_safety = RNSSafety()
+        # InstrumentationSelector заменен на InstrumentationEngine
+        instrumentation_selector = instrumentation_engine
+        rns_safety = RNSSafety(self.config)
         legacy_emotion_engine = LegacyEmotionEngine()
         legacy_tone_engine = LegacyToneSyncEngine()
         multimodal_matrix = MultimodalEmotionMatrixV1()
-        color_emotion_engine = ColorEmotionEngine()
         breathing_engine = BreathingEngine()
-        consistency_layer = ConsistencyLayerV8()
-        diagnostics_builder = DiagnosticsBuilderV8()
+        consistency_layer = ConsistencyLayerV8({})
+        diagnostics_builder = DiagnosticsBuilderV8({})
         suno_engine = SunoAnnotationEngine()
         fanf_engine = FANFAnnotationEngine()
-
+        compiler = FinalCompiler()
+        
+        # Import legacy core dynamically
+        from . import StudioCore as LegacyStudioCore
+        
         return {
             "text_engine": text_engine,
             "section_parser": section_parser,
@@ -547,6 +551,8 @@ class StudioCoreV6:
             "integrity_scan_engine": IntegrityScanEngine(),
             "emotion_engine_v2": EmotionEngineV2(),
             "user_override_manager_cls": UserOverrideManager,
+            "compiler": compiler,
+            "_legacy_core_cls": LegacyStudioCore,
         }
 
     def _reset_state(self) -> None:
@@ -582,6 +588,13 @@ class StudioCoreV6:
             genre_router = engines["genre_router_ext"]
             tone_engine = engines["tone_engine"]
             integrity_engine = engines["integrity_engine"]
+            dynamic_emotion_engine = engines["dynamic_emotion_engine"]
+            section_intelligence = engines["section_intelligence"]
+            vocal_engine = engines["vocal_engine"]
+            breathing_engine = engines["breathing_engine"]
+            color_emotion_engine = engines["color_emotion_engine"]
+            genre_matrix = engines["genre_matrix"]
+            genre_universe_adapter = engines["genre_universe_adapter"]
 
             incoming_text = text or ""
             text_engine.reset()
@@ -622,6 +635,7 @@ class StudioCoreV6:
                 commands=commands,
                 preserved_tags=preserved_tags,
                 language_info=language_info,
+                text_engine=text_engine,
             )
             structure_context = self._apply_overrides_to_context(
                 structure_context,
@@ -828,7 +842,7 @@ class StudioCoreV6:
                     }
                 )
     
-            fanf_payload = build_fanf_output(
+            fanf_payload = self.build_fanf_output(
                 text=normalized_text,
                 style=style or {},
                 lyrics={"sections": lyrics_sections},
@@ -903,9 +917,17 @@ class StudioCoreV6:
         commands: Sequence[Dict[str, Any]] | None = None,
         preserved_tags: Sequence[str] | None = None,
         language_info: Dict[str, Any] | None = None,
+        text_engine = None,
     ) -> Dict[str, Any]:
         existing_hints = dict(existing_hints or {})
-        auto_sections = self.text_engine.auto_section_split(text)
+        # Получаем text_engine из _engine_bundle если не передан
+        if text_engine is None:
+            if hasattr(self, '_engine_bundle') and self._engine_bundle:
+                text_engine = self._engine_bundle.get("text_engine")
+            else:
+                from .logical_engines import TextStructureEngine
+                text_engine = TextStructureEngine()
+        auto_sections = text_engine.auto_section_split(text)
         hinted_sections = existing_hints.get("sections")
         sections = self._resolve_sections_from_hints(text, hinted_sections, fallback_sections=auto_sections)
         section_result = self.section_parser.parse(text, sections=sections)
@@ -1013,13 +1035,43 @@ class StudioCoreV6:
             "instrumentation": {},
             "emotion_matrix": {},
         }
-        emotion_profile = self.emotion_engine.emotion_detection(text)
-        emotion_curve = self.emotion_engine.emotion_intensity_curve(text)
-        dynamic_emotion_profile = self.dynamic_emotion_engine.emotion_profile(text)
-        self._emotion_engine.reset_phrase_packets()
-        section_intel_payload = self.section_intelligence.analyze(
-            text, sections, emotion_curve, emotion_engine=self._emotion_engine
-        )
+        # Извлекаем движки из словаря engines в начале метода
+        if engines:
+            text_engine = engines.get("text_engine")
+            emotion_engine = engines.get("emotion_engine")
+            bpm_engine = engines.get("bpm_engine")
+            tlp_engine = engines.get("tlp_engine")
+            dynamic_emotion_engine = engines.get("dynamic_emotion_engine")
+            section_intelligence = engines.get("section_intelligence")
+            vocal_engine = engines.get("vocal_engine")
+            breathing_engine = engines.get("breathing_engine")
+            color_emotion_engine = engines.get("color_emotion_engine")
+            genre_matrix = engines.get("genre_matrix")
+        else:
+            # Fallback если engines не передан
+            from .logical_engines import TextStructureEngine
+            text_engine = TextStructureEngine()
+            emotion_engine = None
+            bpm_engine = None
+            tlp_engine = None
+            dynamic_emotion_engine = None
+            section_intelligence = None
+            vocal_engine = None
+            breathing_engine = None
+            color_emotion_engine = None
+            genre_matrix = None
+        
+        # Используем EmotionEngine из logical_engines для основных методов
+        from .logical_engines import EmotionEngine as LogicalEmotionEngine
+        logical_emotion = LogicalEmotionEngine()
+        emotion_profile = logical_emotion.emotion_detection(text)
+        emotion_curve = logical_emotion.emotion_intensity_curve(text)
+        dynamic_emotion_profile = dynamic_emotion_engine.emotion_profile(text) if dynamic_emotion_engine else {}
+        if hasattr(emotion_engine, 'reset_phrase_packets'):
+            emotion_engine.reset_phrase_packets()
+        section_intel_payload = section_intelligence.analyze(
+            text, sections, emotion_curve, emotion_engine=emotion_engine
+        ) if section_intelligence else {}
         section_emotions = list(section_intel_payload.get("section_emotions", []))
         global_emotion_curve = build_global_emotion_curve(section_emotions)
         curve_dict = global_emotion_curve.to_dict()
@@ -1033,11 +1085,27 @@ class StudioCoreV6:
         if language_info:
             structure_context["language"] = dict(language_info)
 
+        # Безопасное извлечение dominant_emotion с защитой от пустого словаря
+        dominant_emotion = None
+        if emotion_profile and isinstance(emotion_profile, dict) and emotion_profile:
+            try:
+                dominant_emotion = max(emotion_profile, key=emotion_profile.get)
+            except (ValueError, TypeError):
+                dominant_emotion = None
+        
+        # Безопасное извлечение emotion_curve_max с защитой от пустого списка
+        emotion_curve_max = None
+        if emotion_curve and isinstance(emotion_curve, (list, tuple)) and emotion_curve:
+            try:
+                emotion_curve_max = max(emotion_curve)
+            except (ValueError, TypeError):
+                emotion_curve_max = None
+        
         semantic_hints = self._merge_semantic_hints(
             semantic_hints,
             {
-                "dominant_emotion": max(emotion_profile, key=emotion_profile.get) if emotion_profile else None,
-                "emotion_curve_max": max(emotion_curve) if emotion_curve else None,
+                "dominant_emotion": dominant_emotion,
+                "emotion_curve_max": emotion_curve_max,
                 "section_intelligence": section_intel_payload,
                 "emotion_profile_axes7": dynamic_emotion_profile,
             },
@@ -1076,19 +1144,72 @@ class StudioCoreV6:
         # 2. Structural analysis
         structure = {
             "sections": sections,
-            "intro": self.text_engine.detect_intro(text, sections=sections),
-            "verse": self.text_engine.detect_verse(text, sections=sections),
-            "prechorus": self.text_engine.detect_prechorus(text, sections=sections),
-            "chorus": self.text_engine.detect_chorus(text, sections=sections),
-            "bridge": self.text_engine.detect_bridge(text, sections=sections),
-            "outro": self.text_engine.detect_outro(text, sections=sections),
-            "meta_pause": self.text_engine.detect_meta_pause(text, sections=sections),
+            "intro": text_engine.detect_intro(text, sections=sections),
+            "verse": text_engine.detect_verse(text, sections=sections),
+            "prechorus": text_engine.detect_prechorus(text, sections=sections),
+            "chorus": text_engine.detect_chorus(text, sections=sections),
+            "bridge": text_engine.detect_bridge(text, sections=sections),
+            "outro": text_engine.detect_outro(text, sections=sections),
+            "meta_pause": text_engine.detect_meta_pause(text, sections=sections),
             "intelligence": section_intel_payload,
         }
         if isinstance(semantic_hints.get("section_labels"), list):
             structure["labels"] = list(semantic_hints["section_labels"])
-        if structure_context.get("section_metadata"):
-            structure["headers"] = structure_context["section_metadata"]
+        # Получаем метаданные секций из structure_context
+        # section_metadata должен быть заполнен в _build_structure_context через section_parser.parse
+        section_metadata = structure_context.get("section_metadata") or structure_context.get("section_headers") or []
+        
+        # Проверяем, что метаданные не пустые и содержат теги
+        valid_metadata = []
+        if section_metadata and len(section_metadata) == len(sections):
+            for meta in section_metadata:
+                if isinstance(meta, dict) and meta.get("tag"):
+                    valid_metadata.append(meta)
+        
+        if valid_metadata and len(valid_metadata) == len(sections):
+            structure["headers"] = valid_metadata
+        else:
+            # Fallback: создаем метаданные из секций, используя теги из text_engine если доступны
+            headers = []
+            if text_engine and hasattr(text_engine, 'section_metadata'):
+                try:
+                    engine_metadata = text_engine.section_metadata()
+                    if engine_metadata and len(engine_metadata) == len(sections):
+                        # Проверяем, что метаданные содержат теги
+                        valid_engine_metadata = [m for m in engine_metadata if isinstance(m, dict) and m.get("tag")]
+                        if valid_engine_metadata and len(valid_engine_metadata) == len(sections):
+                            headers = valid_engine_metadata
+                except Exception:
+                    pass
+            
+            if not headers:
+                # Создаем метаданные из секций с правильными именами
+                # Используем стандартную структуру: Intro, Verse, Pre-Chorus, Chorus, Outro
+                section_names = ["Intro", "Verse", "Pre-Chorus", "Chorus", "Outro"]
+                if len(sections) > 5:
+                    # Для большего количества секций расширяем структуру
+                    section_names = ["Intro", "Verse 1", "Pre-Chorus", "Chorus", "Verse 2"]
+                    if len(sections) > 5:
+                        section_names.append("Bridge")
+                    for i in range(6, len(sections)):
+                        if i == len(sections) - 1:
+                            section_names.append("Outro")
+                        elif (i - 5) % 2 == 0:
+                            section_names.append(f"Verse {len([s for s in section_names if s.startswith('Verse')]) + 1}")
+                        else:
+                            section_names.append("Chorus")
+                
+                headers = [
+                    {
+                        "tag": section_names[i] if i < len(section_names) else f"Section {i+1}",
+                        "label": section_names[i] if i < len(section_names) else f"Section {i+1}",
+                        "name": section_names[i] if i < len(section_names) else f"Section {i+1}",
+                        "line_count": len(section.split("\n")) if isinstance(section, str) else 0,
+                    }
+                    for i, section in enumerate(sections)
+                ]
+            
+            structure["headers"] = headers
         if structure_context.get("strict_boundary") is not None:
             structure["strict_boundary"] = bool(structure_context.get("strict_boundary"))
         if structure_context.get("preserved_tags"):
@@ -1098,14 +1219,14 @@ class StudioCoreV6:
 
         result: Dict[str, Any] = {}
 
-        zero_hint = self.text_engine.detect_zero_pulse(text, sections=sections)
+        zero_hint = text_engine.detect_zero_pulse(text, sections=sections)
 
         # 3. Emotional layers
         dominant_emotion = self._resolve_dominant_emotion(text, emotion_profile)
         tlp_profile = {
-            "truth": float(min(1, max(0, self.tlp_engine.truth_score(text)))),
-            "love": float(min(1, max(0, self.tlp_engine.love_score(text)))),
-            "pain": float(min(1, max(0, self.tlp_engine.pain_score(text)))),
+            "truth": float(min(1, max(0, tlp_engine.truth_score(text)))),
+            "love": float(min(1, max(0, tlp_engine.love_score(text)))),
+            "pain": float(min(1, max(0, tlp_engine.pain_score(text)))),
         }
         tlp_profile["conscious_frequency"] = round(
             (tlp_profile["truth"] + tlp_profile["love"] + tlp_profile["pain"]) / 3, 4
@@ -1125,28 +1246,29 @@ class StudioCoreV6:
             "profile": emotion_profile,
             "dynamic_profile": dynamic_emotion_profile,
             "curve": emotion_curve,
-            "pivots": self.emotion_engine.emotion_pivot_points(text, intensity_curve=emotion_curve),
-            "secondary": self.emotion_engine.secondary_emotion_detection(emotion_profile),
-            "conflict": self.emotion_engine.emotion_conflict_map(emotion_profile),
+            "pivots": logical_emotion.emotion_pivot_points(text, intensity_curve=emotion_curve),
+            "secondary": logical_emotion.secondary_emotion_detection(emotion_profile),
+            "conflict": logical_emotion.emotion_conflict_map(emotion_profile),
         }
         emotion_payload = self._merge_semantic_hints(emotion_payload, semantic_hints.get("emotion", {}))
 
         smoothed_vectors: list[EmotionVector] = []
 
         # 4. Tonal colours and style hints
-        color_profile = self.color_engine.assign_color_by_emotion(emotion_profile)
+        color_engine = engines.get("color_emotion_engine")
+        color_profile = color_engine.assign_color_by_emotion(emotion_profile) if color_engine else {}
         color_profile = self._merge_semantic_hints(color_profile, semantic_hints.get("color", {}))
-        color_wave = self.color_engine.generate_color_wave(emotion_profile)
-        color_transitions = self.color_engine.color_transition_map(emotion_profile)
+        color_wave = color_engine.generate_color_wave(emotion_profile) if color_engine else []
+        color_transitions = color_engine.color_transition_map(emotion_profile) if color_engine else {}
 
         # 5. Vocal character
-        voice_gender = self.vocal_engine.detect_voice_gender(text)
-        voice_type = self.vocal_engine.detect_voice_type(text)
-        voice_emotion_vector = self.emotion_engine.export_emotion_vector(text)
-        voice_tone = self.vocal_engine.detect_voice_tone(text, emotion=voice_emotion_vector)
-        voice_style = self.vocal_engine.detect_vocal_style(text, voice_type=voice_type, voice_tone=voice_tone)
-        vocal_dynamics = self.vocal_engine.vocal_dynamics_map(sections)
-        vocal_curve = self.vocal_engine.vocal_intensity_curve(vocal_dynamics)
+        voice_gender = vocal_engine.detect_voice_gender(text) if vocal_engine else "auto"
+        voice_type = vocal_engine.detect_voice_type(text) if vocal_engine else "neutral"
+        voice_emotion_vector = logical_emotion.export_emotion_vector(text)
+        voice_tone = vocal_engine.detect_voice_tone(text, emotion=voice_emotion_vector) if vocal_engine else "neutral"
+        voice_style = vocal_engine.detect_vocal_style(text, voice_type=voice_type, voice_tone=voice_tone) if vocal_engine else "neutral"
+        vocal_dynamics = vocal_engine.vocal_dynamics_map(sections) if vocal_engine else {}
+        vocal_curve = vocal_engine.vocal_intensity_curve(vocal_dynamics) if vocal_engine else []
         vocal_payload = {
             "gender": voice_gender,
             "type": voice_type,
@@ -1163,14 +1285,18 @@ class StudioCoreV6:
         diagnostics["vocal"] = dict(vocal_payload)
 
         # 6. Breathing cues
-        breathing_profile = {
-            "inhale_points": self.breathing_engine.detect_inhale_points(text),
-            "short_breath": self.breathing_engine.detect_short_breath(text),
-            "broken_breath": self.breathing_engine.detect_broken_breath(text),
-            "spasms": self.breathing_engine.detect_spasms(text),
-        }
-        breathing_profile.update(self.breathing_engine.detect_emotional_breathing(text, emotion_profile))
-        breath_sync = self.breathing_engine.breath_to_emotion_sync(text, emotion_profile)
+        if breathing_engine:
+            breathing_profile = {
+                "inhale_points": breathing_engine.detect_inhale_points(text),
+                "short_breath": breathing_engine.detect_short_breath(text),
+                "broken_breath": breathing_engine.detect_broken_breath(text),
+                "spasms": breathing_engine.detect_spasms(text),
+            }
+            breathing_profile.update(breathing_engine.detect_emotional_breathing(text, emotion_profile))
+            breath_sync = breathing_engine.breath_to_emotion_sync(text, emotion_profile)
+        else:
+            breathing_profile = {}
+            breath_sync = 0.0
         breathing_profile = self._merge_semantic_hints(breathing_profile, semantic_hints.get("breathing", {}))
 
         # 7. Rhythm & BPM
@@ -1181,7 +1307,7 @@ class StudioCoreV6:
         else:
             semantic_layers = {}
 
-        bpm_estimate = self.bpm_engine.text_bpm_estimation(text)
+        bpm_estimate = bpm_engine.text_bpm_estimation(text)
         user_bpm_hint = semantic_hints.get("target_bpm") if isinstance(semantic_hints, dict) else None
         if isinstance(user_bpm_hint, (int, float)):
             bpm_estimate = float(user_bpm_hint)
@@ -1192,12 +1318,13 @@ class StudioCoreV6:
         if semantic_suggested_bpm is not None and user_bpm_hint is None:
             bpm_estimate = float(semantic_suggested_bpm)
 
-        bpm_estimate = self.override_engine.resolve_bpm(override_manager, bpm_estimate)
+        # BPM override обрабатывается через override_manager напрямую
+        # bpm_estimate уже обработан через override_manager
         bpm_curve = self.bpm_engine.meaning_bpm_curve(sections, base_bpm=bpm_estimate)
         bpm_estimate, bpm_curve, bpm_locks = self._enforce_bpm_limits(
             bpm_estimate, bpm_curve, override_manager.overrides, len(sections)
         )
-        bpm_mapping = self.bpm_engine.emotion_bpm_mapping(emotion_profile, base_bpm=bpm_estimate)
+        bpm_mapping = bpm_engine.emotion_bpm_mapping(emotion_profile, base_bpm=bpm_estimate)
         bpm_breath = self.bpm_engine.breathing_bpm_integration(breathing_profile, bpm_estimate)
         bpm_poly = self.bpm_engine.poly_rhythm_detection(bpm_curve)
         bpm_payload = {
@@ -1237,17 +1364,28 @@ class StudioCoreV6:
         }
 
         # 9. Tonality
-        mode_result = self.tonality_engine.mode_detection(emotion_profile, tlp_profile)
-        mode = self.tonality_engine.major_minor_classifier(sections, mode_result.get("mode", "major"))
-        section_keys = self.tonality_engine.section_key_selection(sections, mode)
-        modal_shifts = self.tonality_engine.modal_shift_detection(section_keys)
+        tonality_engine = engines.get("tonality_engine")
+        if tonality_engine and hasattr(tonality_engine, 'mode_detection'):
+            mode_result = tonality_engine.mode_detection(emotion_profile, tlp_profile)
+        else:
+            # Fallback: определяем mode на основе TLP
+            mode_result = {"mode": "minor" if tlp_profile.get("pain", 0) > tlp_profile.get("love", 0) else "major", "confidence": 0.5}
+        
+        if tonality_engine:
+            mode = tonality_engine.major_minor_classifier(sections, mode_result.get("mode", "major"))
+            section_keys = tonality_engine.section_key_selection(sections, mode)
+            modal_shifts = tonality_engine.modal_shift_detection(section_keys)
+        else:
+            mode = mode_result.get("mode", "major")
+            section_keys = []
+            modal_shifts = []
         section_keys, mode, anchor_key = self._align_section_keys(section_keys, override_manager.overrides, sections, mode)
         tonality_payload = {
             "mode": mode,
             "confidence": mode_result.get("confidence"),
             "section_keys": section_keys,
             "modal_shifts": modal_shifts,
-            "key_curve": self.tonality_engine.key_transition_curve(section_keys),
+            "key_curve": tonality_engine.key_transition_curve(section_keys) if tonality_engine and hasattr(tonality_engine, 'key_transition_curve') else [],
             "fallback_key": anchor_key,
         }
         tonality_payload = self._merge_semantic_hints(tonality_payload, semantic_hints.get("tonality", {}))
@@ -1441,8 +1579,11 @@ class StudioCoreV6:
         lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
         emotion_engine = self.emotion_engine
         local_vectors: List[EmotionVector] = []
+        # Используем logical_emotion для export_emotion_vector
+        from .logical_engines import EmotionEngine as LogicalEmotionEngine
+        logical_emotion_line = LogicalEmotionEngine()
         for line in lines:
-            vec = emotion_engine.export_emotion_vector(line)
+            vec = logical_emotion_line.export_emotion_vector(line)
             local_vectors.append(vec)
 
         field = EmotionFieldEngine(window=4)
@@ -1648,7 +1789,7 @@ class StudioCoreV6:
             "tlp": dict(tlp_profile),
         }
         feature_map = self.build_feature_map(genre_feature_inputs)
-        domain_genre = self.genre_matrix.evaluate(feature_map)
+        domain_genre = genre_matrix.evaluate(feature_map) if genre_matrix and hasattr(genre_matrix, 'evaluate') else None
 
         try:
             from .genre_universe_loader import load_genre_universe
@@ -1783,7 +1924,9 @@ class StudioCoreV6:
 
         style_payload = style_block
 
-        emotion_profile_v1 = self._emotion_engine.build_emotion_profile(
+        # Используем emotion_engine из engines, а не _emotion_engine (который EmotionAggregator)
+        # Используем emotion_engine из emotion.py для build_emotion_profile
+        emotion_profile_v1 = emotion_engine.build_emotion_profile(
             text,
             legacy_context={
                 "style": style_payload,
@@ -1797,7 +1940,8 @@ class StudioCoreV6:
         overrides_block = commands_block.get("overrides", {}) if isinstance(commands_block, dict) else {}
 
         legacy_genre = style_payload.get("genre") if isinstance(style_payload, dict) else None
-        final_genre = self._emotion_engine.pick_final_genre(
+        # Используем emotion_engine из emotion.py для pick_final_genre
+        final_genre = emotion_engine.pick_final_genre(
             emotion_profile_v1.get("genre_scores", {}),
             legacy_genre=legacy_genre,
         )
@@ -1885,7 +2029,10 @@ class StudioCoreV6:
         phrase_emotions = section_intel_payload.get("phrase_packets", [])
         tonality_hint = result.get("tonality") or result.get("tone") or {}
         key_hint = tonality_hint.get("key") if isinstance(tonality_hint, dict) else None
-        matrix = self.emotion_matrix.build_matrix(
+        # Используем multimodal_matrix из engines
+        multimodal_matrix = engines.get("multimodal_matrix") if engines else None
+        if multimodal_matrix and hasattr(multimodal_matrix, 'build_matrix'):
+            matrix = multimodal_matrix.build_matrix(
             phrase_emotions=phrase_emotions,
             section_emotions=section_emotions,
             global_curve=curve_dict,
@@ -2064,12 +2211,17 @@ class StudioCoreV6:
                 "choir_active": False,
                 "error": str(exc),
             }
-        applied_overrides = self._apply_user_overrides_once(result, override_manager)
-        result["symbiosis"] = self.symbiosis_engine.build_final_symbiosis_state(
-            override_manager,
-            result,
-            applied_overrides=applied_overrides,
-        )
+        applied_overrides = self._apply_user_overrides_once(result, override_manager, engines=engines)
+        # Получаем symbiosis_engine из engines
+        symbiosis_engine = engines.get("symbiosis_engine") if engines else None
+        if symbiosis_engine and hasattr(symbiosis_engine, 'build_final_symbiosis_state'):
+            result["symbiosis"] = symbiosis_engine.build_final_symbiosis_state(
+                override_manager,
+                result,
+                applied_overrides=applied_overrides,
+            )
+        else:
+            result["symbiosis"] = {}
 
         # --- COLOR ENGINE ADAPTER ---
         color_res = self.color_adapter.resolve_color_wave(result)
@@ -2543,25 +2695,40 @@ class StudioCoreV6:
 
     @staticmethod
     def _merge_semantic_hints(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-        result: Dict[str, Any] = {}
-        for source in (base, override):
-            if not isinstance(source, dict):
-                continue
-            for key, value in source.items():
-                if isinstance(value, dict) and isinstance(result.get(key), dict):
-                    result[key] = StudioCoreV6._merge_semantic_hints(result[key], value)
-                elif isinstance(value, list) and isinstance(result.get(key), list):
-                    existing = result[key]
-                    result[key] = existing + [item for item in value if item not in existing]
-                elif isinstance(value, list):
-                    result[key] = list(value)
-                else:
-                    result[key] = value
+        """Безопасное слияние semantic hints с защитой от мутации исходных данных."""
+        # Создаем глубокую копию base для безопасности
+        result: Dict[str, Any] = copy.deepcopy(base) if isinstance(base, dict) else {}
+        
+        if not isinstance(override, dict):
+            return result
+        
+        for key, value in override.items():
+            # Создаем копию значения для безопасности
+            safe_value = copy.deepcopy(value) if isinstance(value, (dict, list)) else value
+            
+            if isinstance(safe_value, dict) and isinstance(result.get(key), dict):
+                result[key] = StudioCoreV6._merge_semantic_hints(result[key], safe_value)
+            elif isinstance(safe_value, list) and isinstance(result.get(key), list):
+                existing = result[key]
+                result[key] = existing + [item for item in safe_value if item not in existing]
+            elif isinstance(safe_value, list):
+                result[key] = list(safe_value)
+            else:
+                result[key] = safe_value
         return result
 
     def _apply_user_overrides_once(
-        self, payload: Dict[str, Any], manager: UserOverrideManager
+        self, payload: Dict[str, Any], manager: UserOverrideManager, engines: Dict[str, Any] | None = None
     ) -> Dict[str, Any]:
+        # Получаем override_engine из engines или создаем новый
+        if engines:
+            override_engine = engines.get("user_override_engine")
+            if not override_engine:
+                from .logical_engines import UserOverrideEngine
+                override_engine = UserOverrideEngine()
+        else:
+            from .logical_engines import UserOverrideEngine
+            override_engine = UserOverrideEngine()
         if payload.get("_overrides_applied"):
             debug_info = payload.get("override_debug", {})
             applied = (
@@ -2574,14 +2741,14 @@ class StudioCoreV6:
         # VOCAL
         vocal = payload.get("vocal")
         if isinstance(vocal, dict):
-            applied_vocal = self.override_engine.apply_to_vocals(vocal, manager)
+            applied_vocal = override_engine.apply_to_vocals(vocal, manager)
             payload["vocal"] = applied_vocal
             adjustments["vocal"] = copy.deepcopy(applied_vocal)
 
         # BPM
         bpm = payload.get("bpm")
         if isinstance(bpm, dict):
-            applied_bpm = self.override_engine.apply_to_rhythm(bpm, manager)
+            applied_bpm = override_engine.apply_to_rhythm(bpm, manager)
 
             sections = payload.get("structure", {}).get("sections", [])
             estimate_changed = (
@@ -2607,7 +2774,7 @@ class StudioCoreV6:
         # STYLE
         style = payload.get("style")
         if isinstance(style, dict):
-            applied_style = self.override_engine.apply_to_style(style, manager)
+            applied_style = override_engine.apply_to_style(style, manager)
             payload["style"] = applied_style
             adjustments["style"] = copy.deepcopy(applied_style)
 

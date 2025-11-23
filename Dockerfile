@@ -13,4 +13,4 @@ COPY README.md .
 
 EXPOSE 7860
 
-CMD ["python", "app.py"]
+CMD ["python3", "app.py"]

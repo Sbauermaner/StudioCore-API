@@ -73,15 +73,21 @@ def normalize_text_preserve_symbols(text: str) -> str:
         ln = _normalize_typography(raw)
         lines.append(ln)
 
-    # Схлопываем кратные пустые строки
+    # Схлопываем кратные пустые строки, но сохраняем двойные пустые строки как разделители секций
+    # ВАЖНО: двойные пустые строки (2+ подряд) используются для разбиения на секции
     out_lines: List[str] = []
     prev_blank = False
+    blank_count = 0
     for ln in lines:
         if ln == "":
-            if not prev_blank:
+            blank_count += 1
+            # Сохраняем максимум 2 пустые строки подряд (для разделителей секций)
+            # Если уже есть одна пустая строка, добавляем еще одну для разделителя
+            if blank_count <= 2:
                 out_lines.append("")
             prev_blank = True
         else:
+            blank_count = 0
             out_lines.append(ln)
             prev_blank = False
 
@@ -129,6 +135,114 @@ def extract_commands_and_tags(raw_text: str) -> Tuple[str, Dict[str, Any], List[
     return clean_text, {"detected": detected, "map": command_map}, unique_tags
 
 
+def _assign_section_names(sections: List[Dict[str, Any]]) -> None:
+    """
+    Автоматически присваивает имена секциям согласно структуре песни.
+    
+    Структура:
+    - Intro (Вступление): Музыкальная часть в начале
+    - Verse (Куплет): Основной текст песни
+    - Pre-Chorus (Пред-припев): Переход от куплета к припеву
+    - Chorus (Припев): Самая запоминающаяся и энергичная часть
+    - Post-Chorus / Tag: После припева
+    - Bridge (Бридж): Одноразовый раздел, отличающийся от остальных
+    - Outro (Концовка): Завершающая часть
+    
+    Логика распределения:
+    - 1 секция: Verse
+    - 2 секции: Intro, Verse
+    - 3 секции: Intro, Verse, Outro
+    - 4 секции: Intro, Verse, Chorus, Outro
+    - 5 секций: Intro, Verse, Pre-Chorus, Chorus, Outro
+    - 6 секций: Intro, Verse 1, Pre-Chorus, Chorus, Verse 2, Outro
+    - 7 секций: Intro, Verse 1, Pre-Chorus, Chorus, Verse 2, Bridge, Outro
+    - 8+ секций: Intro, Verse 1, Pre-Chorus, Chorus, Verse 2, Bridge, Chorus, Outro...
+    """
+    if not sections:
+        return
+    
+    num_sections = len(sections)
+    
+    # Базовые паттерны для малого количества секций
+    if num_sections == 1:
+        sections[0]["tag"] = "Verse"
+    elif num_sections == 2:
+        sections[0]["tag"] = "Intro"
+        sections[1]["tag"] = "Verse"
+    elif num_sections == 3:
+        sections[0]["tag"] = "Intro"
+        sections[1]["tag"] = "Verse"
+        sections[2]["tag"] = "Outro"
+    elif num_sections == 4:
+        sections[0]["tag"] = "Intro"
+        sections[1]["tag"] = "Verse"
+        sections[2]["tag"] = "Chorus"
+        sections[3]["tag"] = "Outro"
+    elif num_sections == 5:
+        sections[0]["tag"] = "Intro"
+        sections[1]["tag"] = "Verse"
+        sections[2]["tag"] = "Pre-Chorus"
+        sections[3]["tag"] = "Chorus"
+        sections[4]["tag"] = "Outro"
+    elif num_sections == 6:
+        sections[0]["tag"] = "Intro"
+        sections[1]["tag"] = "Verse 1"
+        sections[2]["tag"] = "Pre-Chorus"
+        sections[3]["tag"] = "Chorus"
+        sections[4]["tag"] = "Verse 2"
+        sections[5]["tag"] = "Outro"
+    elif num_sections == 7:
+        sections[0]["tag"] = "Intro"
+        sections[1]["tag"] = "Verse 1"
+        sections[2]["tag"] = "Pre-Chorus"
+        sections[3]["tag"] = "Chorus"
+        sections[4]["tag"] = "Verse 2"
+        sections[5]["tag"] = "Bridge"
+        sections[6]["tag"] = "Outro"
+    else:
+        # Для 8+ секций используем полную структуру
+        # Паттерн: Intro, Verse 1, Pre-Chorus, Chorus, Verse 2, Bridge, Chorus, Outro
+        section_names = ["Intro", "Verse 1", "Pre-Chorus", "Chorus", "Verse 2", "Bridge"]
+        
+        # После Bridge обычно идет Chorus, затем чередуем Verse и Chorus
+        verse_num = 3
+        chorus_count = 2  # Уже есть один Chorus на позиции 3
+        
+        for i in range(6, num_sections):
+            if i == num_sections - 1:
+                # Последняя секция - всегда Outro
+                section_names.append("Outro")
+            elif i == 6:
+                # Первая после Bridge - обычно Chorus
+                section_names.append("Chorus")
+                chorus_count += 1
+            else:
+                # Чередуем Verse и Chorus
+                if (i - 6) % 2 == 0:
+                    # Четные позиции после первого Chorus - Verse
+                    section_names.append(f"Verse {verse_num}")
+                    verse_num += 1
+                else:
+                    # Нечетные позиции - Chorus
+                    section_names.append("Chorus")
+                    chorus_count += 1
+        
+        # Присваиваем имена
+        for i, name in enumerate(section_names[:num_sections]):
+            sections[i]["tag"] = name
+        
+        # Если имен меньше чем секций (не должно быть, но на всякий случай)
+        if len(section_names) < num_sections:
+            for i in range(len(section_names), num_sections):
+                if i == num_sections - 1:
+                    sections[i]["tag"] = "Outro"
+                elif (i - len(section_names)) % 2 == 0:
+                    sections[i]["tag"] = f"Verse {verse_num}"
+                    verse_num += 1
+                else:
+                    sections[i]["tag"] = "Chorus"
+
+
 def extract_sections(text: str) -> List[Dict[str, Any]]:
     """
     Делит текст на секции. Поддерживает два типа маркеров:
@@ -166,10 +280,55 @@ def extract_sections(text: str) -> List[Dict[str, Any]]:
         if current["lines"]:
             sections.append(current)
 
+    # Если ничего не нашли — попробуем разбить по пустым строкам (для текста без маркеров)
+    # ВАЖНО: проверяем это ДО удаления пустых строк, чтобы не потерять информацию о разделителях
+    if not sections or (len(sections) == 1 and sections[0].get("tag") == "Body"):
+        # Разбиваем по двойным пустым строкам или группам пустых строк
+        lines = text.split("\n")
+        current_section: List[str] = []
+        detected_sections: List[Dict[str, Any]] = []
+        empty_line_count = 0
+        
+        for line in lines:
+            if not line.strip():
+                empty_line_count += 1
+                # Если накопилось 2+ пустых строк подряд — это разделитель секций
+                if empty_line_count >= 2 and current_section:
+                    # Сохраняем текущую секцию (убираем только пустые строки в конце)
+                    section_lines = current_section[:]
+                    while section_lines and not section_lines[-1].strip():
+                        section_lines.pop()
+                    if section_lines:
+                        detected_sections.append({"tag": "Body", "lines": section_lines})
+                    current_section = []
+                    empty_line_count = 0
+            else:
+                empty_line_count = 0
+                current_section.append(line)
+        
+        # Добавляем последнюю секцию
+        if current_section:
+            section_lines = current_section[:]
+            while section_lines and not section_lines[-1].strip():
+                section_lines.pop()
+            if section_lines:
+                detected_sections.append({"tag": "Body", "lines": section_lines})
+        
+        # Если разбиение по пустым строкам дало результат — используем его
+        if len(detected_sections) > 1:
+            # Уберём внутри секций пустые строки-только-пробелы (но сохраним структуру)
+            for s in detected_sections:
+                s["lines"] = [l for l in s["lines"] if l.strip()]
+            
+            # Автоматическое именование секций согласно структуре песни
+            _assign_section_names(detected_sections)
+            
+            return detected_sections
+    
     # Уберём внутри секций пустые строки-только-пробелы
     for s in sections:
         s["lines"] = [l for l in s["lines"] if l.strip()]
-
+    
     # Если ничего не нашли — вернуть «Body» со всем текстом
     if not sections:
         body_lines = [ln for ln in text.split("\n") if ln.strip()]

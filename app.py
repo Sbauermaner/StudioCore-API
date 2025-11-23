@@ -38,7 +38,7 @@ def extract_main_outputs(result):
     )
     try:
         summary_json = json.dumps(result, ensure_ascii=False, indent=2)
-    except:
+    except Exception:
         summary_json = str(result)
     return style_prompt, lyrics_prompt, ui_text, fanf_text, summary_json
 
@@ -286,4 +286,14 @@ with gr.Blocks(theme=gr.themes.Soft(), title="StudioCore IMMORTAL v7 – Impulse
     diag_btn.click(fn=run_raw_diagnostics, inputs=[diag_input], outputs=[diag_json_out])
 
 if __name__ == "__main__":
-    demo.launch()
+    import os
+    # Конфигурация для деплоя
+    server_port = int(os.getenv("PORT", 7860))
+    server_name = os.getenv("SERVER_NAME", "0.0.0.0")
+    share = os.getenv("GRADIO_SHARE", "False").lower() == "true"
+    
+    demo.launch(
+        server_name=server_name,
+        server_port=server_port,
+        share=share
+    )

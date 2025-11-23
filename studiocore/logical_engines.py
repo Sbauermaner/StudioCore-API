@@ -93,23 +93,30 @@ class TextStructureEngine:
             section_text = "\n".join(lines).strip()
             if section_text:
                 sections.append(section_text)
+            # Используем тег из structured (который уже обновлен _assign_section_names)
+            tag = item.get("tag", "Body")
             metadata.append(
                 {
-                    "tag": item.get("tag"),
+                    "tag": tag,
+                    "label": tag,  # Добавляем label для совместимости
+                    "name": tag,    # Добавляем name для совместимости
                     "lines": list(lines),
                     "line_count": len(lines),
                 }
             )
         if not sections and text.strip():
             sections = [text.strip()]
-        self._section_metadata = [
-            {
-                "tag": item.get("tag"),
+            metadata = [{"tag": "Verse", "label": "Verse", "name": "Verse", "lines": text.strip().split("\n"), "line_count": len(text.strip().split("\n"))}]
+        self._section_metadata = []
+        for item in metadata:
+            tag = item.get("tag", "Body")
+            self._section_metadata.append({
+                "tag": tag,
+                "label": tag,  # Используем tag как label
+                "name": tag,   # Используем tag как name
                 "lines": list(item.get("lines", [])),
                 "line_count": item.get("line_count", len(item.get("lines", []))),
-            }
-            for item in metadata
-        ]
+            })
         return sections
 
     def _resolve_sections(self, text: str, sections: Sequence[str] | None) -> List[str]:
@@ -1028,14 +1035,19 @@ class FinalCompiler:
         return merged
 
     def generate_final_structure(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        sections = payload.get("structure", {}).get("sections", [])
-        return {
+        structure_block = payload.get("structure", {})
+        sections = structure_block.get("sections", [])
+        result = {
             "section_count": len(sections),
             "sections": sections,
-            "intro": payload.get("structure", {}).get("intro"),
-            "chorus": payload.get("structure", {}).get("chorus"),
-            "outro": payload.get("structure", {}).get("outro"),
+            "intro": structure_block.get("intro"),
+            "chorus": structure_block.get("chorus"),
+            "outro": structure_block.get("outro"),
         }
+        # Сохраняем headers если они есть
+        if structure_block.get("headers"):
+            result["headers"] = structure_block["headers"]
+        return result
 
     def generate_final_prompt(self, payload: Dict[str, Any]) -> str:
         style = payload.get("style", {})

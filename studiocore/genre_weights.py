@@ -47,7 +47,7 @@ class GenreWeightsEngine:
         self.universe = load_genre_universe()
 
         # === 1. Домен → веса признаков ===
-        self.domain_feature_weights: Dict[str, Dict[str, float]] = {
+        raw_weights: Dict[str, Dict[str, float]] = {
             "hard": {
                 "sai": 0.22,
                 "power": 0.22,
@@ -114,6 +114,16 @@ class GenreWeightsEngine:
                 "poetic_density": 0.12,
             },
         }
+
+        # Нормализация весов: гарантируем, что отрицательные веса зажаты, и опционально нормализуем суммы
+        self.domain_feature_weights: Dict[str, Dict[str, float]] = {}
+        for domain, weights in raw_weights.items():
+            normalized_weights: Dict[str, float] = {}
+            # Зажимаем отрицательные веса (они используются для вычитания, но должны быть в разумных пределах)
+            for feat, w in weights.items():
+                # Отрицательные веса допустимы (для вычитания), но зажимаем их в разумные пределы
+                normalized_weights[feat] = max(-0.5, min(0.5, w)) if w < 0 else max(0.0, min(1.0, w))
+            self.domain_feature_weights[domain] = normalized_weights
 
         # === 2. Порог по доменам ===
         self.domain_thresholds: Dict[str, float] = {
@@ -248,8 +258,11 @@ class GenreWeightsEngine:
         for domain, weights in self.domain_feature_weights.items():
             s = 0.0
             for feat, w in weights.items():
-                value = features.get(feat, 0.0)
-                s += value * w
+                # Зажимаем значение признака в [0.0, 1.0] для безопасности
+                value = max(0.0, min(1.0, float(features.get(feat, 0.0))))
+                # Веса уже нормализованы в __init__, но дополнительная проверка не помешает
+                safe_weight = max(-0.5, min(0.5, w)) if w < 0 else max(0.0, min(1.0, w))
+                s += value * safe_weight
             scores[domain] = s
 
         poetic = features.get("poetic_density", 0.0)

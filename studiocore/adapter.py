@@ -15,7 +15,7 @@ Semantic compression · RNS safety · Dynamic prompt formatting
 
 import re
 import hashlib
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 
 log = logging.getLogger(__name__)
@@ -101,8 +101,8 @@ def rns_safety_tag(bpm: int, key: str) -> str:
 # -----------------------------------------------------------
 def build_suno_prompt(
     style_data: Dict[str, Any],
-    vocals: List[str] | None,
-    instruments: List[str] | None,
+    vocals: Optional[List[str]],
+    instruments: Optional[List[str]],
     bpm: int,
     philosophy: str,
     version: str,

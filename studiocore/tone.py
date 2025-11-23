@@ -14,6 +14,7 @@ Unified color–resonance engine for emotional frequency visualization.
 """
 
 import math
+import re
 from typing import Any, Dict
 from studiocore.color_engine_adapter import (
     EMOTION_COLOR_MAP,
@@ -163,15 +164,46 @@ class ToneSyncEngine:
         }
 
     def detect_key(self, text: str) -> Dict[str, Any]:
+        """
+        Определяет тональность из текста.
+        ВАЖНО: Не использует цвета из лирики, только явные указания тональности.
+        Ищет только музыкальные обозначения (C, D, E, F, G, A, B с возможными диезами).
+        """
         if not text:
             return {"key": "auto", "confidence": 0.0}
 
-        lowered = text.lower()
-        candidates = [key for key in self.BASE_COLOR_MAP if key.lower() in lowered]
-        base_key = candidates[0] if candidates else "auto"
-        confidence = 0.65 if candidates else 0.0
-
-        return {"key": base_key, "confidence": confidence}
+        # Ищем только явные музыкальные обозначения тональности
+        # Паттерн: начало строки или пробел, затем нота (C, D, E, F, G, A, B), опционально #, затем пробел или конец
+        # Также ищем в квадратных скобках [C minor], [F# major] и т.д.
+        key_pattern = re.compile(
+            r'(?:^|[\s\[(])([CDEFGAB]#?)\s*(?:minor|major|maj|min|m|M)?(?=[\s\]),.!?]|$)',
+            re.IGNORECASE
+        )
+        
+        matches = key_pattern.findall(text)
+        if matches:
+            # Берем первую найденную ноту и нормализуем
+            base_note = matches[0].upper()
+            # Проверяем, что это валидная нота из нашего списка
+            if base_note in self.KEY_STEPS or base_note.replace('#', '') in ['C', 'D', 'E', 'F', 'G', 'A', 'B']:
+                # Ищем mode (minor/major) рядом с нотой
+                mode_match = re.search(
+                    r'(?:^|[\s\[(])' + re.escape(base_note) + r'\s*(minor|major|maj|min|m|M)',
+                    text,
+                    re.IGNORECASE
+                )
+                mode = ""
+                if mode_match:
+                    mode_text = mode_match.group(1).lower()
+                    if mode_text in ('minor', 'min', 'm'):
+                        mode = " minor"
+                    elif mode_text in ('major', 'maj', 'M'):
+                        mode = " major"
+                
+                return {"key": f"{base_note}{mode}", "confidence": 0.75}
+        
+        # Если ничего не найдено - возвращаем auto
+        return {"key": "auto", "confidence": 0.0}
 
     def apply_emotion_modulation(self, key_payload, emotion_vector):
         """

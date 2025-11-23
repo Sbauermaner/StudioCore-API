@@ -126,7 +126,8 @@ class ResonanceDynamicsEngine:
         entropy = 0.0
         for cnt in freq.values():
             p = cnt / length
-            entropy -= p * (0 if p <= 0 else (p).bit_length())  # дешёвый суррогат логарифма
+            import math
+            entropy -= p * (0 if p <= 0 else math.log2(p) if p > 0 else 0)  # используем логарифм вместо bit_length
         entropy = min(1.0, max(0.0, entropy / 10.0))
         return round(entropy, 4)
 
