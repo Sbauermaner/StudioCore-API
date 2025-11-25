@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Sequence
 
-from studiocore.emotion_profile import EmotionVector, EmotionAggregator
+from studiocore.emotion_profile import EmotionVector
 from studiocore.tlp_engine import TruthLovePainEngine  # Import required engine
 
 
