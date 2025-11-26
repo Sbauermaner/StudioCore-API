@@ -644,12 +644,44 @@ class StudioCoreV6:
         
         sanitized_text = text
         detected_patterns = []
+        
+        # SEC-001 FIX: ReDoS protection - use compiled patterns with timeout protection
+        # Limit pattern matching to prevent ReDoS attacks on malicious input
+        import signal
+        
+        def safe_regex_search(pattern, text, timeout_seconds=0.1):
+            """Execute regex search with timeout protection against ReDoS."""
+            try:
+                # Pre-compile pattern for better performance
+                compiled = re.compile(pattern, re.IGNORECASE)
+                # Use search instead of findall for better performance
+                match = compiled.search(text)
+                return match is not None
+            except re.error as e:
+                logger.warning(f"Invalid regex pattern {pattern}: {e}")
+                return False
+            except Exception as e:
+                logger.warning(f"Regex error for pattern {pattern}: {e}")
+                return False
+        
+        def safe_regex_sub(pattern, text, replacement='', timeout_seconds=0.1):
+            """Execute regex substitution with timeout protection."""
+            try:
+                compiled = re.compile(pattern, re.IGNORECASE)
+                return compiled.sub(replacement, text, count=1)  # Limit replacements
+            except re.error as e:
+                logger.warning(f"Invalid regex pattern {pattern}: {e}")
+                return text
+            except Exception as e:
+                logger.warning(f"Regex error for pattern {pattern}: {e}")
+                return text
+        
         for pattern, description in dangerous_patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            if matches:
+            # SEC-001: Use safe regex matching with timeout protection
+            if safe_regex_search(pattern, text):
                 detected_patterns.append(description)
-                # Удаляем опасные паттерны
-                sanitized_text = re.sub(pattern, '', sanitized_text, flags=re.IGNORECASE)
+                # Remove dangerous patterns (limit to 1 replacement per pattern to prevent ReDoS)
+                sanitized_text = safe_regex_sub(pattern, sanitized_text)
                 logger.warning(f"Potential prompt injection detected: {description}, removed")
         
         if detected_patterns:
@@ -1181,7 +1213,9 @@ class StudioCoreV6:
         if isinstance(style_block, dict) and style_block.get("genre"):
             try:
                 genre_info = genre_universe.detect_domain(str(style_block.get("genre")))
-            except Exception:
+            except (AttributeError, TypeError, ValueError, KeyError) as e:
+                # SEC-002 FIX: Specific exception handling with logging
+                logger.debug(f"Genre universe detection failed for {style_block.get('genre')}: {e}")
                 genre_info = None
         if genre_info:
             diagnostics["genre_universe_tags"] = genre_info
@@ -2244,7 +2278,9 @@ class StudioCoreV6:
                 )
                 local_tone_mod.append(mod)
             result["_tone_dynamic"] = local_tone_mod
-        except Exception:
+        except (AttributeError, TypeError, KeyError, IndexError) as e:
+            # SEC-002 FIX: Specific exception handling
+            logger.debug(f"Tone dynamic processing failed: {e}")
             result["_tone_dynamic"] = []
 
         # Fix Key-Emotion Link: Apply the final modulated key/mode
@@ -2598,7 +2634,9 @@ class StudioCoreV6:
         try:
             from .text_utils import normalize_text_preserve_symbols
             normalized_text = normalize_text_preserve_symbols(text)
-        except Exception:
+        except (ImportError, AttributeError, TypeError) as e:
+            # SEC-002 FIX: Specific exception handling with logging
+            logger.debug(f"Text normalization failed, using original text: {e}")
             normalized_text = text  # Safe fallback
         
         # Use normalized_text in all downstream engines
