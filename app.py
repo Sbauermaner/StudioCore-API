@@ -114,23 +114,61 @@ def build_rde_section_text(result):
     rhythm = rde.get("rhythm", "—")
     dynamics = rde.get("dynamics", "—")
     emotion = rde.get("emotion", "—")
-    sections = result.get("structure", {}) if isinstance(result.get("structure"), dict) else {}
-    section_list = sections.get("sections") or []
+    structure = result.get("structure", {}) if isinstance(result.get("structure"), dict) else {}
+    section_list = structure.get("sections") or []
+    headers = structure.get("headers") or []
+    
+    # Получаем информацию о вокальных техниках и эмоциях секций
+    fanf = result.get("fanf", {}) if isinstance(result.get("fanf"), dict) else {}
+    lyrics_sections = fanf.get("lyrics_sections") or []
+    if not lyrics_sections:
+        # Пытаемся получить из другого места
+        lyrics_data = result.get("lyrics", {}) if isinstance(result.get("lyrics"), dict) else {}
+        lyrics_sections = lyrics_data.get("sections", [])
+    
     lines = [
         "RDE (Rhythm / Dynamics / Emotion):",
         f"  Rhythm  : {rhythm}",
         f"  Dynamics: {dynamics}",
         f"  Emotion : {emotion}",
         "",
-        "Detected sections:"
+        f"Detected sections: {len(section_list)}"
     ]
+    
     if section_list:
-        for sec in section_list:
-            name = sec.get("label") or sec.get("name") or "?"
-            intensity = sec.get("intensity", "—")
-            lines.append(f"  - {name} (intensity={intensity})")
+        for i, sec in enumerate(section_list):
+            # Получаем имя секции из headers если доступно
+            section_name = "?"
+            if i < len(headers) and isinstance(headers[i], dict):
+                section_name = headers[i].get("tag") or headers[i].get("label") or headers[i].get("name") or f"Section {i+1}"
+            else:
+                section_name = f"Section {i+1}"
+            
+            # Подсчитываем количество строк в секции
+            if isinstance(sec, str):
+                line_count = len(sec.split("\n"))
+            elif isinstance(sec, dict):
+                line_count = sec.get("line_count", len(sec.get("lines", [])))
+            else:
+                line_count = 0
+            
+            # Получаем вокальную технику и эмоцию для секции
+            vocal_tech = "—"
+            section_emotion = "—"
+            if i < len(lyrics_sections) and isinstance(lyrics_sections[i], dict):
+                vocal_tech = lyrics_sections[i].get("vocal_technique", "—")
+                section_emotion = lyrics_sections[i].get("emotion", "—")
+            
+            section_info = f"  {i+1}. {section_name} ({line_count} строк)"
+            if vocal_tech != "—":
+                section_info += f" | Vocal: {vocal_tech}"
+            if section_emotion != "—":
+                section_info += f" | Emotion: {section_emotion}"
+            
+            lines.append(section_info)
     else:
         lines.append("  (no explicit sections)")
+    
     return "\n".join(lines)
 
 def build_tone_bpm_text(result):
@@ -165,6 +203,13 @@ def build_genre_vocal_text(result):
     gender = vocal.get("gender") or result.get("final_gender_preference")
     form = vocal.get("form") or style.get("vocal_form")
     texture = vocal.get("texture")
+    # Добавляем информацию о вокальных техниках для секций
+    section_techniques = vocal.get("section_techniques", [])
+    techniques_info = ""
+    if section_techniques:
+        techniques_info = "\n\nVocal Techniques by Section:"
+        for idx, tech in enumerate(section_techniques):
+            techniques_info += f"\n  Section {idx+1}: {tech}"
     return "\n".join([
         "Genre Fusion:",
         f"  Primary  : {primary or '—'}",
@@ -175,7 +220,7 @@ def build_genre_vocal_text(result):
         f"  Gender : {gender or 'auto'}",
         f"  Form   : {form or 'adaptive'}",
         f"  Texture: {texture or '—'}",
-    ])
+    ]) + techniques_info
 
 def build_breath_map_text(result):
     diagnostics = result.get("diagnostics", {}) or {}
