@@ -24,6 +24,7 @@ from .emotion_field import EmotionFieldEngine
 from .emotion_profile import EmotionAggregator, EmotionVector
 # HIGH PRIORITY FIX: Move imports to top for "Fail Fast" behavior
 from .tone import ToneSyncEngine as LegacyToneSyncEngine
+from .tone_sync import ToneSyncEngine
 from .genre_router import DynamicGenreRouter
 from .genre_universe_adapter import GenreUniverseAdapter
 from .dynamic_emotion_engine import DynamicEmotionEngine
@@ -42,10 +43,12 @@ from .logical_engines import (
     LyricsAnnotationEngine,
     MeaningVelocityEngine,
     REM_Synchronizer,
+    StyleEngine,
     TextStructureEngine,
     TonalityEngine,
     UserAdaptiveSymbiosisEngine,
     UserOverrideEngine,
+    VocalEngine,
     ZeroPulseEngine,
 )
 from .emotion import EmotionEngine, EmotionEngineV2
@@ -67,6 +70,8 @@ from .text_utils import (
     translate_text_for_analysis,
 )
 from .user_override_manager import UserOverrideManager, UserOverrides
+from .adapter import build_suno_prompt
+from .fusion_engine_v64 import FusionEngineV64
 from studiocore.emotion_map import EmotionMapEngine
 from studiocore.emotion_curve import build_global_emotion_curve
 from studiocore.frequency import RNSSafety, UniversalFrequencyEngine
@@ -472,7 +477,6 @@ class StudioCoreV6:
 
         result["diagnostics"] = diagnostics
         return result
-    """Light-weight compatibility surface for the upcoming v6 engine."""
 
     def __init__(self) -> None:
         """
@@ -495,7 +499,8 @@ class StudioCoreV6:
         self._tlp_engine = TruthLovePainEngine()
         self._rde_engine = RhythmDynamicsEmotionEngine()
         self._genre_router_ext = GenreMatrixExtended()
-        self._tone_engine = ToneSyncEngine()
+        # Use LegacyToneSyncEngine (from tone.py) for detect_key() method
+        self._tone_engine = LegacyToneSyncEngine()
         self._integrity_engine = IntegrityScanEngine()
         self._dynamic_emotion_engine = DynamicEmotionEngine()
         self._section_intelligence = SectionIntelligenceEngine()
@@ -566,9 +571,20 @@ class StudioCoreV6:
         self._color_v3 = ColorEngineV3() if ColorEngineV3 else None
 
     def __getattr__(self, name: str):
+        # HIGH PRIORITY FIX: Support both _engine_bundle (legacy) and direct attributes
+        # First check _engine_bundle (for backward compatibility)
         bundle = self.__dict__.get("_engine_bundle", {})
         if name in bundle:
             return bundle[name]
+        # Then check if it's a direct engine attribute (with _ prefix)
+        if name.startswith("_"):
+            # Try without underscore
+            direct_name = name
+        else:
+            # Try with underscore (engines are stored as _engine_name)
+            direct_name = f"_{name}"
+        if hasattr(self, direct_name):
+            return getattr(self, direct_name)
         raise AttributeError(f"{self.__class__.__name__} has no attribute {name}")
 
     def _validate_and_sanitize_input(self, text: str, diagnostics: dict) -> str:
