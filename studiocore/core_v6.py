@@ -79,9 +79,15 @@ from studiocore.config import (
     DEFAULT_CONFIG, 
     FORCED_GENRES,
     ALGORITHM_WEIGHTS,
+    GENRE_WEIGHTS,
     ROAD_NARRATIVE_KEYWORDS,
     FOLK_BALLAD_KEYWORDS,
     FOLK_BALLAD_KEYWORDS_LEGACY,
+    URBAN_ELECTRONIC_KEYWORDS,
+    POETIC_KEYWORDS,
+    COMEDY_KEYWORDS,
+    GOTHIC_KEYWORDS,
+    GENRE_THRESHOLDS,
 )
 from studiocore.diagnostics_v8 import DiagnosticsBuilderV8
 from studiocore.consistency_v8 import ConsistencyLayerV8
