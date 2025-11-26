@@ -15,7 +15,10 @@ StudioCore Configuration Loader
 
 import os
 import json
+import logging
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 # Canonical StudioCore version. Legacy labels kept for backward compatibility only.
 STUDIOCORE_VERSION = "v6.4-maxi"
