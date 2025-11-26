@@ -81,10 +81,30 @@ def main() -> int:
     if errors:
         print("❌ ERRORS FOUND:")
         print("\n".join(errors))
-        return 1
+        exit_code = 1
+    else:
+        print("✔ No workflow errors detected")
+        exit_code = 0
 
-    print("✔ No workflow errors detected")
-    return 0
+    # Write results to lgp.txt as expected by run_full_diag.sh
+    lgp_path = ROOT / "main" / "lgp.txt"
+    from datetime import datetime
+    header = "=== StudioCore — FULL SYSTEM DIAGNOSTIC REPORT ==="
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    
+    report = f"\n{header}\n"
+    report += f"Timestamp: {timestamp}\n"
+    report += "\n".join(info) + "\n"
+    if errors:
+        report += "\n".join(errors) + "\n"
+    report += f"Status: {'FAILED' if errors else 'PASSED'}\n"
+    report += "=" * 50 + "\n"
+    
+    lgp_path.parent.mkdir(parents=True, exist_ok=True)
+    with lgp_path.open("a", encoding="utf-8") as f:
+        f.write(report)
+
+    return exit_code
 
 
 if __name__ == "__main__":
