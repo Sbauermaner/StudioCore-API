@@ -149,6 +149,42 @@ LOW_EMOTION_RDE_FRACTURE_MAX = 0.15
 LOW_EMOTION_RDE_ENTROPY_MAX = 0.35
 
 
+def load_config_weights(path: str = "config_weights.json") -> dict:
+    """
+    Load external genre weights and keywords configuration from JSON file.
+    
+    Args:
+        path: Path to the JSON configuration file
+        
+    Returns:
+        Dictionary with genre_weights, keywords, and thresholds
+        
+    Raises:
+        FileNotFoundError: If config file doesn't exist
+        json.JSONDecodeError: If JSON is invalid
+    """
+    import json
+    from pathlib import Path
+    
+    config_path = Path(path)
+    if not config_path.exists():
+        # Return empty dict if file doesn't exist (fallback to hardcoded values)
+        logger.warning(f"Config weights file not found: {path}, using hardcoded values")
+        return {}
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        logger.info(f"Loaded config weights from {path}")
+        return data
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in config weights file {path}: {e}")
+        return {}
+    except Exception as e:
+        logger.error(f"Error loading config weights from {path}: {e}")
+        return {}
+
+
 def load_config(path: str = "studio_config.json") -> dict:
     """
     Загружает конфигурацию StudioCore или создаёт новую.
@@ -374,6 +410,21 @@ GENRE_THRESHOLDS = {
     "rage_mode_tension_min": 0.25,
     "epic_mode_min": 0.35
 }
+
+# ============================================================================
+# External Configuration Loader (V7 - Auto-load from JSON)
+# ============================================================================
+# Try to load external configuration, fallback to hardcoded values
+_external_config = load_config_weights("config_weights.json")
+
+if _external_config and _external_config.get("meta", {}).get("auto_load"):
+    # Override hardcoded values with external config if available
+    if "genre_weights" in _external_config:
+        GENRE_WEIGHTS.update(_external_config["genre_weights"])
+    if "thresholds" in _external_config:
+        GENRE_THRESHOLDS.update(_external_config["thresholds"])
+    # Keywords are kept in separate variables, can be accessed via external config
+    logger.info("External configuration loaded and merged with hardcoded values")
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
