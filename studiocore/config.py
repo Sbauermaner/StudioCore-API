@@ -304,7 +304,21 @@ ROAD_NARRATIVE_KEYWORDS = {
     ],
 }
 
-FOLK_BALLAD_KEYWORDS = [
+# FOLK_BALLAD_KEYWORDS - Updated to match JSON structure (V7)
+FOLK_BALLAD_KEYWORDS = {
+    "ru": [
+        "тропа", "дорог", "ветер", "луна", "ноч", "земл", "память",
+        "возвращал", "шептал", "тихо", "тум", "природ", "пешком", "мимо",
+        "поле", "степь", "село", "деревня", "печь", "предки"
+    ],
+    "en": [
+        "trail", "field", "moon", "earth", "old roads", "road", "village",
+        "wind", "grass", "legends", "sagas", "ancestors", "shepherd", "blizzard"
+    ]
+}
+
+# Legacy flat list format (for backward compatibility)
+FOLK_BALLAD_KEYWORDS_FLAT = [
     # Russian keywords
     "тропа", "тропе", "поле", "поля", "луна", "луной", "земля", "землёй",
     "старые дороги", "дорога", "дороге", "дорогами", "степь", "посевы",
