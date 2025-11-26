@@ -9,7 +9,8 @@ Fixes state leak issues by ensuring no data persists between calls.
 Uses externalized configuration from config.py for weights and thresholds.
 """
 
-from typing import Dict, Any, Optional
+from __future__ import annotations
+from typing import Dict, Any, Optional, Union
 from studiocore.config import GENRE_WEIGHTS, GENRE_THRESHOLDS
 
 
@@ -23,7 +24,7 @@ class HybridGenreEngine:
         # No state initialization here to prevent leaks
         pass
 
-    def resolve(self, text_input: str | None = None, context: dict | None = None) -> dict | str | None:
+    def resolve(self, text_input: Optional[str] = None, context: Optional[dict] = None) -> Union[dict, str, None]:
         """
         Resolves the primary genre based on text input or existing genre and context.
         
@@ -74,12 +75,12 @@ class HybridGenreEngine:
 
     @staticmethod
     def collect_signals(
-        domain_genre: str | None,
-        folk_ballad_candidate: dict | None,
+        domain_genre: Optional[str],
+        folk_ballad_candidate: Optional[dict],
         road_narrative_score: float,
         emotion_profile: dict,
         feature_map: dict,
-        legacy_genre: str | None,
+        legacy_genre: Optional[str],
         semantic_hints: dict,
         commands: list,
     ) -> dict:
@@ -155,7 +156,7 @@ class HybridGenreEngine:
         return {"signals": signals, "total_weight": total_weight}
 
     @staticmethod
-    def resolve_hybrid_genre(signals_data: dict, user_override: str | None = None) -> str | None:
+    def resolve_hybrid_genre(signals_data: dict, user_override: Optional[str] = None) -> Optional[str]:
         """
         Resolves the final hybrid genre string. Pure function.
         Uses externalized configuration from GENRE_WEIGHTS.
