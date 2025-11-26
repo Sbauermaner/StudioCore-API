@@ -522,7 +522,7 @@ class StudioCoreV6:
         self._vocal_engine = VocalEngine()
         self._rns_safety = RNSSafety(self.config)
         self._legacy_emotion_engine = EmotionEngine()  # Legacy alias
-        self._legacy_tone_engine = ToneSyncEngine()  # Legacy alias
+        self._legacy_tone_engine = LegacyToneSyncEngine()  # Legacy alias (same as _tone_engine)
         self._multimodal_matrix = MultimodalEmotionMatrixV1()
         self._breathing_engine = BreathingEngine()
         self._suno_engine = SunoAnnotationEngine()
