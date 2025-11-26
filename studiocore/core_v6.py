@@ -175,7 +175,9 @@ def _safe_float(value: object, default: float | None = None) -> float | None:
         if value is None:
             return default
         return float(value)
-    except Exception:  # noqa: BLE001
+    except (ValueError, TypeError, AttributeError) as e:
+        # SEC-002 FIX: Specific exception handling instead of generic Exception
+        logger.debug(f"Failed to convert {value} to float: {e}")
         return default
 
 
@@ -2434,7 +2436,9 @@ class StudioCoreV6:
             from .genre_universe_loader import load_genre_universe
 
             universe = load_genre_universe()
-        except Exception:  # pragma: no cover - fallback if loader fails
+        except (ImportError, AttributeError, RuntimeError) as e:
+            # SEC-002 FIX: Specific exception handling with logging
+            logger.debug(f"Genre universe loader failed: {e}, using None as fallback")
             universe = None
 
         # MASTER-PATCH v5.1: Валидация legacy genre перед использованием
