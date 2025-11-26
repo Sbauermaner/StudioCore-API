@@ -24,16 +24,18 @@ class HybridGenreEngine:
         # No state initialization here to prevent leaks
         pass
 
-    def resolve(self, text_input: Optional[str] = None, context: Optional[dict] = None) -> Union[dict, str, None]:
+    def resolve(self, text_input: Optional[str] = None, genre: Optional[str] = None, context: Optional[dict] = None) -> Union[dict, str, None]:
         """
         Resolves the primary genre based on text input or existing genre and context.
         
-        Supports two signatures:
+        Supports multiple signatures:
         1. resolve(text_input: str) -> dict (for dynamic tests)
         2. resolve(genre: str, context: dict) -> str (for pipeline)
+        3. resolve(text_input=..., context=...) -> dict (for tests)
         
         Args:
-            text_input: Text string for analysis OR genre string (depending on signature)
+            text_input: Text string for analysis (for direct analysis)
+            genre: Existing genre string (for pipeline refinement)
             context: Optional context dictionary (for pipeline signature)
             
         Returns:
@@ -41,6 +43,11 @@ class HybridGenreEngine:
             str: For genre+context calls (resolved genre string)
             None: If resolution fails
         """
+        # Handle genre parameter (for pipeline calls: resolve(genre=..., context=...))
+        if genre is not None:
+            # Signature 2: genre and context (for pipeline)
+            return genre  # For now, just return the genre (can be enhanced later)
+        
         # Signature 1: text_input only (for dynamic tests)
         if context is None:
             if not text_input or not isinstance(text_input, str):
