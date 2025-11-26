@@ -227,63 +227,63 @@ ALGORITHM_WEIGHTS = {
 }
 
 # ============================================================================
-# Genre Weights (V7 Extended Configuration)
+# Genre Weights (V7 Extended Configuration - Externalized Genre Weighting)
 # ============================================================================
 GENRE_WEIGHTS = {
     "semantic_aggression": {
         "anger_multiplier": 0.4,
-        "conflict_base": 1.0,
+        "conflict_base": 1.0
     },
     "power_vector": {
         "bpm_divisor": 180.0,
-        "intensity_multiplier": 0.3,
+        "intensity_multiplier": 0.3
     },
     "edge_factor": {
         "anger_multiplier": 0.6,
         "tone_intense_boost": 0.3,
-        "tone_balanced_boost": 0.15,
+        "tone_balanced_boost": 0.15
     },
     "rhythm_density": {
-        "bpm_divisor": 200.0,
+        "bpm_divisor": 200.0
     },
     "narrative_pressure": {
-        "fracture_multiplier": 0.1,
+        "fracture_multiplier": 0.1
     },
     "poetic_density": {
         "imagery_multiplier": 2.2,
         "punctuation_multiplier": 0.4,
         "long_line_multiplier": 0.3,
-        "motif_multiplier": 0.1,
+        "motif_multiplier": 0.1
     },
     "swing_ratio": {
         "command_boost": 0.25,
         "poly_variance_divisor": 40.0,
         "keyword_weight": 0.6,
-        "variance_weight": 0.4,
+        "variance_weight": 0.4
     },
     "jazz_complexity": {
         "palette_weight": 0.35,
         "modal_weight": 0.35,
-        "text_weight": 0.3,
+        "text_weight": 0.3
     },
     "electronic_pressure": {
         "palette_weight": 0.5,
         "text_weight": 0.3,
-        "bpm_weight": 0.2,
+        "bpm_weight": 0.2
     },
     "comedy_factor": {
         "hits_weight": 0.6,
         "blob_weight": 0.15,
-        "laughter_weight": 0.1,
+        "laughter_weight": 0.1
     },
     "gothic_factor": {
-        "minor_lumen_multiplier": 0.1,
+        "minor_lumen_multiplier": 0.1
     },
     "dramatic_weight": {
         "tension_weight": 0.5,
         "gradient_weight": 0.3,
-        "pressure_weight": 0.2,
-    },
+        "pressure_weight": 0.2
+    }
 }
 
 # ============================================================================
@@ -323,6 +323,10 @@ FOLK_BALLAD_KEYWORDS_LEGACY = [
 # ============================================================================
 # Extended Keyword Lists (V7 Extended Configuration)
 # ============================================================================
+# Note: ROAD_NARRATIVE_KEYWORDS already defined above with same structure
+# The user's JSON matches the existing structure, so we keep it as is.
+
+# Extended keyword categories
 URBAN_ELECTRONIC_KEYWORDS = [
     "rap", "drill", "trap", "808", "club", "EDM", "techno", "rave",
     "bass", "beat", "MC", "рэп", "бит", "клуб", "техно", "хаус",
@@ -347,14 +351,14 @@ GOTHIC_KEYWORDS = [
 ]
 
 # ============================================================================
-# Thresholds (V7 Extended Configuration)
+# Genre Detection Thresholds (V7 Extended Configuration)
 # ============================================================================
 GENRE_THRESHOLDS = {
     "road_narrative_score_min": 0.45,
     "folk_ballad_confidence_min": 0.5,
     "rage_mode_anger_min": 0.22,
     "rage_mode_tension_min": 0.25,
-    "epic_mode_min": 0.35,
+    "epic_mode_min": 0.35
 }
 
 # StudioCore Signature Block (Do Not Remove)
