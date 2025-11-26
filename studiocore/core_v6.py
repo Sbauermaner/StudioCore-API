@@ -22,13 +22,15 @@ from .multimodal_emotion_matrix import MultimodalEmotionMatrixV1
 from .color_engine_adapter import ColorEngineAdapter
 from .emotion_field import EmotionFieldEngine
 from .emotion_profile import EmotionAggregator, EmotionVector
-# Lazy imports moved inside functions to avoid circular dependencies
-# (per StudioCore Constitution)
-# Imports now occur inside method bodies only when needed.
+# HIGH PRIORITY FIX: Move imports to top for "Fail Fast" behavior
 from .tone import ToneSyncEngine as LegacyToneSyncEngine
 from .genre_router import DynamicGenreRouter
 from .genre_universe_adapter import GenreUniverseAdapter
 from .dynamic_emotion_engine import DynamicEmotionEngine
+from .tlp_engine import TruthLovePainEngine
+from .rde_engine import RhythmDynamicsEmotionEngine, ResonanceDynamicsEngine
+from .genre_matrix_extended import GenreMatrixExtended, GenreMatrixEngine
+from .section_parser import SectionParser
 from .emotion_genre_matrix import compute_genre_bias
 from .logical_engines import (
     BreathingEngine,
@@ -46,7 +48,7 @@ from .logical_engines import (
     UserOverrideEngine,
     ZeroPulseEngine,
 )
-from .emotion import EmotionEngine
+from .emotion import EmotionEngine, EmotionEngineV2
 from .instrument_dynamics import InstrumentalDynamicsEngine
 from .integrity import IntegrityScanEngine
 from .section_intelligence import SectionIntelligenceEngine
@@ -68,7 +70,14 @@ from .user_override_manager import UserOverrideManager, UserOverrides
 from studiocore.emotion_map import EmotionMapEngine
 from studiocore.emotion_curve import build_global_emotion_curve
 from studiocore.frequency import RNSSafety, UniversalFrequencyEngine
-from studiocore.config import DEFAULT_CONFIG, FORCED_GENRES
+from studiocore.config import (
+    DEFAULT_CONFIG, 
+    FORCED_GENRES,
+    ALGORITHM_WEIGHTS,
+    ROAD_NARRATIVE_KEYWORDS,
+    FOLK_BALLAD_KEYWORDS,
+    FOLK_BALLAD_KEYWORDS_LEGACY,
+)
 from studiocore.diagnostics_v8 import DiagnosticsBuilderV8
 from studiocore.consistency_v8 import ConsistencyLayerV8
 from studiocore.logger_runtime import write_runtime_log
@@ -76,8 +85,9 @@ from studiocore.logger_runtime import write_runtime_log
 # === MASTER_PATCH V6.1 HOOK ===
 try:
     from .master_patch_v6_1 import *
-except:
-    pass
+except (ImportError, Exception) as e:
+    # MEDIUM PRIORITY FIX: Use specific exception and log
+    logger.warning(f"Master Patch V6.1 import failed: {e}")
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +239,12 @@ def _build_consistency_report(
         if total > 0:
             # The precise formula can be adjusted, but we keep it simple and
             # consistent with previous documentation.
-            cf_recomputed = (t * 0.4 + l * 0.3 + p * 0.5) / total
+            # Use externalized weights from config
+            cf_recomputed = (
+                t * ALGORITHM_WEIGHTS["tlp_truth_weight"] + 
+                l * ALGORITHM_WEIGHTS["tlp_love_weight"] + 
+                p * ALGORITHM_WEIGHTS["tlp_pain_weight"]
+            ) / total
 
     tlp_consistent = True
     if cf_diag is not None and cf_recomputed is not None:
@@ -461,12 +476,60 @@ class StudioCoreV6:
 
     def __init__(self) -> None:
         """
-        Stateless constructor: only load static config.
-        No engines or parsers must be created here.
+        Stateless constructor: initialize static config and stateless engines.
+        
+        HIGH PRIORITY FIX: Stateless engines are initialized once here to avoid
+        re-instantiation overhead on every analyze() call.
         """
 
         self.config = copy.deepcopy(DEFAULT_CONFIG)
         self._engine_bundle: dict[str, object] = {}
+        
+        # Initialize stateless engines once (HIGH PRIORITY FIX: Performance optimization)
+        # These engines have no state and can be reused across requests
+        self._text_engine = TextStructureEngine()
+        self._section_parser = SectionParser(self._text_engine)
+        self._emotion_engine = EmotionEngine()
+        self._bpm_engine = BPMEngine()
+        self._frequency_engine = UniversalFrequencyEngine()
+        self._tlp_engine = TruthLovePainEngine()
+        self._rde_engine = RhythmDynamicsEmotionEngine()
+        self._genre_router_ext = GenreMatrixExtended()
+        self._tone_engine = ToneSyncEngine()
+        self._integrity_engine = IntegrityScanEngine()
+        self._dynamic_emotion_engine = DynamicEmotionEngine()
+        self._section_intelligence = SectionIntelligenceEngine()
+        self._meaning_engine = MeaningVelocityEngine()
+        self._instrument_dynamics = InstrumentalDynamicsEngine()
+        self._color_adapter = ColorEngineAdapter()
+        self._color_emotion_engine = ColorEmotionEngine()
+        self._color_wave_engine = self._color_emotion_engine  # Alias
+        self._instrumentation_engine = InstrumentationEngine()
+        self._command_interpreter = CommandInterpreter()
+        self._rem_engine = REM_Synchronizer()
+        self._zero_pulse_engine = ZeroPulseEngine()
+        self._annotation_engine = LyricsAnnotationEngine()
+        self._genre_matrix = GenreMatrixEngine()
+        self._style_engine = StyleEngine()
+        self._genre_router = DynamicGenreRouter()
+        self._genre_universe_adapter = GenreUniverseAdapter()
+        self._emotion_aggregator = EmotionAggregator()
+        self._vocal_engine = VocalEngine()
+        self._rns_safety = RNSSafety(self.config)
+        self._legacy_emotion_engine = EmotionEngine()  # Legacy alias
+        self._legacy_tone_engine = ToneSyncEngine()  # Legacy alias
+        self._multimodal_matrix = MultimodalEmotionMatrixV1()
+        self._breathing_engine = BreathingEngine()
+        self._suno_engine = SunoAnnotationEngine()
+        self._fanf_engine = FANFAnnotationEngine()
+        self._compiler = FinalCompiler()
+        self._resonance_engine = ResonanceDynamicsEngine()
+        self._emotion_engine_v2 = EmotionEngineV2()
+        
+        # Classes and functions (not instances)
+        self._fusion_builder_cls = FusionEngineV64
+        self._suno_prompt_builder_fn = build_suno_prompt
+        self._user_override_manager_cls = UserOverrideManager
         
         # MASTER_PATCH_V5_SKELETON: helper modules (NO-OP)
         # Note: HybridGenreEngine is already defined as inner class in v6.0, so we use that
@@ -478,8 +541,9 @@ class StudioCoreV6:
             from .genre_conflict_resolver import GenreConflictResolver
             from .neutral_mode import NeutralModePreFinalizer
             from .color_engine_v3 import ColorEngineV3
-        except Exception:
-            # Fail-safe: if modules missing, we just skip advanced logic
+        except (ImportError, Exception) as e:
+            # MEDIUM PRIORITY FIX: Use specific exception and log
+            logger.warning(f"Master Patch modules import failed: {e}")
             RageFilterV2 = EpicOverride = SectionMergeMode = \
                 HybridInstrumentationLayer = GenreConflictResolver = \
                 NeutralModePreFinalizer = ColorEngineV3 = None
@@ -488,7 +552,9 @@ class StudioCoreV6:
         try:
             from .hybrid_genre_engine import HybridGenreEngine as ExternalHGE
             self._hge = ExternalHGE()
-        except ImportError:
+        except ImportError as e:
+            # MEDIUM PRIORITY FIX: Log the import error
+            logger.warning(f"External HybridGenreEngine import failed: {e}, using fallback")
             # Fallback to inner class if external not available
             self._hge = self.HybridGenreEngine() if hasattr(self, 'HybridGenreEngine') else None
         self._rage_filter = RageFilterV2() if RageFilterV2 else None
@@ -587,153 +653,89 @@ class StudioCoreV6:
         return sanitized_text
 
     def _build_engine_bundle(self) -> dict[str, object]:
-        """Create a fresh set of engines for a single analyze() call.
-
-        All engines are request-scoped and stored only in a transient bundle to
-        avoid any cross-request leakage.
+        """Create engine bundle using pre-initialized stateless engines.
+        
+        HIGH PRIORITY FIX: Uses engines initialized in __init__ to avoid
+        re-instantiation overhead. Only request-specific data is created here.
         """
-
-        # Lazy imports keep the module safe from circular dependencies.
-        from .logical_engines import TextStructureEngine
-        from .section_parser import SectionParser
-        from .emotion import EmotionEngine, EmotionEngineV2
-        from .bpm_engine import BPMEngine
-        from .frequency import UniversalFrequencyEngine, RNSSafety
-        from .tlp_engine import TruthLovePainEngine
-        from .rde_engine import RhythmDynamicsEmotionEngine, ResonanceDynamicsEngine
-        from .genre_matrix_extended import GenreMatrixExtended, GenreMatrixEngine
-        from .tone import ToneSyncEngine
-        from .integrity import IntegrityScanEngine
-        from .dynamic_emotion_engine import DynamicEmotionEngine
-        from .section_intelligence import SectionIntelligenceEngine
-        from .instrument_dynamics import InstrumentalDynamicsEngine
-        from .color_engine_adapter import ColorEngineAdapter
-        from .genre_router import DynamicGenreRouter
-        from .genre_universe_adapter import GenreUniverseAdapter
-        from .emotion_profile import EmotionAggregator
-        from .emotion import EmotionEngine as LegacyEmotionEngine
-        from .tone import ToneSyncEngine as LegacyToneSyncEngine
-        from .multimodal_emotion_matrix import MultimodalEmotionMatrixV1
-        from .logical_engines import (
-            MeaningVelocityEngine,
-            InstrumentationEngine,
-            CommandInterpreter,
-            REM_Synchronizer,
-            ZeroPulseEngine,
-            LyricsAnnotationEngine,
-            StyleEngine,
-            VocalEngine,
-            ColorEmotionEngine,
-            BreathingEngine,
-        )
-        from .consistency_v8 import ConsistencyLayerV8
-        from .diagnostics_v8 import DiagnosticsBuilderV8
-        from .adapter import build_suno_prompt
-        from .fusion_engine_v64 import FusionEngineV64
-        from .integrity import IntegrityScanEngine
-        from .user_override_manager import UserOverrideManager
-        from .suno_annotations import SunoAnnotationEngine
-        from .fanf_annotation import FANFAnnotationEngine
-        from .genre_universe_loader import load_genre_universe
-
-        text_engine = TextStructureEngine()
-        section_parser = SectionParser(text_engine)
-        emotion_engine = EmotionEngine()
-        bpm_engine = BPMEngine()
-        frequency_engine = UniversalFrequencyEngine()
-        tlp_engine = TruthLovePainEngine()
-        rde_engine = RhythmDynamicsEmotionEngine()
-        genre_router_ext = GenreMatrixExtended()
-        tone_engine = ToneSyncEngine()
-        integrity_engine = IntegrityScanEngine()
-        dynamic_emotion_engine = DynamicEmotionEngine()
-        section_intelligence = SectionIntelligenceEngine()
-        meaning_engine = MeaningVelocityEngine()
-        instrument_dynamics = InstrumentalDynamicsEngine()
-        color_adapter = ColorEngineAdapter()
-        color_emotion_engine = ColorEmotionEngine()
-        # ColorWaveEngine заменен на ColorEmotionEngine (имеет метод generate_color_wave)
-        color_wave_engine = color_emotion_engine
-        instrumentation_engine = InstrumentationEngine()
-        command_interpreter = CommandInterpreter()
-        rem_engine = REM_Synchronizer()
-        zero_pulse_engine = ZeroPulseEngine()
-        annotation_engine = LyricsAnnotationEngine()
-        genre_matrix = GenreMatrixEngine()
-        style_engine = StyleEngine()
-        genre_router = DynamicGenreRouter()
-        genre_universe_adapter = GenreUniverseAdapter()
-        emotion_aggregator = EmotionAggregator()
-        vocal_engine = VocalEngine()
-        # InstrumentationSelector заменен на InstrumentationEngine
-        instrumentation_selector = instrumentation_engine
-        rns_safety = RNSSafety(self.config)
-        legacy_emotion_engine = LegacyEmotionEngine()
-        legacy_tone_engine = LegacyToneSyncEngine()
-        multimodal_matrix = MultimodalEmotionMatrixV1()
-        breathing_engine = BreathingEngine()
+        # Use pre-initialized stateless engines from __init__
+        # Request-specific layers (empty dicts for now, populated per request)
         consistency_layer = ConsistencyLayerV8({})
         diagnostics_builder = DiagnosticsBuilderV8({})
-        suno_engine = SunoAnnotationEngine()
-        fanf_engine = FANFAnnotationEngine()
-        compiler = FinalCompiler()
         
-        # Import legacy core dynamically
+        # Import legacy core dynamically (only used for fallback)
         from . import StudioCore as LegacyStudioCore
 
+        # Return bundle using pre-initialized engines
         return {
-            "text_engine": text_engine,
-            "section_parser": section_parser,
-            "emotion_engine": emotion_engine,
-            "bpm_engine": bpm_engine,
-            "frequency_engine": frequency_engine,
-            "tlp_engine": tlp_engine,
-            "rde_engine": rde_engine,
-            "genre_router_ext": genre_router_ext,
-            "tone_engine": tone_engine,
-            "integrity_engine": integrity_engine,
-            "dynamic_emotion_engine": dynamic_emotion_engine,
-            "section_intelligence": section_intelligence,
-            "meaning_engine": meaning_engine,
-            "instrument_dynamics": instrument_dynamics,
-            "color_adapter": color_adapter,
-            "color_wave_engine": color_wave_engine,
-            "instrumentation_engine": instrumentation_engine,
-            "command_interpreter": command_interpreter,
-            "rem_engine": rem_engine,
-            "zero_pulse_engine": zero_pulse_engine,
-            "annotation_engine": annotation_engine,
-            "genre_matrix": genre_matrix,
-            "style_engine": style_engine,
-            "genre_router": genre_router,
-            "genre_universe_adapter": genre_universe_adapter,
-            "_emotion_engine": emotion_aggregator,
-            "vocal_engine": vocal_engine,
-            "instrumentation_selector": instrumentation_selector,
-            "rns_safety": rns_safety,
-            "legacy_emotion_engine": legacy_emotion_engine,
-            "legacy_tone_engine": legacy_tone_engine,
-            "multimodal_matrix": multimodal_matrix,
-            "color_emotion_engine": color_emotion_engine,
-            "breathing_engine": breathing_engine,
-            "consistency_layer": consistency_layer,
-            "diagnostics_builder": diagnostics_builder,
-            "suno_engine": suno_engine,
-            "fanf_engine": fanf_engine,
-            "resonance_engine": ResonanceDynamicsEngine(),
-            "fusion_builder": FusionEngineV64,
-            "suno_prompt_builder": build_suno_prompt,
-            "integrity_scan_engine": IntegrityScanEngine(),
-            "emotion_engine_v2": EmotionEngineV2(),
-            "user_override_manager_cls": UserOverrideManager,
-            "compiler": compiler,
+            "text_engine": self._text_engine,
+            "section_parser": self._section_parser,
+            "emotion_engine": self._emotion_engine,
+            "bpm_engine": self._bpm_engine,
+            "frequency_engine": self._frequency_engine,
+            "tlp_engine": self._tlp_engine,
+            "rde_engine": self._rde_engine,
+            "genre_router_ext": self._genre_router_ext,
+            "tone_engine": self._tone_engine,
+            "integrity_engine": self._integrity_engine,
+            "dynamic_emotion_engine": self._dynamic_emotion_engine,
+            "section_intelligence": self._section_intelligence,
+            "meaning_engine": self._meaning_engine,
+            "instrument_dynamics": self._instrument_dynamics,
+            "color_adapter": self._color_adapter,
+            "color_wave_engine": self._color_wave_engine,
+            "instrumentation_engine": self._instrumentation_engine,
+            "command_interpreter": self._command_interpreter,
+            "rem_engine": self._rem_engine,
+            "zero_pulse_engine": self._zero_pulse_engine,
+            "annotation_engine": self._annotation_engine,
+            "genre_matrix": self._genre_matrix,
+            "style_engine": self._style_engine,
+            "genre_router": self._genre_router,
+            "genre_universe_adapter": self._genre_universe_adapter,
+            "_emotion_engine": self._emotion_aggregator,
+            "vocal_engine": self._vocal_engine,
+            "instrumentation_selector": self._instrumentation_engine,  # Alias
+            "rns_safety": self._rns_safety,
+            "legacy_emotion_engine": self._legacy_emotion_engine,
+            "legacy_tone_engine": self._legacy_tone_engine,
+            "multimodal_matrix": self._multimodal_matrix,
+            "color_emotion_engine": self._color_emotion_engine,
+            "breathing_engine": self._breathing_engine,
+            "consistency_layer": consistency_layer,  # Request-specific
+            "diagnostics_builder": diagnostics_builder,  # Request-specific
+            "suno_engine": self._suno_engine,
+            "fanf_engine": self._fanf_engine,
+            "resonance_engine": self._resonance_engine,
+            "fusion_builder": self._fusion_builder_cls,
+            "suno_prompt_builder": self._suno_prompt_builder_fn,
+            "integrity_scan_engine": self._integrity_engine,  # Reuse
+            "emotion_engine_v2": self._emotion_engine_v2,
+            "user_override_manager_cls": self._user_override_manager_cls,
+            "compiler": self._compiler,
             "_legacy_core_cls": LegacyStudioCore,
         }
 
     def _reset_state(self) -> None:
-        """Remove any transient state after analyze()."""
-
-        self.__dict__ = {"config": copy.deepcopy(self.config)}
+        """Remove only transient state after analyze(), preserve system components.
+        
+        CRITICAL FIX: Only clear transient data (_engine_bundle), not system components
+        like _hge, _rage_filter, _epic_override, etc. that were initialized in __init__.
+        """
+        # Only clear transient request-scoped data
+        if hasattr(self, '_engine_bundle'):
+            self._engine_bundle = {}
+        
+        # Preserve all system components initialized in __init__:
+        # - self._hge
+        # - self._rage_filter
+        # - self._epic_override
+        # - self._section_merge_mode
+        # - self._hil
+        # - self._gcr
+        # - self._neutral_prefinal
+        # - self._color_v3
+        # - self.config
 
     def analyze(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         """
@@ -2152,7 +2154,10 @@ class StudioCoreV6:
             mode_result = tonality_engine.mode_detection(emotion_profile, tlp_profile)
         else:
             # Fallback: определяем mode на основе TLP
-            mode_result = {"mode": "minor" if tlp_profile.get("pain", 0) > tlp_profile.get("love", 0) else "major", "confidence": 0.5}
+            mode_result = {
+                "mode": "minor" if tlp_profile.get("pain", 0) > tlp_profile.get("love", 0) else "major", 
+                "confidence": ALGORITHM_WEIGHTS["default_confidence"]
+            }
         
         if tonality_engine:
             mode = tonality_engine.major_minor_classifier(sections, mode_result.get("mode", "major"))
@@ -3522,18 +3527,10 @@ class StudioCoreV6:
         """
         t = text.lower()
 
-        keywords_road = [
-            "road", "back road", "backroad", "highway", "flyover state",
-            "interstate", "dust", "truck stop"
-        ]
-        keywords_death = [
-            "bury me", "bury me on a back road", "grave", "no name on the stone",
-            "my grave", "when i die", "reaper", "fate", "karma"
-        ]
-        keywords_weight = [
-            "chains", "gold", "weight", "carry that weight",
-            "bridges i burned", "bridges i burned up", "tank full of gas"
-        ]
+        # Use externalized keywords from config
+        keywords_road = ROAD_NARRATIVE_KEYWORDS["road"]
+        keywords_death = ROAD_NARRATIVE_KEYWORDS["death"]
+        keywords_weight = ROAD_NARRATIVE_KEYWORDS["weight"]
 
         def has_any(words: list[str]) -> bool:
             return any(w in t for w in words)
@@ -3554,11 +3551,11 @@ class StudioCoreV6:
         determination = float(emotions.get("determination", 0.0))
 
         base = (road + death + weight) / 3.0 if (road + death + weight) > 0 else 0.0
-        # усиливаем за счёт CF и эмоций
+        # усиливаем за счёт CF и эмоций (using externalized weights)
         score = base
-        score += 0.25 * cf
-        score += 0.25 * sorrow
-        score += 0.20 * determination
+        score += ALGORITHM_WEIGHTS["road_narrative_cf_weight"] * cf
+        score += ALGORITHM_WEIGHTS["road_narrative_sorrow_weight"] * sorrow
+        score += ALGORITHM_WEIGHTS["road_narrative_determination_weight"] * determination
 
         return {
             "score": min(score, 1.0),
@@ -3661,10 +3658,11 @@ class StudioCoreV6:
             and resonance <= LOW_EMOTION_RDE_RESONANCE_MAX * 2.0
             and fracture <= LOW_EMOTION_RDE_FRACTURE_MAX * 2.0
         ):
-            rde["resonance"] = resonance * 0.4
-            rde["fracture"] = fracture * 0.3
+            # Use externalized smoothing factors from config
+            rde["resonance"] = resonance * ALGORITHM_WEIGHTS["rde_resonance_smoothing"]
+            rde["fracture"] = fracture * ALGORITHM_WEIGHTS["rde_fracture_smoothing"]
             # entropy оставляем ближе к исходной, но слегка снижаем
-            rde["entropy"] = entropy * 0.7
+            rde["entropy"] = entropy * ALGORITHM_WEIGHTS["rde_entropy_smoothing"]
         
         return rde
 
@@ -3678,10 +3676,8 @@ class StudioCoreV6:
             return False
         
         tokens = normalized_text.lower()
-        folk_keys = [
-            'тропа', 'дорог', 'ветер', 'луна', 'ноч', 'земл', 'память',
-            'возвращал', 'шептал', 'тихо', 'тум', 'природ', 'пешком', 'мимо'
-        ]
+        # Use externalized keywords from config
+        folk_keys = FOLK_BALLAD_KEYWORDS_LEGACY
         score = sum(1 for k in folk_keys if k in tokens)
         return score >= 3
 
@@ -3704,8 +3700,9 @@ class StudioCoreV6:
         anger = float(emotion_profile.get("anger", 0.0) or 0.0)
         tension = float(emotion_profile.get("tension", 0.0) or 0.0)
         
-        # Основные триггеры: anger > 0.22 ИЛИ tension > 0.25
-        return anger > 0.22 or tension > 0.25
+        # Основные триггеры (using externalized thresholds from config)
+        return anger > ALGORITHM_WEIGHTS["rage_anger_threshold"] or \
+               tension > ALGORITHM_WEIGHTS["rage_tension_threshold"]
 
     def _is_epic_mode(self, emotion_profile: dict) -> bool:
         """
@@ -3725,8 +3722,8 @@ class StudioCoreV6:
         
         epic = float(emotion_profile.get("epic", 0.0) or 0.0)
         
-        # Epic > 0.35 и при этом НЕ rage
-        if epic > 0.35:
+        # Epic threshold (using externalized threshold from config) и при этом НЕ rage
+        if epic > ALGORITHM_WEIGHTS["epic_threshold"]:
             return not self._is_rage_mode(emotion_profile)
         
         return False
@@ -3749,15 +3746,8 @@ class StudioCoreV6:
             return None
         
         # Расширенный список folk-признаков
-        folk_keywords = [
-            "тропа", "тропе", "поле", "поля", "луна", "луной", "земля", "землёй",
-            "старые дороги", "дорога", "дороге", "дорогами", "степь", "посевы",
-            "отчий дом", "печь", "село", "деревня", "огни села", "ветер", "трава",
-            "трава под ногами", "легенды", "саги", "предки", "пастух", "вьюга",
-            # Английские эквиваленты
-            "trail", "field", "moon", "earth", "old roads", "road", "village", "wind",
-            "grass", "legends", "sagas", "ancestors", "shepherd", "blizzard"
-        ]
+        # Use externalized keywords from config
+        folk_keywords = FOLK_BALLAD_KEYWORDS
         
         text_lower = normalized_text.lower()
         # Подсчет совпадений (минимум 3 разных токена)

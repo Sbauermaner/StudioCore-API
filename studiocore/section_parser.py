@@ -58,7 +58,18 @@ class SectionParser:
         prefer_strict_boundary = False
 
         # Ensure metadata is accessible (it should be populated by auto_section_split)
-        metadata = self._text_engine.section_metadata()
+        # FIX: Если sections переданы, нужно убедиться, что метаданные сохранены
+        if sections is not None:
+            # Если sections переданы, но метаданные пустые, пытаемся получить их из text_engine
+            # без сброса состояния (метаданные уже должны быть установлены)
+            metadata = self._text_engine.section_metadata()
+            # Если метаданные пустые, но sections переданы, значит нужно их восстановить
+            if not metadata or not any(m.get("tag") for m in metadata if isinstance(m, dict)):
+                # Пытаемся получить метаданные, вызвав auto_section_split для обновления состояния
+                self._text_engine.auto_section_split(text)
+                metadata = self._text_engine.section_metadata()
+        else:
+            metadata = self._text_engine.section_metadata()
 
         annotations = self._annotation_engine.parse(text)
         lyrical_density = self._estimate_lyrical_density("\n".join(resolved_sections) or text)

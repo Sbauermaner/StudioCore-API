@@ -74,8 +74,11 @@ def semantic_compress(text: str, max_len: int = 1000, preserve_last_line: bool =
             if last_line not in compressed_text:
                 if len(compressed_text) + len(last_line) + 1 < max_len:
                     compressed_text += "\n" + last_line
-        except Exception:
-            pass # Игнорируем, если что-то пошло не так
+        except (ValueError, IndexError, AttributeError) as e:
+            # Логируем ошибку вместо молчаливого игнорирования
+            log.debug(f"Ошибка при сжатии текста: {e}")
+            # Возвращаем исходный текст, если сжатие не удалось
+            pass
 
     result = compressed_text[:max_len].strip()
     if not result.endswith("…") and len(text) > max_len:

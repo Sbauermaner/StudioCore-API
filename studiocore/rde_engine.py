@@ -29,6 +29,10 @@ class RDESnapshot:
 class RhythmDynamicsEmotionEngine:
     """Compute high-level synthesis metrics for diagnostics and UI layers."""
 
+    def __init__(self) -> None:
+        """Initialize the engine with a shared TLP engine instance."""
+        self._tlp_engine = TruthLovePainEngine()
+
     def compose(
         self,
         *,
@@ -58,9 +62,10 @@ class RhythmDynamicsEmotionEngine:
 
     def export_emotion_vector(self, text: str) -> EmotionVector:
         """
-        Passive hook. Returns a neutral EmotionVector until dynamic mode is enabled.
+        Delegates to the unified TLP engine implementation.
+        Uses the shared instance to avoid creating new objects on each call.
         """
-        return TruthLovePainEngine().export_emotion_vector(text)  # Delegate to TLP Engine
+        return self._tlp_engine.export_emotion_vector(text)
 
     def calc_resonance(self, text: str) -> float:
         if not text:

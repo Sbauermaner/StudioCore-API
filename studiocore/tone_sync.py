@@ -25,7 +25,11 @@ class ToneProfile:
 
 
 class ToneSyncEngine:
-    """Stateless-движок: на вход — эмоции/TLP/BPM/тональность, на выход — tone_profile."""
+    """Stateless-движок: на вход — эмоции/TLP/BPM/тональность, на выход — tone_profile.
+    
+    ВАЖНО: Этот класс используется как основной ToneSyncEngine.
+    Класс с тем же именем в tone.py используется как LegacyToneSyncEngine для обратной совместимости.
+    """
 
     def __init__(self) -> None:
         self._profiles: Dict[str, ToneProfile] = {

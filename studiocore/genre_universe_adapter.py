@@ -4,10 +4,13 @@
 # Hash: 22ae-df91-bc11-6c7e
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
 
 from .genre_universe import GenreUniverse
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -77,8 +80,10 @@ class GenreUniverseAdapter:
                             tags=tags,
                             source="universe_v2",
                         )
-        except Exception:
-            pass
+        except (TypeError, ValueError, KeyError, AttributeError) as e:
+            # Логируем ошибку вместо молчаливого игнорирования
+            # Продолжаем выполнение с fallback
+            logger.debug(f"Ошибка при разрешении жанра из universe: {e}")
 
         if macro in self._fallback_map:
             subgenre, tags = self._fallback_map[macro]

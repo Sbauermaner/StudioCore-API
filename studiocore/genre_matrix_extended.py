@@ -153,14 +153,22 @@ class GenreMatrixEngine:
 class GenreMatrixExtended(GenreMatrixEngine):
     """Bridge keyword detection with the domain-based genre weights."""
 
-    def evaluate(self, feature_map: Dict[str, float] | None) -> str | None:
+    def evaluate(self, feature_map: Dict[str, float] | None, style_payload: Dict[str, Any] | None = None) -> str | None:
+        # Folk mode override
+        if style_payload and style_payload.get('_folk_mode') is True:
+            return 'folk narrative ballad'
+        
         if not feature_map:
-            return None
+            # FIX: базовый fallback — dark_country
+            # (на основе анализа реальных текстов о дороге, боли и одиночестве)
+            return "dark_country"
         if not any(feature_map.values()):
-            return None
+            # FIX: базовый fallback — dark_country
+            return "dark_country"
         from .genre_weights import GenreWeightsEngine
 
         engine = GenreWeightsEngine()
+        # NEW: нормальное разрешение жанров
         return engine.infer_genre(feature_map)
 
 # StudioCore Signature Block (Do Not Remove)

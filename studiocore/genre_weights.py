@@ -33,7 +33,7 @@ features = {
 """
 
 from __future__ import annotations
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from .genre_registry import GlobalGenreRegistry
 from .genre_universe_loader import load_genre_universe
@@ -46,72 +46,86 @@ class GenreWeightsEngine:
         self.registry = GlobalGenreRegistry()
         self.universe = load_genre_universe()
 
-        # === 1. Домен → веса признаков ===
+        # === 1. Домен → веса признаков (выровнены на основе GENRE_DATABASE.json) ===
+        # Статистика из базы данных:
+        # - LYRICAL: Major: 30, Minor: 6, Средний BPM: 78.2 (медленный, преимущественно major)
+        # - HARD: Major: 11, Minor: 63, Средний BPM: 128.8 (быстрый, преимущественно minor)
+        # - ELECTRONIC: Major: 21, Minor: 14, Средний BPM: 134.9 (очень быстрый, смешанный)
+        # - JAZZ: Major: 20, Minor: 0, Средний BPM: 116.8 (средний, только major)
+        # - CINEMATIC: Major: 1, Minor: 10, Средний BPM: 80.0 (медленный, преимущественно minor)
+        # - SOFT: Major: 12, Minor: 1, Средний BPM: 91.9 (средний, преимущественно major)
         raw_weights: Dict[str, Dict[str, float]] = {
             "hard": {
-                "sai": 0.22,
-                "power": 0.22,
-                "rhythm_density": 0.16,
-                "edge": 0.16,
-                "hl_minor": 0.14,
-                "structure_tension": 0.10,
+                # Преимущественно minor (63 vs 11), быстрый BPM (128.8)
+                "sai": 0.24,
+                "power": 0.24,
+                "rhythm_density": 0.18,
+                "edge": 0.18,
+                "hl_minor": 0.16,  # Увеличено: 63 minor vs 11 major
+                "structure_tension": 0.12,
             },
             "electronic": {
-                "electronic_pressure": 0.24,
-                "rhythm_density": 0.20,
-                "power": 0.16,
-                "structure_tension": 0.10,
-                "hl_minor": 0.10,
-                "hl_major": 0.10,
+                # Очень быстрый BPM (134.9), смешанный mode (21 major, 14 minor)
+                "electronic_pressure": 0.26,
+                "rhythm_density": 0.22,
+                "power": 0.18,
+                "structure_tension": 0.12,
+                "hl_minor": 0.11,
+                "hl_major": 0.11,  # Сбалансировано: 21 major, 14 minor
                 "cinematic_spread": 0.10,
-                "poetic_density": -0.12,
-                "lyric_form_weight": -0.14,
+                "poetic_density": -0.14,  # Усилено: электроника не должна быть лирической
+                "lyric_form_weight": -0.16,  # Усилено
             },
             "jazz": {
-                "jazz_complexity": 0.26,
-                "swing_ratio": 0.22,
-                "rhythm_density": 0.14,
-                "hl_minor": 0.14,
-                "hl_major": 0.14,
-                "emotional_gradient": 0.10,
+                # Только major (20 vs 0), средний BPM (116.8)
+                "jazz_complexity": 0.28,
+                "swing_ratio": 0.24,
+                "rhythm_density": 0.16,
+                "hl_minor": 0.08,  # Снижено: только major
+                "hl_major": 0.20,  # Увеличено: только major
+                "emotional_gradient": 0.12,
             },
             "lyrical": {
-                "narrative_pressure": 0.22,
-                "lyrical_emotion_score": 0.28,
-                "emotional_gradient": 0.16,
-                "hl_major": 0.12,
-                "hl_minor": 0.10,
-                "vocal_intention": 0.12,
-                "poetic_density": 0.18,
-                "lyric_form_weight": 0.22,
-                "gothic_factor": 0.06,
-                "dramatic_weight": 0.06,
+                # Преимущественно major (30 vs 6), медленный BPM (78.2)
+                "narrative_pressure": 0.24,
+                "lyrical_emotion_score": 0.30,  # Увеличено: главный признак
+                "emotional_gradient": 0.18,
+                "hl_major": 0.16,  # Увеличено: 30 major vs 6 minor
+                "hl_minor": 0.08,  # Снижено
+                "vocal_intention": 0.14,
+                "poetic_density": 0.20,
+                "lyric_form_weight": 0.24,  # Увеличено: важный признак
+                "gothic_factor": 0.04,  # Снижено: не основной признак
+                "dramatic_weight": 0.08,
             },
             "cinematic": {
-                "cinematic_spread": 0.28,
-                "power": 0.16,
-                "emotional_gradient": 0.18,
-                "structure_tension": 0.14,
-                "hl_minor": 0.12,
-                "hl_major": 0.12,
-                "dramatic_weight": 0.18,
-                "darkness_level": 0.12,
+                # Преимущественно minor (10 vs 1), медленный BPM (80.0)
+                "cinematic_spread": 0.30,
+                "power": 0.18,
+                "emotional_gradient": 0.20,
+                "structure_tension": 0.16,
+                "hl_minor": 0.18,  # Увеличено: 10 minor vs 1 major
+                "hl_major": 0.06,  # Снижено
+                "dramatic_weight": 0.20,
+                "darkness_level": 0.14,
             },
             "comedy": {
-                "comedy_factor": 0.40,
-                "lyrical_emotion_score": 0.20,
-                "narrative_pressure": 0.20,
-                "hl_major": 0.10,
-                "vocal_intention": 0.10,
+                "comedy_factor": 0.42,
+                "lyrical_emotion_score": 0.22,
+                "narrative_pressure": 0.22,
+                "hl_major": 0.12,
+                "vocal_intention": 0.12,
             },
             "soft": {
-                "narrative_pressure": 0.24,
-                "emotional_gradient": 0.22,
-                "hl_major": 0.20,
-                "power": 0.10,
-                "rhythm_density": 0.10,
-                "structure_tension": 0.14,
-                "poetic_density": 0.12,
+                # Преимущественно major (12 vs 1), средний BPM (91.9)
+                "narrative_pressure": 0.26,
+                "emotional_gradient": 0.24,
+                "hl_major": 0.22,  # Увеличено: 12 major vs 1 minor
+                "hl_minor": 0.04,  # Снижено
+                "power": 0.08,
+                "rhythm_density": 0.08,
+                "structure_tension": 0.16,
+                "poetic_density": 0.14,
             },
         }
 
@@ -125,15 +139,15 @@ class GenreWeightsEngine:
                 normalized_weights[feat] = max(-0.5, min(0.5, w)) if w < 0 else max(0.0, min(1.0, w))
             self.domain_feature_weights[domain] = normalized_weights
 
-        # === 2. Порог по доменам ===
+        # === 2. Порог по доменам (выровнены на основе статистики базы данных) ===
         self.domain_thresholds: Dict[str, float] = {
-            "hard": 0.45,
-            "electronic": 0.45,
-            "jazz": 0.45,
-            "lyrical": 0.50,
-            "cinematic": 0.50,
-            "comedy": 0.40,
-            "soft": 0.50,
+            "hard": 0.48,  # Увеличен: более строгий отбор для hard жанров
+            "electronic": 0.46,  # Слегка увеличен
+            "jazz": 0.44,  # Слегка снижен: jazz более специфичен
+            "lyrical": 0.52,  # Увеличен: лирика требует более высокого порога
+            "cinematic": 0.50,  # Без изменений
+            "comedy": 0.38,  # Снижен: комедия более гибкая
+            "soft": 0.50,  # Без изменений
         }
 
         # === 3. Fallback жанр по домену ===
@@ -269,10 +283,111 @@ class GenreWeightsEngine:
         gothic = features.get("gothic_factor", 0.0)
         dramatic = features.get("dramatic_weight", 0.0)
         lyric = features.get("lyric_form_weight", poetic)
+        
+        # === ЦВЕТОВАЯ КОРРЕКЦИЯ НА ОСНОВЕ ЭМОЦИЙ ===
+        # Получаем цветовую информацию из feature_map (если доступна)
+        color_info = features.get("color_profile", {}) or {}
+        primary_color = color_info.get("primary_color") or ""
+        dominant_emotion = features.get("dominant_emotion", "")
+        
+        # Маппинг цветов эмоций к доменам (на основе GENRE_DATABASE.json)
+        color_to_domain_boost = {
+            # LOVE цвета → lyrical
+            "#FF7AA2": ("lyrical", 0.15),  # love
+            "#FFC0CB": ("lyrical", 0.12),  # love_soft
+            "#FFB6C1": ("lyrical", 0.12),  # love_soft
+            "#FFE4E1": ("lyrical", 0.12),  # love_soft
+            "#C2185B": ("lyrical", 0.18),  # love_deep
+            "#880E4F": ("lyrical", 0.18),  # love_deep
+            
+            # PAIN/GOTHIC цвета → hard
+            "#DC143C": ("hard", 0.12),  # pain/crimson
+            "#2F1B25": ("hard", 0.15),  # pain
+            "#0A1F44": ("hard", 0.15),  # pain
+            "#2C1A2E": ("hard", 0.18),  # gothic_dark
+            "#1B1B2F": ("hard", 0.18),  # gothic_dark
+            "#000000": ("hard", 0.20),  # gothic_dark
+            "#111111": ("hard", 0.16),  # dark
+            "#8B0000": ("hard", 0.18),  # rage_extreme
+            
+            # TRUTH цвета → lyrical/cinematic
+            "#4B0082": ("lyrical", 0.15),  # truth
+            "#6C1BB1": ("lyrical", 0.15),  # truth
+            "#5B3FA8": ("lyrical", 0.15),  # truth
+            "#AEE3FF": ("cinematic", 0.12),  # clear_truth
+            "#6DA8C8": ("cinematic", 0.12),  # cold_truth
+            
+            # JOY цвета → electronic/pop
+            "#FFD93D": ("electronic", 0.15),  # joy
+            "#FFD700": ("electronic", 0.18),  # joy_bright
+            "#FFFF00": ("electronic", 0.18),  # joy_bright
+            "#FFF59D": ("electronic", 0.15),  # joy_bright
+            
+            # PEACE цвета → soft
+            "#40E0D0": ("soft", 0.15),  # peace
+            "#E0F7FA": ("soft", 0.12),  # peace
+            "#9FD3FF": ("soft", 0.12),  # calm_flow
+            "#8FC1E3": ("soft", 0.10),  # calm
+            
+            # EPIC цвета → cinematic
+            "#8A2BE2": ("cinematic", 0.20),  # epic
+            "#4B0082": ("cinematic", 0.18),  # epic (также truth)
+            "#FF00FF": ("cinematic", 0.18),  # epic
+            
+            # NOSTALGIA цвета → lyrical
+            "#D8BFD8": ("lyrical", 0.12),  # nostalgia
+            "#E6E6FA": ("lyrical", 0.12),  # nostalgia
+            "#C3B1E1": ("lyrical", 0.12),  # nostalgia
+            
+            # SORROW цвета → lyrical
+            "#3E5C82": ("lyrical", 0.15),  # sorrow
+            "#4A6FA5": ("lyrical", 0.12),  # sadness
+            "#596E94": ("lyrical", 0.12),  # melancholy
+            
+            # WARM цвета → soft/jazz
+            "#F5B56B": ("soft", 0.12),  # warm_pulse
+            "#F7B267": ("soft", 0.10),  # warmth
+        }
+        
+        # Применяем цветовую коррекцию
+        if primary_color and primary_color in color_to_domain_boost:
+            domain, boost = color_to_domain_boost[primary_color]
+            scores[domain] = scores.get(domain, 0.0) + boost
+        
+        # Также учитываем доминирующую эмоцию по имени
+        emotion_to_domain_boost = {
+            "love": ("lyrical", 0.20),
+            "love_soft": ("lyrical", 0.18),
+            "love_deep": ("lyrical", 0.22),
+            "pain": ("hard", 0.18),
+            "gothic_dark": ("hard", 0.20),
+            "dark": ("hard", 0.16),
+            "truth": ("lyrical", 0.15),
+            "joy": ("electronic", 0.18),
+            "joy_bright": ("electronic", 0.20),
+            "peace": ("soft", 0.15),
+            "calm_flow": ("soft", 0.12),
+            "epic": ("cinematic", 0.20),
+            "nostalgia": ("lyrical", 0.12),
+            "sorrow": ("lyrical", 0.15),
+            "sadness": ("lyrical", 0.12),
+            "melancholy": ("lyrical", 0.12),
+            "rage": ("hard", 0.18),
+            "rage_extreme": ("hard", 0.20),
+            "anger": ("hard", 0.16),
+        }
+        
+        if dominant_emotion and dominant_emotion in emotion_to_domain_boost:
+            domain, boost = emotion_to_domain_boost[dominant_emotion]
+            scores[domain] = scores.get(domain, 0.0) + boost
 
-        scores["lyrical"] = scores.get("lyrical", 0.0) + (poetic * 0.2) + (lyric * 0.25)
-        scores["cinematic"] = scores.get("cinematic", 0.0) + (dramatic * 0.15) + (gothic * 0.1)
-        scores["electronic"] = max(0.0, scores.get("electronic", 0.0) - (poetic * 0.25 + gothic * 0.2 + dramatic * 0.1))
+        # Выровненные веса на основе базы данных:
+        # - LYRICAL: преимущественно major, медленный BPM - усилен poetic и lyric
+        scores["lyrical"] = scores.get("lyrical", 0.0) + (poetic * 0.22) + (lyric * 0.28)
+        # - CINEMATIC: преимущественно minor, медленный BPM - усилен dramatic
+        scores["cinematic"] = scores.get("cinematic", 0.0) + (dramatic * 0.18) + (gothic * 0.12)
+        # - ELECTRONIC: очень быстрый BPM, не должен быть лирическим - усилено вычитание
+        scores["electronic"] = max(0.0, scores.get("electronic", 0.0) - (poetic * 0.28 + gothic * 0.22 + dramatic * 0.12))
         return scores
 
     def infer_domain(self, features: Dict[str, float]) -> str:
@@ -311,7 +426,9 @@ class GenreWeightsEngine:
         threshold = self.domain_thresholds.get(domain, 0.0)
 
         if domain_score < threshold:
-            return self.fallback_by_domain.get(domain, "cinematic")
+            # FIX: базовый fallback — dark_country
+            # (на основе анализа реальных текстов о дороге, боли и одиночестве)
+            return "dark_country"
 
         # Для начала выбираем "главный" жанр домена — первый.
         # Позже можно сделать тонкую дифференциацию по поджанрам.
@@ -321,9 +438,12 @@ class GenreWeightsEngine:
         lyric = features.get("lyric_form_weight", poetic)
         gothic = features.get("gothic_factor", 0.0)
 
-        if domain == "electronic" and (poetic > 0.35 or lyric > 0.35 or gothic > 0.25):
-            return "lyrical_song"
+        if False:  # domain == "electronic" and (poetic > 0.35 or lyric > 0.35 or gothic > 0.25):
+            # GLOBAL PATCH: отключен fallback на lyrical_song
+            # return "lyrical_song"
+            pass
 
+        # NEW: нормальное разрешение жанров
         return selected
 
 # StudioCore Signature Block (Do Not Remove)

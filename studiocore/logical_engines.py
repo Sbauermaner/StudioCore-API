@@ -31,7 +31,7 @@ from .instrument import (
 )
 from .rhythm import LyricMeter
 from .text_utils import extract_sections, normalize_text_preserve_symbols
-from .tone import ToneSyncEngine
+from .tone_sync import ToneSyncEngine
 from .user_override_manager import UserOverrideManager
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?…])\s+")
@@ -88,12 +88,58 @@ class TextStructureEngine:
         structured = extract_sections(text)
         sections: List[str] = []
         metadata: List[Dict[str, Any]] = []
+        
+        # Проверяем, есть ли пользовательские маркеры (до вызова _assign_section_names)
+        has_user_markers = any(
+            item.get("tag", "").lower() not in ("body", "") and 
+            (item.get("tag", "") in ["Verse 1", "Verse 2", "Verse 3", "Final Chorus", "Pre-Chorus", "Chorus", "Bridge", "Outro", "Intro"] or
+             "куплет" in item.get("tag", "").lower() or "припев" in item.get("tag", "").lower() or
+             "мост" in item.get("tag", "").lower() or "аутро" in item.get("tag", "").lower() or
+             "интро" in item.get("tag", "").lower() or "преприпев" in item.get("tag", "").lower())
+            for item in structured
+        )
+        
+        # Если есть пользовательские маркеры - НЕ вызываем _assign_section_names
+        # Она вызывается только для текстов без явных маркеров
+        # НО: проверяем повторяющиеся секции и аннотируем их, даже если есть пользовательские маркеры
+        if not has_user_markers and structured:
+            # Вызываем _assign_section_names только если нет пользовательских маркеров
+            from .text_utils import _assign_section_names
+            _assign_section_names(structured)
+        elif has_user_markers and structured:
+            # Если есть пользовательские маркеры, все равно проверяем повторяющиеся секции
+            from .text_utils import _detect_duplicate_sections
+            duplicates = _detect_duplicate_sections(structured)
+            if duplicates:
+                # Группируем повторяющиеся секции
+                from typing import Dict, List
+                section_groups: Dict[str, List[int]] = {}
+                
+                for i, sec in enumerate(structured):
+                    lines = sec.get("lines", [])
+                    text_content = "\n".join(lines).strip()
+                    normalized = text_content.lower().replace(" ", "").replace("\n", "")
+                    
+                    if normalized not in section_groups:
+                        section_groups[normalized] = []
+                    section_groups[normalized].append(i)
+                
+                # Аннотируем повторяющиеся секции
+                for normalized, indices in section_groups.items():
+                    if len(indices) > 1:
+                        indices.sort()
+                        first_tag = structured[indices[0]].get("tag", "Section")
+                        base_name = "Chorus" if "chorus" in first_tag.lower() or "припев" in first_tag.lower() else first_tag.split()[0] if first_tag.split() else "Section"
+                        
+                        for idx, sec_idx in enumerate(indices, 1):
+                            structured[sec_idx]["tag"] = f"{base_name} {idx}"
+        
         for item in structured:
             lines = item.get("lines", [])
             section_text = "\n".join(lines).strip()
             if section_text:
                 sections.append(section_text)
-            # Используем тег из structured (который уже обновлен _assign_section_names)
+            # Используем тег из structured (который сохранен из маркеров или установлен _assign_section_names)
             tag = item.get("tag", "Body")
             metadata.append(
                 {
@@ -213,23 +259,53 @@ class EmotionEngine:
         self._tlp_engine = TruthLovePainEngine()  # Initialize TLP for vector calculation
 
     def emotion_detection(self, text: str) -> Dict[str, float]:
-        return self._analyzer.analyze(text)
+        """
+        MASTER-PATCH v2: Добавляем пост-фильтр для дорожной исповеди.
+        MASTER-PATCH v4.0: Добавляем Rage-mode конфликт резолвер.
+        """
+        emo = self._analyzer.analyze(text)
+        
+        # Мягкий фильтр для дорожной исповеди: sensual не доминирует над sorrow/determination.
+        sorrow = emo.get("sorrow", 0.0)
+        determination = emo.get("determination", 0.0)
+        sensual = emo.get("sensual", 0.0)
+
+        if sensual > 0.15 and (sorrow + determination) > 0.5:
+            # чутка режем sensual, перераспределяя в sorrow/determination
+            delta = sensual - 0.15
+            emo["sensual"] = 0.15
+            emo["sorrow"] = sorrow + 0.6 * delta
+            emo["determination"] = determination + 0.4 * delta
+        
+        # MASTER-PATCH v6.0 — Rage-mode conflict resolver (только anger/tension)
+        anger = emo.get("anger", 0.0)
+        tension = emo.get("tension", 0.0)
+        
+        # Rage mode: anger > 0.22 ИЛИ tension > 0.25 (НЕ epic)
+        is_rage = anger > 0.22 or tension > 0.25
+        
+        if is_rage:
+            # Remove peace/calm/serenity if rage mode detected
+            if "peace" in emo:
+                emo["peace"] = 0.0
+            if "calm" in emo:
+                emo["calm"] = 0.0
+            if "serenity" in emo:
+                emo["serenity"] = 0.0
+            
+            # Boost tension if anger > 0.20
+            if anger > 0.20:
+                tension = emo.get("tension", 0.0)
+                emo["tension"] = max(tension, 0.25)
+        
+        return emo
 
     def export_emotion_vector(self, text: str) -> EmotionVector:
-        """Calculates Valence and Arousal based on TLP scores from the TLP engine (Fix #1: Neutral Vector)."""
-        profile = self._tlp_engine.analyze(text)
-        truth, love, pain = profile.get("truth", 0.0), profile.get("love", 0.0), profile.get("pain", 0.0)
-        weight = profile.get("conscious_frequency", 0.5)
-        valence = love - pain
-        arousal = (love + pain + truth) / 3.0
-        return EmotionVector(
-            truth=truth,
-            love=love,
-            pain=pain,
-            valence=valence,
-            arousal=arousal,
-            weight=weight,
-        )
+        """
+        Delegates to the unified TLP engine implementation.
+        This ensures consistency across all engines.
+        """
+        return self._tlp_engine.export_emotion_vector(text)
 
     def emotion_intensity_curve(self, text: str) -> List[float]:
         sentences = _split_sentences(text)
@@ -315,12 +391,43 @@ class VocalEngine:
     """Extracts rough vocal characteristics from the lyrics."""
 
     def detect_voice_gender(self, text: str) -> str:
+        """Определяет пол вокала по местоимениям и грамматике глаголов."""
+        import re
+        
         tokens = [t.lower() for t in _words(text)]
-        feminine = sum(tokens.count(pronoun) for pronoun in ("she", "her", "она", "её"))
-        masculine = sum(tokens.count(pronoun) for pronoun in ("he", "him", "он", "его"))
-        if feminine > masculine:
+        # 1. Анализ местоимений третьего лица
+        feminine = sum(tokens.count(pronoun) for pronoun in ("she", "her", "она", "её", "ей"))
+        masculine = sum(tokens.count(pronoun) for pronoun in ("he", "him", "он", "его", "ему"))
+        
+        # 2. Анализ грамматики глаголов прошедшего времени (для русского языка)
+        # Мужские формы: "я стоял", "я был", "я шел", "я знал", "я искал"
+        # Ищем "я" + глагол с окончанием на "л" (но не "ла", "ли", "ло")
+        male_verbs = len(re.findall(r"\bя\s+\w*л(?![аеиоуыэюяё])\b", text, re.I))
+        # Женские формы: "я стояла", "я была", "я шла", "я знала", "я искала"
+        female_verbs = len(re.findall(r"\bя\s+\w*ла\b", text, re.I))
+        
+        # 3. Анализ притяжательных местоимений и прилагательных
+        # Мужские: "мой", "моя" (в контексте мужского рода), "мой дом", "моя работа" (но это сложнее)
+        male_possessive = len(re.findall(r"\b(мой|свой)\s+\w+[^ая]\b", text, re.I))
+        # Женские: "моя" (в контексте женского рода), но это сложнее определить
+        
+        # 4. Анализ глаголов настоящего времени с окончаниями
+        # Мужские: "я иду", "я делаю" (но это не всегда работает)
+        # Женские: "я иду", "я делаю" (одинаково)
+        
+        # 5. Анализ причастий и деепричастий
+        # Мужские: "сделавший", "увидевший"
+        male_participles = len(re.findall(r"\b\w+вший\b", text, re.I))
+        # Женские: "сделавшая", "увидевшая"
+        female_participles = len(re.findall(r"\b\w+вшая\b", text, re.I))
+        
+        # Подсчет общего количества индикаторов
+        total_feminine = feminine + female_verbs + female_participles
+        total_masculine = masculine + male_verbs + male_possessive + male_participles
+        
+        if total_feminine > total_masculine:
             return "female"
-        if masculine > feminine:
+        if total_masculine > total_feminine:
             return "male"
         return "neutral"
 

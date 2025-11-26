@@ -101,7 +101,7 @@ class EmotionDrivenSunoAdapter:
         annotations: Dict[str, str] = {}
         for entry in self.sections:
             section_name = entry.get("section") or entry.get("name") or "section"
-            intensity = self._safe_float(entry.get("intensity"))
+            intensity = EmotionDrivenSunoAdapter._safe_float(entry.get("intensity"))
             intensity_label = self._intensity_label(intensity)
             hot_phrases = [
                 f'hot phrase: "{phrase}" → emphasize with vocal stress / pause'
@@ -240,7 +240,11 @@ class SunoAnnotationEngine:
         genre = style.get("genre") or "auto"
         if genre in (None, "auto") and emotion_matrix:
             genre = emotion_matrix.get("genre", {}).get("primary") or genre
-        mood = style.get("mood") or "auto"
+        # MASTER-PATCH v3.1 — Mood Override
+        if style.get("_mood_corrected"):
+            mood = style["mood"]
+        else:
+            mood = style.get("mood") or "auto"
         energy = style.get("energy") or "auto"
         arrangement = style.get("arrangement") or "auto"
         bpm_source = legacy.get("bpm") if isinstance(legacy, dict) else None

@@ -28,6 +28,9 @@ class ToneSyncEngine:
     """
     Converts emotional frequency (Truth × Love × Pain) + Key
     into a synesthetic visual–resonant signature.
+    
+    ВАЖНО: Этот класс используется как LegacyToneSyncEngine для обратной совместимости.
+    Основной ToneSyncEngine находится в tone_sync.py.
     """
 
     RIFT_MARKERS = (

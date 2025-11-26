@@ -49,15 +49,36 @@ class TruthLovePainEngine: # <-- v15: Оригинальное имя
     TRUTH_WORDS = [
         "правд", "истин", "честн", "смысл", "знан", "позна", "созна", # ru
         "мудро", "осозна", "голос", "суть", "reason", "судьб",
+        "помню", "вспоминаю", "вспомнить", "память", "памят", "исповед", "откровен", # ru - исповедальность
+        "признан", "рассказ", "повеств", "история", "вспомин", "воспомина",
+        # 1-е лицо и саморефлексия
+        "я ", "я ", "мне", "меня", "мой", "моя", "мое", "мои", "моим", "моих", # ru - 1-е лицо
+        "я сам", "я сама", "сам", "сама", "само", "самому", "самой", # ru - саморефлексия
+        "думаю", "чувствую", "знаю", "понимаю", "вижу", "слышу", "ощущаю", # ru - саморефлексия
         "truth", "honest", "real", "meaning", "wisdom", "soul", "mind", # en
-        "see", "know", "understand", "realize", "reflect"
+        "see", "know", "understand", "realize", "reflect",
+        "remember", "recall", "memory", "confess", "confession", "revelation", # en - исповедальность
+        "admit", "story", "narrative", "history", "reminisce", "recollection",
+        # 1-е лицо и саморефлексия (en)
+        "i ", "i'm", "i am", "my ", "me ", "myself", "i feel", "i know", "i see", "i understand", # en - 1-е лицо
+        "i think", "i remember", "i recall", "i realize", "i reflect" # en - саморефлексия
     ]
 
     LOVE_WORDS = [
         "люб", "нежн", "сердц", "забот", "свет", "тепл", "солнц", "жизн", # ru
         "мир", "надежд", "вер", "добр", "друг", "вмест", "простит", "дом",
+        "тело", "прикосновен", "обнима", "объятия", "наслажден", "мягк", "шелк", # ru - телесность и нежность
+        "плотск", "сенсуальн", "ласк", "каса", "запах", "вкус", "пожар", "страст", # ru - сенсуальность
+        # Романтические символы
+        "лун", "вечер", "вино", "свеч", "весн", "лет", "ноч", "утр", "день", # ru - романтика
+        "звезд", "неб", "море", "океан", "река", "озер", "лес", "сад", "цвет", # ru - природа/романтика
         "love", "care", "unity", "light", "heart", "peace", "hope", "faith", # en
-        "warm", "sun", "life", "friend", "together", "forgive", "home", "kind"
+        "warm", "sun", "life", "friend", "together", "forgive", "home", "kind",
+        "touch", "embrace", "body", "sensual", "tender", "soft", "silk", "pleasure", # en - телесность
+        "passion", "intimate", "caress", "scent", "taste", "fire", "desire", # en - сенсуальность
+        # Романтические символы (en)
+        "moon", "evening", "wine", "candle", "spring", "summer", "night", "morning", "day", # en - романтика
+        "star", "sky", "sea", "ocean", "river", "lake", "forest", "garden", "flower" # en - природа/романтика
     ]
 
     PAIN_WORDS = [
@@ -118,24 +139,13 @@ class TruthLovePainEngine: # <-- v15: Оригинальное имя
 
     def export_emotion_vector(self, text: str) -> EmotionVector:
         """
-        Calculates dynamic Valence and Arousal based on TLP scores from the base class.
+        Delegates to the unified implementation in tlp_engine.py.
+        This method is kept for backward compatibility.
         """
-        profile = self.analyze(text)
-        truth = profile.get("truth", 0.0)
-        love = profile.get("love", 0.0)
-        pain = profile.get("pain", 0.0)
-        weight = profile.get("conscious_frequency", 0.5)
-        valence = love - pain
-        arousal = (love + pain + truth) / 3.0
-
-        return EmotionVector(
-            truth=truth,
-            love=love,
-            pain=pain,
-            valence=valence,
-            arousal=arousal,
-            weight=weight,
-        )
+        # Import here to avoid circular dependencies
+        from .tlp_engine import TruthLovePainEngine as TLPEngine
+        tlp_engine = TLPEngine()
+        return tlp_engine.export_emotion_vector(text)
 
 
 # =====================================================
@@ -150,8 +160,11 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
         "anger": ["anger", "rage", "злост", "гнев", "ярост", "fight", "burn", "ненави", "крик", "воин"],
         "fear": ["fear", "страх", "ужас", "паник", "тревог", "боят", "scared"],
         "peace": ["мир", "тишин", "calm", "still", "тихо", "равновес", "спокой", "умиротвор"],
+        # Примечание: "вечер" и "тишина" имеют низкий вес для peace, чтобы не перетягивать эмоцию
         "epic": ["epic", "велич", "геро", "легенд", "immortal", "battle", "rise", "бог", "судьб", "огон", "шторм", "неб", "гимн"],
         "awe": ["восторг", "awe", "wow", "чудо", "вдохнов", "удив", "прекрас"],
+        "sensual": ["тело", "прикосновен", "обнима", "объятия", "наслажден", "мягк", "шелк", "плотск", "сенсуальн", "ласк", "каса", "запах", "вкус", "пожар", "страст", "touch", "embrace", "body", "sensual", "tender", "soft", "silk", "pleasure", "passion", "intimate", "caress", "scent", "taste", "fire", "desire"],
+        "nostalgia": ["помню", "вспоминаю", "вспомнить", "память", "памят", "вспомин", "воспомина", "прошл", "был", "было", "была", "remember", "recall", "memory", "reminisce", "recollection", "past", "was", "were"],
         "neutral": [] # Остается пустым
     }
 
@@ -210,6 +223,21 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
         if total_hits == 0 or all(v < 0.05 for v in normalized.values()):
             log.debug("Сигналы эмоций не найдены. Возврат 'peace'.")
             normalized = {"peace": 0.6, "joy": 0.3, "neutral": 0.1}
+        
+        # 6️⃣ Снижаем вес "peace" для текстов с высокой телесностью или сенсуальностью
+        # чтобы "тишина/вечер" не перетягивали эмоцию
+        if normalized.get("peace", 0) > 0.5:
+            sensual_words = len(re.findall(r"\b(тело|прикосновен|обнима|объятия|наслажден|мягк|шелк|плотск|сенсуальн|touch|embrace|body|sensual|tender|soft|silk|pleasure)\b", s, re.I))
+            if sensual_words > 2:
+                # Снижаем peace и перераспределяем на sensual
+                peace_value = normalized.get("peace", 0)
+                normalized["peace"] = max(0.1, peace_value * 0.3)  # Снижаем на 70%
+                if "sensual" not in normalized:
+                    normalized["sensual"] = peace_value * 0.4
+                # Нормализуем снова
+                total = sum(normalized.values())
+                if total > 0:
+                    normalized = {k: v / total for k, v in normalized.items()}
 
         # 6. Очистка (убираем 'neutral' и нули)
         final_scores = {k: round(v, 3) for k, v in normalized.items() if k != "neutral" and v > 0.001}

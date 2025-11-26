@@ -133,6 +133,22 @@ class StudioCoreConfig:
     FALLBACK_EMOTION: str = "neutral"
 
 
+# ============================================================================
+# Neutral / Low-Emotion defaults (MASTER-PATCH v3)
+# ============================================================================
+NEUTRAL_MOOD = "neutral, calm, observational"
+NEUTRAL_COLOR_WAVE = ["#4A5568", "#718096"]  # холодный серый / стальной
+LOW_EMOTION_BPM_MIN = 58
+LOW_EMOTION_BPM_MAX = 70
+
+# Пороговые значения для определения "низкоэмоционального" текста
+LOW_EMOTION_TLP_PAIN_MAX = 0.10
+LOW_EMOTION_TLP_TRUTH_MIN = 0.50
+LOW_EMOTION_RDE_RESONANCE_MAX = 0.20
+LOW_EMOTION_RDE_FRACTURE_MAX = 0.15
+LOW_EMOTION_RDE_ENTROPY_MAX = 0.35
+
+
 def load_config(path: str = "studio_config.json") -> dict:
     """
     Загружает конфигурацию StudioCore или создаёт новую.
@@ -180,6 +196,69 @@ FORCED_GENRES = {
     "joy_bright": "pop adaptive light",
     "confidence": "hiphop adaptive",
 }
+
+# ============================================================================
+# Algorithm Weighting Factors (MASTER-PATCH v7 - Externalized Magic Numbers)
+# ============================================================================
+ALGORITHM_WEIGHTS = {
+    # TLP weighting factors
+    "tlp_truth_weight": 0.4,
+    "tlp_love_weight": 0.3,
+    "tlp_pain_weight": 0.5,
+    
+    # Road narrative scoring weights
+    "road_narrative_cf_weight": 0.25,
+    "road_narrative_sorrow_weight": 0.25,
+    "road_narrative_determination_weight": 0.20,
+    
+    # RDE smoothing factors for low-emotion texts
+    "rde_resonance_smoothing": 0.4,
+    "rde_fracture_smoothing": 0.3,
+    "rde_entropy_smoothing": 0.7,
+    
+    # Emotion mode thresholds
+    "rage_anger_threshold": 0.22,
+    "rage_tension_threshold": 0.25,
+    "epic_threshold": 0.35,
+    
+    # Section intensity defaults
+    "default_section_intensity": 0.5,
+    "default_confidence": 0.5,
+}
+
+# ============================================================================
+# Keyword Lists (MASTER-PATCH v7 - Externalized Hardcoded Lists)
+# ============================================================================
+ROAD_NARRATIVE_KEYWORDS = {
+    "road": [
+        "road", "back road", "backroad", "highway", "flyover state",
+        "interstate", "dust", "truck stop"
+    ],
+    "death": [
+        "bury me", "bury me on a back road", "grave", "no name on the stone",
+        "my grave", "when i die", "reaper", "fate", "karma"
+    ],
+    "weight": [
+        "chains", "gold", "weight", "carry that weight",
+        "bridges i burned", "bridges i burned up", "tank full of gas"
+    ],
+}
+
+FOLK_BALLAD_KEYWORDS = [
+    # Russian keywords
+    "тропа", "тропе", "поле", "поля", "луна", "луной", "земля", "землёй",
+    "старые дороги", "дорога", "дороге", "дорогами", "степь", "посевы",
+    "отчий дом", "печь", "село", "деревня", "огни села", "ветер", "трава",
+    "трава под ногами", "легенды", "саги", "предки", "пастух", "вьюга",
+    # English equivalents
+    "trail", "field", "moon", "earth", "old roads", "road", "village", "wind",
+    "grass", "legends", "sagas", "ancestors", "shepherd", "blizzard"
+]
+
+FOLK_BALLAD_KEYWORDS_LEGACY = [
+    'тропа', 'дорог', 'ветер', 'луна', 'ноч', 'земл', 'память',
+    'возвращал', 'шептал', 'тихо', 'тум', 'природ', 'пешком', 'мимо'
+]
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)

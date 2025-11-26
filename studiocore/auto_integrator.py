@@ -24,6 +24,7 @@ AutoIntegrator v1.0 — системный модуль автоматическ
 import subprocess
 import os
 import sys
+import shlex
 from pathlib import Path
 import shutil
 
@@ -36,9 +37,33 @@ class AutoIntegrator:
     #       GIT HELPERS
     # ==============================
     def _run(self, cmd: str):
+        """
+        Безопасное выполнение команды без shell=True.
+        Разбивает команду на список аргументов для предотвращения инъекций.
+        """
         try:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            # Безопасное разбиение команды на аргументы
+            # Используем shlex.split для правильной обработки кавычек и пробелов
+            import shlex
+            cmd_parts = shlex.split(cmd) if isinstance(cmd, str) else cmd
+            
+            # Если cmd уже список, используем его напрямую
+            if not isinstance(cmd_parts, list):
+                cmd_parts = [str(cmd)]
+            
+            # Выполняем без shell=True для безопасности
+            result = subprocess.run(
+                cmd_parts,
+                shell=False,  # Безопасно: без shell
+                capture_output=True,
+                text=True,
+                timeout=30  # Таймаут для предотвращения зависаний
+            )
             return result.stdout, result.stderr
+        except subprocess.TimeoutExpired:
+            return "", "Command timeout (30s)"
+        except FileNotFoundError:
+            return "", f"Command not found: {cmd_parts[0] if cmd_parts else 'unknown'}"
         except Exception as e:
             return "", str(e)
 

@@ -46,11 +46,40 @@ class UserOverrides:
         color_state: Optional[str] = None,
         semantic_hints: Dict[str, Any] | None = None,
     ) -> None:
-        self.bpm = float(bpm) if isinstance(bpm, (int, float)) else None
-        self.key = key
+        # Валидация BPM: ограничиваем разумными значениями (40-200)
+        if isinstance(bpm, (int, float)):
+            self.bpm = float(max(40.0, min(200.0, bpm)))
+        else:
+            self.bpm = None
+        
+        # Валидация Key: проверяем базовую структуру (нота + опционально mode)
+        if key and isinstance(key, str) and key.strip():
+            key_clean = key.strip()
+            # Простая валидация: должна начинаться с валидной ноты или быть "auto"
+            valid_notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+            key_parts = key_clean.split(maxsplit=1)
+            root_note = key_parts[0].replace("#", "").upper()
+            # Если начинается с валидной ноты или это "auto" - принимаем
+            if key_clean.lower() == "auto" or root_note in valid_notes:
+                self.key = key_clean
+            else:
+                # Некорректный key - используем None (будет fallback)
+                self.key = None
+        else:
+            self.key = None
+        
         self.genre = genre
         self.mood = mood
-        self.vocal_profile = dict(vocal_profile or {})
+        
+        # Валидация vocal_profile: ограничиваем допустимые значения gender
+        vocal_profile_clean = dict(vocal_profile or {})
+        if "gender" in vocal_profile_clean:
+            valid_genders = ["male", "female", "auto", "neutral", "mixed"]
+            if vocal_profile_clean["gender"] not in valid_genders:
+                # Некорректный gender - удаляем или используем fallback
+                vocal_profile_clean.pop("gender", None)
+        self.vocal_profile = vocal_profile_clean
+        
         self.instrumentation = _ensure_list(instrumentation)
         self.structure_hints = [dict(item) for item in (structure_hints or [])]
         self.color_state = color_state

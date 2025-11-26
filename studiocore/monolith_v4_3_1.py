@@ -30,7 +30,7 @@ from .config import DEFAULT_CONFIG, load_config
 from .text_utils import normalize_text_preserve_symbols, extract_raw_blocks
 # v15: Исправлен ImportError (возвращаем оригинальные имена)
 from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
-from .tone import ToneSyncEngine
+from .tone_sync import ToneSyncEngine
 from .vocals import VocalProfileRegistry
 from .integrity import IntegrityScanEngine as FullIntegrityScanEngine  # Импорт движка V6
 from .rhythm import LyricMeter

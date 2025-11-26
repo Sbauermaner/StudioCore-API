@@ -170,7 +170,11 @@ class FANFAnnotationEngine:
         self, style: Dict[str, Any], bpm: Dict[str, Any], tonality: Dict[str, Any], tlp: Dict[str, Any]
     ) -> str:
         genre = _safe(style.get("genre")) if isinstance(style, dict) else "—"
-        mood = _safe(style.get("mood")) if isinstance(style, dict) else "—"
+        # MASTER-PATCH v3.1 — Mood Override
+        if isinstance(style, dict) and style.get("_mood_corrected"):
+            mood = _safe(style.get("mood"))
+        else:
+            mood = _safe(style.get("mood")) if isinstance(style, dict) else "—"
         bpm_val = _safe(bpm.get("estimate"), "120") if isinstance(bpm, dict) else "120"
         key = _safe(tonality.get("mode"), "auto") if isinstance(tonality, dict) else "auto"
         anchor = _first(tonality.get("section_keys", []), "C") if isinstance(tonality, dict) else "C"
