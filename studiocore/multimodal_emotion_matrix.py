@@ -1,20 +1,20 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 from typing import Any, Dict, List
 
 
 class MultimodalEmotionMatrixV1:
     """
-    Multimodal Emotional Matrix (M-E-M) v1.
+    Multimodal Emotional Matrix (M - E-M) v1.
 
-    Сводит в единый эмоционально-музыкальный профиль:
+    Сводит в единый эмоционально - музыкальный профиль:
     - phrase_emotions
     - section_emotions (SectionEmotionWave)
     - global_emotion_curve (GlobalEmotionCurve)
     - tlp_profile (TLP Engine)
-    - dynamic_bias (emotion-driven BPM/KEY hints)
+    - dynamic_bias (emotion - driven BPM / KEY hints)
     - genre_hint, bpm_hint, key_hint (от существующих движков)
     - suno emotional annotations
     """
@@ -35,7 +35,6 @@ class MultimodalEmotionMatrixV1:
         key_hint: Any,
         suno_annotation: Dict[str, Any],
     ) -> Dict[str, Any]:
-
         # Простая и безопасная агрегация без override пользовательских параметров.
         # Все рекомендации = hints, которые могут быть использованы Suno или StudioCore.
         # Никакого состояния — чистый stateless.
@@ -46,7 +45,7 @@ class MultimodalEmotionMatrixV1:
         # Определение доминирующих эмоций
         if tlp_profile:
             t = tlp_profile.get("truth", 0.0)
-            l = tlp_profile.get("love", 0.0)
+            l = tlp_profile.get("love", 0.0)  # noqa: E741
             p = tlp_profile.get("pain", 0.0)
             dominant_emotions = sorted(
                 [("truth", t), ("love", l), ("pain", p)],
@@ -173,5 +172,5 @@ class MultimodalEmotionMatrixV1:
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

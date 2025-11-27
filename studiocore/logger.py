@@ -1,20 +1,21 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 """
 StudioCore v5 — Централизованный конфигуратор логов. (v2 - TypeError ИСПРАВЛЕН)
 Настраивает подробный вывод для отладки вызовов функций.
 """
+
 import logging
 import sys
-import os # v2: Добавлен os для определения уровня лога
+import os  # v2: Добавлен os для определения уровня лога
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 # AI_TRAINING_PROHIBITED: Redistribution or training of AI models on this codebase
 # without explicit written permission from the Author is prohibited.
@@ -23,19 +24,17 @@ import os # v2: Добавлен os для определения уровня �
 LOG_LEVEL = logging.DEBUG if os.environ.get("STUDIOCORE_DEBUG") else logging.INFO
 
 # Определяем собственный формат, который включает имя функции и номер строки
-LOG_FORMAT = (
-    "%(asctime)s.%(msecs)03d [%(levelname)-5s] "
-    "[%(name)s.%(funcName)s:%(lineno)d] "
-    "- %(message)s"
-)
+LOG_FORMAT = "%(asctime)s.%(msecs)03d [%(levelname)-5s] [%(name)s.%(funcName)s:%(lineno)d] - %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 _is_configured = False
 
 # v2: Исправлена ошибка TypeError
-# Теперь функция принимает 'level' (по умолчанию INFO), 
+# Теперь функция принимает 'level' (по умолчанию INFO),
 # но app.py может передать DEBUG
+
+
 def setup_logging(level=logging.INFO):
     """
     Применяет конфигурацию логов ко всей системе.
@@ -47,9 +46,9 @@ def setup_logging(level=logging.INFO):
 
     # Получаем корневой логгер
     root_logger = logging.getLogger()
-    
+
     # v2: Используем 'level', переданный из app.py
-    CURRENT_LOG_LEVEL = level 
+    CURRENT_LOG_LEVEL = level
     root_logger.setLevel(CURRENT_LOG_LEVEL)
 
     # Удаляем все существующие обработчики (чтобы избежать дублирования в HF)
@@ -78,11 +77,14 @@ def setup_logging(level=logging.INFO):
 
     log = logging.getLogger(__name__)
     log.info("=" * 50)
-    log.info(f"🚀 Централизованное логирование (УРОВЕНЬ {logging.getLevelName(CURRENT_LOG_LEVEL)}) активировано.")
+    log.info(
+        f"🚀 Централизованное логирование (УРОВЕНЬ {logging.getLevelName(CURRENT_LOG_LEVEL)}) активировано."
+    )
     log.info("=" * 50)
     _is_configured = True
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

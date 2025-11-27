@@ -40,10 +40,14 @@ def main() -> None:
     old_reports = reports[:-30]
     archive_path = archive_reports(old_reports)
 
-    new_content = header_prefix + "".join(f"{HEADER}{report}" for report in reports[-30:])
+    new_content = header_prefix + "".join(
+        f"{HEADER}{report}" for report in reports[-30:]
+    )
     LGP.write_text(new_content, encoding="utf-8")
 
-    print(f"Archived {len(old_reports)} reports to {archive_path.name} and kept the latest 30.")
+    print(
+        f"Archived {len(old_reports)} reports to {archive_path.name} and kept the latest 30."
+    )
 
 
 if __name__ == "__main__":

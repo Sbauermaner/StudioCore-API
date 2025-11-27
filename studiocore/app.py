@@ -1,8 +1,8 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 """
 StudioCore Internal Test Runner
 Позволяет тестировать ядро отдельно от UI и FastAPI.
@@ -15,8 +15,8 @@ from studiocore import StudioCore, STUDIOCORE_VERSION
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 # AI_TRAINING_PROHIBITED: Redistribution or training of AI models on this codebase
 # without explicit written permission from the Author is prohibited.
@@ -36,7 +36,7 @@ def main():
 
     input_data = sys.argv[1]
     if Path(input_data).exists():
-        text = Path(input_data).read_text(encoding="utf-8")
+        text = Path(input_data).read_text(encoding="utf - 8")
     else:
         text = input_data
 
@@ -45,7 +45,9 @@ def main():
 
     result = core.analyze(text)
     out_path = "studiocore_result.json"
-    Path(out_path).write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+    Path(out_path).write_text(
+        json.dumps(result, indent=2, ensure_ascii=False), encoding="utf - 8"
+    )
 
     print(f"✅ Анализ завершён. Результат сохранён → {out_path}")
 
@@ -55,5 +57,5 @@ if __name__ == "__main__":
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

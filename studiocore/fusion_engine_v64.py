@@ -1,19 +1,19 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 FusionEngine v6.4
 
 Задача:
 - взять разрозненные куски анализа (emotion, bpm, tonality, style, color, genre_route)
-- уважить legacy-настройки пользователя (bpm/key/genre/mood)
+- уважить legacy - настройки пользователя (bpm / key / genre / mood)
 - собрать единый "fusion_summary" с:
     * final_bpm
     * final_key
@@ -25,16 +25,14 @@ FusionEngine v6.4
     * diagnostics
 """
 
-from __future__ import annotations
-
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 
 class FusionEngineV64:
     """Объединяющий слой StudioCore v6.4.
 
     Ожидаемый входной payload (из core_v6):
-    - legacy: dict (старый движок: emotions/tlp/style/bpm/инструменты)
+    - legacy: dict (старый движок: emotions / tlp / style / bpm / инструменты)
     - emotion: dict (profile, dominant, curve)
     - bpm: dict (estimate, locks, manual_override)
     - tonality: dict (section_keys, mode)
@@ -98,11 +96,17 @@ class FusionEngineV64:
         # 4) дефолт
         return "C (C minor)"
 
-    def _resolve_genre(self, legacy: Dict[str, Any], genre_route: Dict[str, Any]) -> Dict[str, str]:
+    def _resolve_genre(
+        self, legacy: Dict[str, Any], genre_route: Dict[str, Any]
+    ) -> Dict[str, str]:
         style = legacy.get("style") or {}
         legacy_genre = style.get("genre")
         # если пользователь явно прописал жанр — уважаем
-        if isinstance(legacy_genre, str) and legacy_genre.strip() and legacy_genre not in ("auto", "adaptive"):
+        if (
+            isinstance(legacy_genre, str)
+            and legacy_genre.strip()
+            and legacy_genre not in ("auto", "adaptive")
+        ):
             main = legacy_genre.strip()
             sub = genre_route.get("subgenre") or main
             return {
@@ -128,7 +132,9 @@ class FusionEngineV64:
         dominant = self._get_dominant_emotion(emotion)
         return f"{dominant}_driven"
 
-    def _resolve_instrumentation(self, legacy: Dict[str, Any], instrumentation: Dict[str, Any]) -> str:
+    def _resolve_instrumentation(
+        self, legacy: Dict[str, Any], instrumentation: Dict[str, Any]
+    ) -> str:
         # 1) если legacy.instruments есть — собираем их
         legacy_instr = legacy.get("instruments") or []
         if isinstance(legacy_instr, list) and legacy_instr:
@@ -147,7 +153,9 @@ class FusionEngineV64:
 
         return "piano, strings, bass, pads"
 
-    def _resolve_vocal_profile(self, legacy: Dict[str, Any], vocal: Dict[str, Any]) -> str:
+    def _resolve_vocal_profile(
+        self, legacy: Dict[str, Any], vocal: Dict[str, Any]
+    ) -> str:
         # 1) legacy.vocals + vocal_form
         vocals = legacy.get("vocals") or []
         vocal_form = legacy.get("vocal_form") or ""
@@ -157,7 +165,7 @@ class FusionEngineV64:
                 return f"{vocal_form}: {profile}"
             return profile
 
-        # 2) новый vocal-профиль
+        # 2) новый vocal - профиль
         tone = vocal.get("tone") or "neutral"
         style = vocal.get("style") or "standard"
         gender = vocal.get("gender") or "neutral"
@@ -201,7 +209,8 @@ class FusionEngineV64:
         dominant_emotion: str,
         tlp: Dict[str, float],
     ) -> str:
-        # компактный подсказчик для "Lyrics" — чтобы Suno понимал эмоциональное ядро
+        # компактный подсказчик для "Lyrics" — чтобы Suno понимал эмоциональное
+        # ядро
         truth = tlp.get("truth", 0.0)
         love = tlp.get("love", 0.0)
         pain = tlp.get("pain", 0.0)
@@ -211,7 +220,9 @@ class FusionEngineV64:
             f"(TLP: truth={truth:.2f}, love={love:.2f}, pain={pain:.2f})"
         )
 
-    def fuse(self, payload: Dict[str, Any], *, genre_route: Dict[str, Any]) -> Dict[str, Any]:
+    def fuse(
+        self, payload: Dict[str, Any], *, genre_route: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Главный метод.
 
         Принимает:
@@ -221,14 +232,31 @@ class FusionEngineV64:
         Возвращает:
             fusion_summary: dict с финальными параметрами
         """
-        legacy = payload.get("legacy") or payload.get("symbiosis", {}).get("legacy") or {}
-        emotion = payload.get("emotion") or payload.get("symbiosis", {}).get("emotion") or {}
+        legacy = (
+            payload.get("legacy") or payload.get("symbiosis", {}).get("legacy") or {}
+        )
+        emotion = (
+            payload.get("emotion") or payload.get("symbiosis", {}).get("emotion") or {}
+        )
         bpm = payload.get("bpm") or payload.get("symbiosis", {}).get("bpm") or {}
-        tonality = payload.get("tonality") or payload.get("symbiosis", {}).get("tonality") or {}
+        tonality = (
+            payload.get("tonality")
+            or payload.get("symbiosis", {}).get("tonality")
+            or {}
+        )
         color = payload.get("color") or payload.get("symbiosis", {}).get("color") or {}
-        instrumentation = payload.get("instrumentation") or payload.get("symbiosis", {}).get("instrumentation") or {}
+        instrumentation = (
+            payload.get("instrumentation")
+            or payload.get("symbiosis", {}).get("instrumentation")
+            or {}
+        )
         vocal = payload.get("vocal") or payload.get("symbiosis", {}).get("vocal") or {}
-        tlp = legacy.get("tlp") or payload.get("tlp") or payload.get("symbiosis", {}).get("tlp") or {}
+        tlp = (
+            legacy.get("tlp")
+            or payload.get("tlp")
+            or payload.get("symbiosis", {}).get("tlp")
+            or {}
+        )
 
         dominant = self._get_dominant_emotion(emotion)
         final_bpm = self._resolve_bpm(legacy, bpm)
@@ -274,7 +302,8 @@ class FusionEngineV64:
 
         return fusion_summary
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

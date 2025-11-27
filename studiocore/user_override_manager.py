@@ -1,9 +1,10 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """User override helpers required by the StudioCore Codex specification."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -46,17 +47,31 @@ class UserOverrides:
         color_state: Optional[str] = None,
         semantic_hints: Dict[str, Any] | None = None,
     ) -> None:
-        # Валидация BPM: ограничиваем разумными значениями (40-200)
+        # Валидация BPM: ограничиваем разумными значениями (40 - 200)
         if isinstance(bpm, (int, float)):
             self.bpm = float(max(40.0, min(200.0, bpm)))
         else:
             self.bpm = None
-        
+
         # Валидация Key: проверяем базовую структуру (нота + опционально mode)
         if key and isinstance(key, str) and key.strip():
             key_clean = key.strip()
-            # Простая валидация: должна начинаться с валидной ноты или быть "auto"
-            valid_notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+            # Простая валидация: должна начинаться с валидной ноты или быть
+            # "auto"
+            valid_notes = [
+                "C",
+                "C#",
+                "D",
+                "D#",
+                "E",
+                "F",
+                "F#",
+                "G",
+                "G#",
+                "A",
+                "A#",
+                "B",
+            ]
             key_parts = key_clean.split(maxsplit=1)
             root_note = key_parts[0].replace("#", "").upper()
             # Если начинается с валидной ноты или это "auto" - принимаем
@@ -67,10 +82,10 @@ class UserOverrides:
                 self.key = None
         else:
             self.key = None
-        
+
         self.genre = genre
         self.mood = mood
-        
+
         # Валидация vocal_profile: ограничиваем допустимые значения gender
         vocal_profile_clean = dict(vocal_profile or {})
         if "gender" in vocal_profile_clean:
@@ -79,7 +94,7 @@ class UserOverrides:
                 # Некорректный gender - удаляем или используем fallback
                 vocal_profile_clean.pop("gender", None)
         self.vocal_profile = vocal_profile_clean
-        
+
         self.instrumentation = _ensure_list(instrumentation)
         self.structure_hints = [dict(item) for item in (structure_hints or [])]
         self.color_state = color_state
@@ -161,7 +176,9 @@ class UserOverrideManager:
     def apply_to_vocals(self, vocal_payload: Dict[str, Any]) -> Dict[str, Any]:
         payload = dict(vocal_payload)
         if self.overrides.vocal_profile:
-            payload.update({k: v for k, v in self.overrides.vocal_profile.items() if v is not None})
+            payload.update(
+                {k: v for k, v in self.overrides.vocal_profile.items() if v is not None}
+            )
             payload.setdefault("source", "user")
         return payload
 
@@ -169,7 +186,15 @@ class UserOverrideManager:
         return {
             "has_overrides": any(
                 getattr(self.overrides, field)
-                for field in ("bpm", "key", "genre", "mood", "vocal_profile", "instrumentation", "structure_hints")
+                for field in (
+                    "bpm",
+                    "key",
+                    "genre",
+                    "mood",
+                    "vocal_profile",
+                    "instrumentation",
+                    "structure_hints",
+                )
             ),
             "fields": {
                 "bpm": self.overrides.bpm,
@@ -182,7 +207,8 @@ class UserOverrideManager:
             },
         }
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

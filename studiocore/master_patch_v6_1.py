@@ -7,14 +7,14 @@ Each activator class implements the enable() method to process payloads.
 
 class HybridGenreEngineActivator:
     """Activator for Hybrid Genre Engine functionality."""
-    
+
     def enable(self, core, payload):
         """Enable hybrid genre engine processing.
-        
+
         Args:
             core: The core instance
             payload: The payload to process
-            
+
         Returns:
             The processed payload
         """
@@ -23,14 +23,14 @@ class HybridGenreEngineActivator:
 
 class RageFilterV2Activator:
     """Activator for Rage Filter V2 functionality."""
-    
+
     def enable(self, core, payload):
         """Enable rage filter V2 processing.
-        
+
         Args:
             core: The core instance
             payload: The payload to process
-            
+
         Returns:
             The processed payload
         """
@@ -39,14 +39,14 @@ class RageFilterV2Activator:
 
 class EpicOverrideActivator:
     """Activator for Epic Override functionality."""
-    
+
     def enable(self, core, payload):
         """Enable epic override processing.
-        
+
         Args:
             core: The core instance
             payload: The payload to process
-            
+
         Returns:
             The processed payload
         """
@@ -55,14 +55,14 @@ class EpicOverrideActivator:
 
 class HybridInstrumentationActivator:
     """Activator for Hybrid Instrumentation functionality."""
-    
+
     def enable(self, core, payload):
         """Enable hybrid instrumentation processing.
-        
+
         Args:
             core: The core instance
             payload: The payload to process
-            
+
         Returns:
             The processed payload
         """
@@ -71,14 +71,14 @@ class HybridInstrumentationActivator:
 
 class SectionMergeModeActivator:
     """Activator for Section Merge Mode functionality."""
-    
+
     def enable(self, core, payload):
         """Enable section merge mode processing.
-        
+
         Args:
             core: The core instance
             payload: The payload to process
-            
+
         Returns:
             The processed payload
         """
@@ -87,14 +87,14 @@ class SectionMergeModeActivator:
 
 class AdaptiveFlowEngineV2Activator:
     """Activator for Adaptive Flow Engine V2 functionality."""
-    
+
     def enable(self, core, payload):
         """Enable adaptive flow engine V2 processing.
-        
+
         Args:
             core: The core instance
             payload: The payload to process
-            
+
         Returns:
             The processed payload
         """
@@ -103,16 +103,15 @@ class AdaptiveFlowEngineV2Activator:
 
 class ColorEngineV3Activator:
     """Activator for Color Engine V3 functionality."""
-    
+
     def enable(self, core, payload):
         """Enable color engine V3 processing.
-        
+
         Args:
             core: The core instance
             payload: The payload to process
-            
+
         Returns:
             The processed payload
         """
         return payload
-

@@ -11,7 +11,11 @@ def test_suno_emotion_adapter_basic():
         "global_tlp": {"truth": 0.1, "love": 0.8, "pain": 0.1},
     }
     sections = [
-        {"section": "verse", "intensity": 0.4, "hot_phrases": ["Любовь как тихий свет"]},
+        {
+            "section": "verse",
+            "intensity": 0.4,
+            "hot_phrases": ["Любовь как тихий свет"],
+        },
         {"section": "chorus", "intensity": 0.9, "hot_phrases": ["Сгорит душа"]},
     ]
     ann = build_suno_annotations("..", sections, curve)
@@ -26,7 +30,11 @@ def test_prepare_diagnostics_fills_from_emotion_matrix():
     diagnostics = {
         "emotion_matrix": {
             "bpm": {"recommended": 132, "source": "emotion_matrix_v1"},
-            "key": {"recommended": "F#", "mode": "minor", "source": "emotion_matrix_v1"},
+            "key": {
+                "recommended": "F#",
+                "mode": "minor",
+                "source": "emotion_matrix_v1",
+            },
             "vocals": {
                 "gender": "female",
                 "notes": ["airy", "soft"],
@@ -63,6 +71,7 @@ def test_esenin_diagnostics_not_none():
     assert diagnostics.get("tonality") is not None
     assert diagnostics.get("vocal") is not None
     assert diagnostics.get("emotion_matrix") is not None
+
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)

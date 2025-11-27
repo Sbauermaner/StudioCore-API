@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf - 8 -*-
 """
 Consistency Layer v8 for StudioCore IMMORTAL
 
@@ -15,12 +15,12 @@ from typing import Any, Dict
 
 
 class ConsistencyLayerV8:
-    """Evaluates cross-engine consistency and produces a structured block."""
+    """Evaluates cross - engine consistency and produces a structured block."""
 
     def __init__(self, diagnostics: Dict[str, Any]) -> None:
         self.d = diagnostics or {}
 
-    # --- Helpers --------------------------------------------------------------
+    # --- Helpers ------------------------------------------------------------
 
     def _calc_bpm_tlp_match(self) -> bool:
         """Check if BPM fits emotional intensity."""
@@ -45,7 +45,7 @@ class ConsistencyLayerV8:
         rde = self.d.get("rde") or {}
 
         dyn = rde.get("dynamic") or 0
-        emo = rde.get("emotional") or 0
+        # emo = rde.get("emotional") or 0  # noqa: F841
 
         if "gothic" in str(genre).lower():
             return dyn < 0.8
@@ -77,13 +77,14 @@ class ConsistencyLayerV8:
             return 1.0
 
         score = 1.0
-        if any("intro" in s.lower() for s in sections) and \
-           any("chorus" in s.lower() for s in sections):
+        if any("intro" in s.lower() for s in sections) and any(
+            "chorus" in s.lower() for s in sections
+        ):
             score += 0.1
 
         return min(score, 1.0)
 
-    # --- Public ---------------------------------------------------------------
+    # --- Public -------------------------------------------------------------
 
     def build(self) -> Dict[str, Any]:
         return {

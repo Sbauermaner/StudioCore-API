@@ -16,6 +16,7 @@ def test_bpm_engine_describe_returns_curve():
     assert isinstance(payload["curve"], list)
     assert "poly_rhythm" in payload
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27

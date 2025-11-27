@@ -1,7 +1,7 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 from __future__ import annotations
 
 import logging
@@ -35,7 +35,7 @@ class GenreUniverseAdapter:
     def __init__(self) -> None:
         self.universe = GenreUniverse()
 
-        # Fallback-таблица — безопасные поджанры на случай, если в реестре нет записи.
+        # Fallback - таблица — безопасные поджанры на случай, если в реестре нет записи.
         # Codex: НЕ удаляй, можно дополнять.
         self._fallback_map: Dict[str, Tuple[str, List[str]]] = {
             "rock_metal": ("alternative_rock", ["rock", "guitar", "band"]),
@@ -69,7 +69,7 @@ class GenreUniverseAdapter:
 
         try:
             if hasattr(self.universe, "resolve_music"):
-                resolved = self.universe.resolve_music(macro)  # type: ignore[attr-defined]
+                resolved = self.universe.resolve_music(macro)  # type: ignore[attr - defined]
                 if isinstance(resolved, dict):
                     sub = str(resolved.get("id") or resolved.get("name") or macro)
                     tags = list(resolved.get("tags") or [])
@@ -101,7 +101,8 @@ class GenreUniverseAdapter:
             source="fallback_minimal",
         )
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

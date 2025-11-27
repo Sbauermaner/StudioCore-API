@@ -1,18 +1,17 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-"""Light-weight rule-based genre detector for StudioCore v6."""
-from __future__ import annotations
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+"""Light - weight rule - based genre detector for StudioCore v6."""
 
 from typing import Any, Dict, List
 
-from studiocore.emotion_profile import EmotionVector, EmotionAggregator
+from studiocore.emotion_profile import EmotionVector
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 # AI_TRAINING_PROHIBITED: Redistribution or training of AI models on this codebase
 # without explicit written permission from the Author is prohibited.
@@ -98,13 +97,15 @@ class GenreMatrixEngine:
                 "имиджевое сообщение",
                 "заявление",
                 "байлайнер",
-                "кейс-стори",
-                "пресс-релиз",
+                "кейс - стори",
+                "пресс - релиз",
                 "комментарий",
             ],
         }
 
-    def detect(self, text: str, emotion_vector: EmotionVector | None = None) -> Dict[str, Any]:
+    def detect(
+        self, text: str, emotion_vector: EmotionVector | None = None
+    ) -> Dict[str, Any]:
         """Return a weighted map of genres inferred from ``text``."""
 
         lowered = text.lower()
@@ -119,7 +120,9 @@ class GenreMatrixEngine:
         normalized = {genre: score / total for genre, score in raw_scores.items()}
         score = dict(normalized)
 
-        local_emotion = (emotion_vector or EmotionVector(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)).valence
+        local_emotion = (
+            emotion_vector or EmotionVector(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+        ).valence
 
         if local_emotion < -0.4:
             score["tragic"] = score.get("tragic", 0) + 0.2
@@ -151,13 +154,17 @@ class GenreMatrixEngine:
 
 
 class GenreMatrixExtended(GenreMatrixEngine):
-    """Bridge keyword detection with the domain-based genre weights."""
+    """Bridge keyword detection with the domain - based genre weights."""
 
-    def evaluate(self, feature_map: Dict[str, float] | None, style_payload: Dict[str, Any] | None = None) -> str | None:
+    def evaluate(
+        self,
+        feature_map: Dict[str, float] | None,
+        style_payload: Dict[str, Any] | None = None,
+    ) -> str | None:
         # Folk mode override
-        if style_payload and style_payload.get('_folk_mode') is True:
-            return 'folk narrative ballad'
-        
+        if style_payload and style_payload.get("_folk_mode") is True:
+            return "folk narrative ballad"
+
         if not feature_map:
             # FIX: базовый fallback — dark_country
             # (на основе анализа реальных текстов о дороге, боли и одиночестве)
@@ -171,7 +178,8 @@ class GenreMatrixExtended(GenreMatrixEngine):
         # NEW: нормальное разрешение жанров
         return engine.infer_genre(feature_map)
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

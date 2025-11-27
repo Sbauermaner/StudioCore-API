@@ -1,9 +1,9 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
-# -*- coding: utf-8 -*-
+# -*- coding: utf - 8 -*-
 """
 SymbiosisAudit v1.0 — полный аудит StudioCore.
 
@@ -22,9 +22,6 @@ SymbiosisAudit v1.0 — полный аудит StudioCore.
 """
 
 import importlib
-import os
-import sys
-import traceback
 from pathlib import Path
 
 
@@ -37,6 +34,7 @@ class SymbiosisAudit:
     # =====================================
     # UTILS
     # =====================================
+
     def log(self, msg: str):
         self.report.append(msg)
 
@@ -47,10 +45,11 @@ class SymbiosisAudit:
     # =====================================
     # CHECK DIRECTORY STRUCTURE
     # =====================================
+
     def check_structure(self):
         required_dirs = [
             "studiocore",
-            "studiocore/engines",
+            "studiocore / engines",
             "tests",
         ]
         for d in required_dirs:
@@ -62,6 +61,7 @@ class SymbiosisAudit:
     # =====================================
     # CHECK PYTHON FILES
     # =====================================
+
     def check_files(self):
         for path in self.root.rglob("*.py"):
             if path.stat().st_size == 0:
@@ -72,6 +72,7 @@ class SymbiosisAudit:
     # =====================================
     # CHECK IMPORTS
     # =====================================
+
     def check_imports(self):
         for path in self.root.rglob("*.py"):
             module = str(path).replace("/", ".").replace(".py", "")
@@ -84,6 +85,7 @@ class SymbiosisAudit:
     # =====================================
     # CHECK CORE ENGINES INTEGRATION
     # =====================================
+
     def check_core_engines(self):
         engines = [
             "bpm_engine",
@@ -112,6 +114,7 @@ class SymbiosisAudit:
     # =====================================
     # CHECK CORE VERSIONS
     # =====================================
+
     def check_core_versions(self):
         versions = [
             "core_v4",
@@ -128,6 +131,7 @@ class SymbiosisAudit:
     # =====================================
     # GENERATE REPORT
     # =====================================
+
     def generate_report(self):
         report_file = Path("symbiosis_report.txt")
         report_file.write_text("\n".join(self.report), encoding="utf8")
@@ -138,6 +142,7 @@ class SymbiosisAudit:
     # =====================================
     # RUN ALL
     # =====================================
+
     def execute(self):
         self.log("=== SYMBIOSIS AUDIT START ===")
 

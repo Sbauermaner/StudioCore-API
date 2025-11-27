@@ -1,7 +1,7 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """Rhythm × Dynamics × Emotion integration utilities."""
 
@@ -27,7 +27,7 @@ class RDESnapshot:
 
 
 class RhythmDynamicsEmotionEngine:
-    """Compute high-level synthesis metrics for diagnostics and UI layers."""
+    """Compute high - level synthesis metrics for diagnostics and UI layers."""
 
     def __init__(self) -> None:
         """Initialize the engine with a shared TLP engine instance."""
@@ -41,7 +41,9 @@ class RhythmDynamicsEmotionEngine:
         emotion_profile: Dict[str, float],
         instrumentation_payload: Dict[str, Any],
     ) -> RDESnapshot:
-        dominant = max(emotion_profile, key=emotion_profile.get) if emotion_profile else None
+        dominant = (
+            max(emotion_profile, key=emotion_profile.get) if emotion_profile else None
+        )
         palette = instrumentation_payload.get("palette")
         if isinstance(palette, dict):
             palette = palette.get("primary") or palette.get("palette")
@@ -53,9 +55,11 @@ class RhythmDynamicsEmotionEngine:
             dominant_emotion=dominant,
             target_bpm=bpm_payload.get("estimate"),
             breath_sync=breathing_profile.get("sync_score"),
-            target_energy=bpm_payload.get("emotion_map", {}).get(dominant)
-            if dominant
-            else bpm_payload.get("target_energy"),
+            target_energy=(
+                bpm_payload.get("emotion_map", {}).get(dominant)
+                if dominant
+                else bpm_payload.get("target_energy")
+            ),
             palette=palette,
         )
         return snapshot
@@ -95,7 +99,7 @@ class ResonanceDynamicsEngine:
     # keep existing code but add:
 
     def calc_resonance(self, text: str) -> float:
-        """Псевдо-резонанс: повторяемость ключевых слов и ритмических паттернов."""
+        """Псевдо - резонанс: повторяемость ключевых слов и ритмических паттернов."""
         low = text.lower()
         repeats = 0
         tokens = low.split()
@@ -117,7 +121,7 @@ class ResonanceDynamicsEngine:
 
         lens = [len(ln) for ln in lines]
         avg = sum(lens) / len(lens)
-        variance = sum((l - avg) ** 2 for l in lens) / len(lens)
+        variance = sum((item - avg) ** 2 for item in lens) / len(lens)
         fracture = min(1.0, variance / max(avg**2, 1.0))
         return round(fracture, 4)
 
@@ -132,7 +136,9 @@ class ResonanceDynamicsEngine:
         for cnt in freq.values():
             p = cnt / length
             import math
-            entropy -= p * (0 if p <= 0 else math.log2(p) if p > 0 else 0)  # используем логарифм вместо bit_length
+
+            # используем логарифм вместо bit_length
+            entropy -= p * (0 if p <= 0 else math.log2(p) if p > 0 else 0)
         entropy = min(1.0, max(0.0, entropy / 10.0))
         return round(entropy, 4)
 
@@ -141,5 +147,5 @@ __all__ = ["RDESnapshot", "RhythmDynamicsEmotionEngine", "ResonanceDynamicsEngin
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

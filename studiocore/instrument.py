@@ -1,9 +1,10 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """Instrumentation utilities required by the Codex specification."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -25,7 +26,7 @@ _DEFAULT_LIBRARY: Sequence[str] = (
 
 @dataclass(frozen=True)
 class InstrumentPick:
-    """Light-weight data container for instrument recommendations."""
+    """Light - weight data container for instrument recommendations."""
 
     instruments: List[str]
     confidence: float
@@ -52,13 +53,13 @@ class InstrumentLibrary:
             rationale = "Calm atmosphere — focus on sustained harmonics."
         elif energy < 0.55:
             instruments = ["grand piano", "cinematic strings", "analog bass"]
-            rationale = "Mid-energy narrative — blend organic and synthetic layers."
+            rationale = "Mid - energy narrative — blend organic and synthetic layers."
         elif energy < 0.8:
             instruments = ["electric guitar", "analog bass", "lofi kit"]
             rationale = "Energetic core — emphasise rhythm section."
         else:
             instruments = ["modular synth", "orchestral percussion", "electric guitar"]
-            rationale = "High-energy climax — accentuate percussive hits."
+            rationale = "High - energy climax — accentuate percussive hits."
 
         return InstrumentPick(instruments, round(0.6 + energy * 0.4, 3), rationale)
 
@@ -103,9 +104,13 @@ def instrument_selection(
         if "rock" in genre_low:
             palette = library.extend_palette(["electric guitar", "live drums"])
         elif "hip" in genre_low or "rap" in genre_low:
-            palette = library.extend_palette(["808 bass", "drum machine", "vinyl crackle"])
+            palette = library.extend_palette(
+                ["808 bass", "drum machine", "vinyl crackle"]
+            )
         elif "edm" in genre_low or "electronic" in genre_low:
-            palette = library.extend_palette(["sidechained pad", "super saw", "fm bass"])
+            palette = library.extend_palette(
+                ["sidechained pad", "super saw", "fm bass"]
+            )
         elif "cinematic" in genre_low or "score" in genre_low:
             palette = library.extend_palette(["cinematic brass", "granular textures"])
 
@@ -131,12 +136,13 @@ def instrument_based_on_emotion(
     emotions = _ensure_emotion_profile(emotions)
     dominant = max(emotions, key=emotions.get)
     library = InstrumentLibrary()  # Initialize library early
-    
-    # MASTER-PATCH v6.0 — Rage-mode instrumentation (только anger/tension)
+
+    # MASTER - PATCH v6.0 — Rage - mode instrumentation (только anger /
+    # tension)
     anger = emotions.get("anger", 0.0)
     tension = emotions.get("tension", 0.0)
     is_rage = anger > 0.22 or tension > 0.25
-    
+
     if is_rage:
         # Return aggressive instruments for rage mode
         palette = [
@@ -144,7 +150,7 @@ def instrument_based_on_emotion(
             "industrial drums",
             "heavy bass synth",
             "brass stabs",
-            "metallic percussion"
+            "metallic percussion",
         ]
         merged = library.extend_palette(list(base_palette or []) + palette)
         return {
@@ -152,18 +158,18 @@ def instrument_based_on_emotion(
             "emotions": emotions,
             "suggested": palette,
             "palette": merged,
-            "explanation": "Rage-mode detected — aggressive instrumentation applied.",
+            "explanation": "Rage - mode detected — aggressive instrumentation applied.",
         }
-    
-    # MASTER-PATCH v6.0 — Epic-mode instrumentation
+
+    # MASTER - PATCH v6.0 — Epic - mode instrumentation
     epic = emotions.get("epic", 0.0)
     if epic > 0.35 and not is_rage:
         # Epic cinematic instruments (без distorted guitar / industrial drums)
         palette = [
-            "brass (horns/trumpets)",
+            "brass (horns / trumpets)",
             "orchestral percussion",
             "dramatic strings",
-            "cinematic pads"
+            "cinematic pads",
         ]
         merged = library.extend_palette(list(base_palette or []) + palette)
         return {
@@ -171,15 +177,15 @@ def instrument_based_on_emotion(
             "emotions": emotions,
             "suggested": palette,
             "palette": merged,
-            "explanation": "Epic-mode detected — cinematic instrumentation applied.",
+            "explanation": "Epic - mode detected — cinematic instrumentation applied.",
         }
-    
+
     mapping = {
         "joy": ["acoustic guitar", "hand percussion", "bright piano"],
         "sadness": ["felt piano", "solo violin", "soft pads"],
         "anger": ["distorted guitar", "aggressive synth", "drums"],
         "fear": ["dissonant strings", "processed vocals", "sub bass"],
-        "epic": ["orchestral brass", "taiko ensemble", "choir"]
+        "epic": ["orchestral brass", "taiko ensemble", "choir"],
     }
     palette = mapping.get(dominant, ["ambient piano", "textured pad"])
     library = InstrumentLibrary()
@@ -217,7 +223,7 @@ def instrument_based_on_voice(
         rationale = "Ensemble vocals — support with lush harmonic beds."
     else:
         instruments = library.suggest_for_energy(target_energy).instruments
-        rationale = "Neutral voice — rely on energy-aligned library selection."
+        rationale = "Neutral voice — rely on energy - aligned library selection."
 
     palette = library.extend_palette(instruments)
     return {
@@ -273,14 +279,14 @@ def instrument_rhythm_sync(
         groove = "downtempo"
         toolkit = ["brush kit", "upright bass", "ambient percussion"]
     elif bpm < 110:
-        groove = "mid-groove"
+        groove = "mid - groove"
         toolkit = ["studio kit", "rhodes piano", "subtle shakers"]
     elif bpm < 140:
         groove = "uptempo"
         toolkit = ["tight drums", "synth bass", "plucked synth"]
     else:
-        groove = "high-energy"
-        toolkit = ["hard-hitting drums", "sidechain pad", "risers"]
+        groove = "high - energy"
+        toolkit = ["hard - hitting drums", "sidechain pad", "risers"]
 
     movement = 0.0
     if rhythm_profile:
@@ -300,42 +306,36 @@ def instrument_rhythm_sync(
 
 
 def folk_ballad_instruments():
-    return [
-        'acoustic guitar',
-        'soft strings',
-        'flute',
-        'warm pad',
-        'shaker'
-    ]
+    return ["acoustic guitar", "soft strings", "flute", "warm pad", "shaker"]
 
 
 def build_hybrid_instrumentation(
     genre_label: str,
     emotion_profile: Dict[str, float],
     bpm: int,
-    base_instrument_set: List[str]
+    base_instrument_set: List[str],
 ) -> List[str]:
     """
-    MASTER-PATCH v6.0: Hybrid Instrumentation Layer (HIL).
-    
+    MASTER - PATCH v6.0: Hybrid Instrumentation Layer (HIL).
+
     Строит гибридную инструментацию на основе жанрового лейбла и базового набора.
-    
+
     Args:
-        genre_label: Жанровый лейбл (может быть гибридным, например "folk-cinematic hybrid")
+        genre_label: Жанровый лейбл (может быть гибридным, например "folk - cinematic hybrid")
         emotion_profile: Профиль эмоций
         bpm: BPM трека
         base_instrument_set: Базовый набор инструментов
-        
+
     Returns:
         Расширенный список инструментов
     """
     result = list(base_instrument_set) if base_instrument_set else []
     seen = set(result)
-    
+
     # Парсим genre_label для извлечения доменов
     genre_lower = genre_label.lower() if genre_label else ""
     domains = []
-    
+
     # Определяем домены из лейбла
     if "folk" in genre_lower or "ballad" in genre_lower:
         domains.append("folk")
@@ -347,44 +347,70 @@ def build_hybrid_instrumentation(
         domains.append("electronic")
     if "dark" in genre_lower or "country" in genre_lower:
         domains.append("dark_country")
-    
+
     # Добавляем инструменты для каждого домена
     for domain in domains:
         if domain == "folk":
-            folk_instruments = ["acoustic guitar", "shaker", "soft strings", "flute", "warm pad"]
+            folk_instruments = [
+                "acoustic guitar",
+                "shaker",
+                "soft strings",
+                "flute",
+                "warm pad",
+            ]
             for inst in folk_instruments:
                 if inst not in seen:
                     result.append(inst)
                     seen.add(inst)
         elif domain == "cinematic":
-            cinematic_instruments = ["brass (horns/trumpets)", "orchestral percussion", "dramatic strings", "cinematic pads"]
+            cinematic_instruments = [
+                "brass (horns / trumpets)",
+                "orchestral percussion",
+                "dramatic strings",
+                "cinematic pads",
+            ]
             for inst in cinematic_instruments:
                 if inst not in seen:
                     result.append(inst)
                     seen.add(inst)
         elif domain == "hiphop":
-            hiphop_instruments = ["808", "tight drum kit", "sub-bass", "synthetic leads"]
+            hiphop_instruments = [
+                "808",
+                "tight drum kit",
+                "sub - bass",
+                "synthetic leads",
+            ]
             for inst in hiphop_instruments:
                 if inst not in seen:
                     result.append(inst)
                     seen.add(inst)
         elif domain == "electronic":
-            electronic_instruments = ["synth leads", "plucks", "sidechained pads", "modular synth"]
+            electronic_instruments = [
+                "synth leads",
+                "plucks",
+                "sidechained pads",
+                "modular synth",
+            ]
             for inst in electronic_instruments:
                 if inst not in seen:
                     result.append(inst)
                     seen.add(inst)
         elif domain == "dark_country":
-            dark_country_instruments = ["slide guitar", "low piano", "muted drums", "acoustic guitar"]
+            dark_country_instruments = [
+                "slide guitar",
+                "low piano",
+                "muted drums",
+                "acoustic guitar",
+            ]
             for inst in dark_country_instruments:
                 if inst not in seen:
                     result.append(inst)
                     seen.add(inst)
-    
+
     return result
 
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

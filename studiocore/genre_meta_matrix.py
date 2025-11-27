@@ -1,18 +1,18 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 GenreMetaMatrix v1.0 — доменная матрица жанров для StudioCore.
 
 Задача:
-- взять список жанров, которые распознал парсер/ядро,
+- взять список жанров, которые распознал парсер / ядро,
 - классифицировать их по крупным доменам (rock, metal, edm, jazz, hiphop, pop,
   world, cinema, comedy, lyric, literature, stage, gothic, etc.),
 - посчитать веса по доменам,
@@ -32,7 +32,7 @@ from typing import Dict, List
 
 
 class GenreMetaMatrix:
-    """Доменно-ориентированная матрица жанров."""
+    """Доменно - ориентированная матрица жанров."""
 
     def __init__(self) -> None:
         # Простейшая сигнатура доменов.
@@ -42,8 +42,19 @@ class GenreMetaMatrix:
             "metal": ["metal", "core", "doom", "sludge"],
             "jazz": ["jazz", "swing", "bebop", "bop"],
             "blues": ["blues"],
-            "edm": ["edm", "house", "techno", "trance", "dubstep", "dnb",
-                    "breakbeat", "synthwave", "ambient", "drone", "wave"],
+            "edm": [
+                "edm",
+                "house",
+                "techno",
+                "trance",
+                "dubstep",
+                "dnb",
+                "breakbeat",
+                "synthwave",
+                "ambient",
+                "drone",
+                "wave",
+            ],
             "hiphop": ["hiphop", "hip_hop", "rap", "trap", "drill", "phonk"],
             "pop": ["pop", "city_pop", "dance_pop", "k_pop", "j_pop", "rnb"],
             "soul_funk": ["soul", "funk", "motown", "gospel"],
@@ -53,8 +64,17 @@ class GenreMetaMatrix:
             "comedy": ["comedy", "humor", "parody", "satire", "burlesque", "clown"],
             "gothic": ["gothic", "darkwave", "occult", "ritual", "witch"],
             "literature": ["novel", "epic", "saga", "essay", "memoir"],
-            "lyric": ["lyric", "sonnet", "ode", "elegy", "haiku",
-                      "ballad", "villanelle", "free_verse", "slam"],
+            "lyric": [
+                "lyric",
+                "sonnet",
+                "ode",
+                "elegy",
+                "haiku",
+                "ballad",
+                "villanelle",
+                "free_verse",
+                "slam",
+            ],
         }
 
     def _match_domains_for_genre(self, genre: str) -> List[str]:
@@ -94,7 +114,8 @@ class GenreMetaMatrix:
 
         return normalized
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

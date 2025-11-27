@@ -41,8 +41,7 @@ def test_fake_user_emotion_and_genre(user):
 
     expected_emotion = user["expected_emotion"].lower()
     assert expected_emotion in emotion_name.lower(), (
-        f"❌ Emotion mismatch for user={user['id']}: "
-        f"expected '{expected_emotion}', got '{emotion_name}'"
+        f"❌ Emotion mismatch for user={user['id']}: expected '{expected_emotion}', got '{emotion_name}'"
     )
 
     # === 2. Проверка жанра ===
@@ -51,8 +50,7 @@ def test_fake_user_emotion_and_genre(user):
     expected_genre = user["expected_genre"].lower()
 
     assert expected_genre in genre, (
-        f"❌ Genre mismatch for user={user['id']}: "
-        f"expected '{expected_genre}', got '{genre}'"
+        f"❌ Genre mismatch for user={user['id']}: expected '{expected_genre}', got '{genre}'"
     )
 
     # === 3. BPM должен быть числом
@@ -64,8 +62,7 @@ def test_fake_user_emotion_and_genre(user):
     structure = result.get("auto_context", {}).get("section_headers", [])
     assert isinstance(structure, list), "❌ Structure must be list"
     assert len(structure) >= 1, (
-        f"❌ No section parsing for user={user['id']}. "
-        "Expected Intro/Verse/Chorus/etc."
+        f"❌ No section parsing for user={user['id']}. Expected Intro/Verse/Chorus/etc."
     )
 
     # === 5. Не должно быть утечек override-маркеров
@@ -83,7 +80,10 @@ def test_fake_user_emotion_and_genre(user):
 
 def test_fake_user_state_and_bias_reset():
     core = StudioCoreV6()
-    results = [core.analyze(user["sample_text"], preferred_gender="auto") for user in load_fake_users()]
+    results = [
+        core.analyze(user["sample_text"], preferred_gender="auto")
+        for user in load_fake_users()
+    ]
 
     biases = []
     bpms = []
@@ -95,7 +95,9 @@ def test_fake_user_state_and_bias_reset():
         genre = str(style_block.get("genre", "")).lower()
 
         assert bias, f"❌ genre_bias missing for user={user['id']}"
-        assert all(0.0 <= float(v) <= 1.0 for v in bias.values()), "❌ genre_bias values out of range"
+        assert all(0.0 <= float(v) <= 1.0 for v in bias.values()), (
+            "❌ genre_bias values out of range"
+        )
 
         biases.append(bias)
         bpms.append(bpm_estimate)
@@ -103,7 +105,9 @@ def test_fake_user_state_and_bias_reset():
 
         _assert_integrity(res)
 
-    assert len({json.dumps(b, sort_keys=True) for b in biases}) > 1, "❌ Bias values must differ across samples"
+    assert len({json.dumps(b, sort_keys=True) for b in biases}) > 1, (
+        "❌ Bias values must differ across samples"
+    )
     numeric_bpms = {b for b in bpms if isinstance(b, (int, float))}
     assert len(numeric_bpms) > 1, "❌ BPM must reset per request"
     assert any(g != "edm" for g in genres), "❌ Genre must not default to EDM"

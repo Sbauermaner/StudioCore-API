@@ -14,6 +14,7 @@ def test_genre_universe_adapter_smoke():
     assert isinstance(res.tags, list)
     assert res.source in ("universe_v2", "fallback_table", "fallback_minimal")
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27

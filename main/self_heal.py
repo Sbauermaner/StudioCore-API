@@ -3,7 +3,6 @@
 
 import os
 from pathlib import Path
-import re
 
 ROOT = Path(__file__).resolve().parents[1]
 LGP = ROOT / "main" / "lgp.txt"
@@ -17,7 +16,8 @@ def heal(fix_workflows: bool | None = None):
     original_txt = txt
     fixes = []
 
-    # Workflow правки по умолчанию отключены; включаются только явным флагом/переменной.
+    # Workflow правки по умолчанию отключены; включаются только явным
+    # флагом/переменной.
     enable_workflow_fixes = (
         fix_workflows
         if fix_workflows is not None
@@ -48,7 +48,10 @@ def heal(fix_workflows: bool | None = None):
         wf = ROOT / ".github" / "workflows"
         for yml in wf.glob("*.yml"):
             content = yml.read_text(encoding="utf-8")
-            new = content.replace("bash ./run_full_diag.sh", "bash ${{ github.workspace }}/run_full_diag.sh")
+            new = content.replace(
+                "bash ./run_full_diag.sh",
+                "bash ${{ github.workspace }}/run_full_diag.sh",
+            )
             if new != content:
                 yml.write_text(new, encoding="utf-8")
                 fixes.append(f"workflow fixed path in {yml.name}")

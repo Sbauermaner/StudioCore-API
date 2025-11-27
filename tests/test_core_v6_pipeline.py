@@ -31,9 +31,7 @@ def test_core_v6_analyze_produces_expected_sections():
 def test_core_v6_handles_missing_instrument_dynamics():
     core = StudioCoreV6()
 
-    core.instrument_dynamics.map_instruments_to_structure = (
-        lambda *args, **kwargs: None
-    )
+    core.instrument_dynamics.map_instruments_to_structure = lambda *args, **kwargs: None
 
     result = core.analyze("Тестовый текст…")
 
@@ -45,6 +43,7 @@ def test_core_v6_provides_diagnostics():
     result = core.analyze("Тестовый текст")
     assert "diagnostics" in result
     assert isinstance(result["diagnostics"], dict)
+
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)

@@ -1,12 +1,12 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 GenreRoutingEngine v6.4
@@ -19,15 +19,14 @@ GenreRoutingEngine v6.4
     ✔ рок, металл, панк
     ✔ джаз, соул, фанк
     ✔ edm (400+ стилей)
-    ✔ хип-хоп (все школы)
+    ✔ хип - хоп (все школы)
     ✔ классика / неоклассика
     ✔ darkwave / gothic / industrial
     ✔ лирика / поэзия / драма / эпос / романтизм
     ✔ этнические школы мира (300+)
 """
 
-from __future__ import annotations
-from typing import Dict, List, Tuple
+from typing import Dict
 
 
 class GenreRoutingEngineV64:
@@ -39,8 +38,20 @@ class GenreRoutingEngineV64:
 
     # Группы жанров на основе эмоций
     EMOTION_GROUPS = {
-        "rage": ["metal", "thrash_metal", "deathcore", "industrial_metal", "drill", "dark_hiphop"],
-        "rage_extreme": ["black_metal", "death_metal", "martial_industrial", "ideological_drama"],
+        "rage": [
+            "metal",
+            "thrash_metal",
+            "deathcore",
+            "industrial_metal",
+            "drill",
+            "dark_hiphop",
+        ],
+        "rage_extreme": [
+            "black_metal",
+            "death_metal",
+            "martial_industrial",
+            "ideological_drama",
+        ],
         "love": ["romantic_ballad", "lyrical", "soul", "R&B", "soft_pop"],
         "love_soft": ["acoustic_poem", "folk", "indie_soft"],
         "love_deep": ["neoclassical_romantic", "string_ballad", "ambient_love"],
@@ -48,22 +59,27 @@ class GenreRoutingEngineV64:
         "sadness": ["darkwave", "post_punk", "coldwave", "neo_folk"],
         "melancholy": ["chamber_dark", "neoclassical_dark", "minimal_piano"],
         "disappointment": ["lowfi", "dark_indie", "tragic_poem"],
-        "gothic_dark": ["gothic_rock", "dark_cabaret", "neoclassical_darkwave", "ethereal_dark"],
+        "gothic_dark": [
+            "gothic_rock",
+            "dark_cabaret",
+            "neoclassical_darkwave",
+            "ethereal_dark",
+        ],
         "dark_poetic": ["poetic_darkwave", "baroque_dark", "dramatic_ballad"],
         "hiphop_conflict": ["hardcore_rap", "east_coast", "drill", "rage_rap"],
-        "street_power": ["old_school_hiphop", "boom_bap", "trap", "g-funk"],
+        "street_power": ["old_school_hiphop", "boom_bap", "trap", "g - funk"],
         "fear": ["industrial_dark", "horror_synth", "martial_dark"],
         "hope": ["orchestral_cinematic", "epic_light", "uplifting"],
         "peace": ["ambient_light", "meditation", "soft_world"],
         "neutral": ["cinematic_neutral", "soft_ambient"],
     }
 
-    # Соответствие жанров → Suno-стилей (слои)
+    # Соответствие жанров → Suno - стилей (слои)
     SUNO_STYLE = {
         "gothic_rock": "Gothic Cabaret Noir",
         "dark_cabaret": "Dark Cabaret",
         "neoclassical_darkwave": "Neoclassical Darkwave",
-        "hardcore_rap": "Aggressive Hip-Hop",
+        "hardcore_rap": "Aggressive Hip - Hop",
         "black_metal": "Black Metal Cathedral",
         "romantic_ballad": "Romantic Ballad Cinematic",
         "ambient_light": "Soft Ambient Pad",
@@ -78,7 +94,7 @@ class GenreRoutingEngineV64:
         Возвращает:
             - основной жанр
             - поджанр
-            - suno-слой
+            - suno - слой
         """
         group = self.EMOTION_GROUPS.get(dominant, ["cinematic_neutral"])
         main_genre = group[0]
@@ -92,7 +108,8 @@ class GenreRoutingEngineV64:
             "suno_style": suno_style,
         }
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

@@ -29,6 +29,7 @@ def test_rde_engine_compose_returns_snapshot():
     assert "pads" in (snapshot.palette or [])
     assert snapshot.breath_sync == BREATH["sync_score"]
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27

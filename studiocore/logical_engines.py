@@ -1,25 +1,32 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """Logical engine helpers used by the StudioCore v6 compatibility layer.
 
 The Codex specification expects a wide collection of logical engines.  The
-implementations below provide light-weight, deterministic heuristics that can
+implementations below provide light - weight, deterministic heuristics that can
 run in restricted environments while still producing structured data.
 """
+
 from __future__ import annotations
 
-import math
 import re
 from collections import Counter
 from statistics import mean
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Tuple  # noqa: F401
+
+from typing import Any, Dict, Iterable, List, Sequence
 
 from .color_engine_adapter import EMOTION_COLOR_MAP, get_emotion_colors
 from .emotion import AutoEmotionalAnalyzer
-from .emotion import TruthLovePainEngine  # Import required engine for EmotionVector
+
+# Import required engine for EmotionVector
+from .emotion import TruthLovePainEngine
 from .emotion_profile import EmotionVector
 from .instrument import (
     InstrumentLibrary,
@@ -35,7 +42,7 @@ from .tone_sync import ToneSyncEngine
 from .user_override_manager import UserOverrideManager
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?…])\s+")
-_COMMAND_RE = re.compile(r"\[(?P<name>[A-Z_]+)\s*:?\s*(?P<value>[^\]]+)\]")
+_COMMAND_RE = re.compile(r"\[(?P < name > [A - Z_]+)\s*:?\s * (?P < value > [^\]]+)\]")
 _VOWEL_RE = re.compile(r"[aeiouyаеёиоуыэюя]", re.I)
 
 
@@ -47,7 +54,7 @@ def _split_sentences(text: str) -> List[str]:
 
 
 def _words(text: str) -> List[str]:
-    return re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text)
+    return re.findall(r"[a - zA - Zа - яА - ЯёЁ]+", text)
 
 
 def _section_texts(text: str) -> List[str]:
@@ -70,7 +77,7 @@ class TextStructureEngine:
     KEYWORDS = {
         "intro": ("intro", "интро", "вступ", "opening"),
         "verse": ("verse", "куплет", "strofa"),
-        "prechorus": ("pre-chorus", "prechorus", "преприпев"),
+        "prechorus": ("pre - chorus", "prechorus", "преприпев"),
         "chorus": ("chorus", "припев", "hook", "refrain"),
         "bridge": ("bridge", "бридж", "middle"),
         "outro": ("outro", "финал", "ending"),
@@ -80,7 +87,7 @@ class TextStructureEngine:
         self._section_metadata: List[Dict[str, Any]] = []
 
     def reset(self) -> None:
-        """Clear cached structural metadata to avoid cross-request bleed."""
+        """Clear cached structural metadata to avoid cross - request bleed."""
         self._section_metadata = []
 
     def auto_section_split(self, text: str) -> List[str]:
@@ -88,81 +95,120 @@ class TextStructureEngine:
         structured = extract_sections(text)
         sections: List[str] = []
         metadata: List[Dict[str, Any]] = []
-        
-        # Проверяем, есть ли пользовательские маркеры (до вызова _assign_section_names)
+
+        # Проверяем, есть ли пользовательские маркеры (до вызова
+        # _assign_section_names)
         has_user_markers = any(
-            item.get("tag", "").lower() not in ("body", "") and 
-            (item.get("tag", "") in ["Verse 1", "Verse 2", "Verse 3", "Final Chorus", "Pre-Chorus", "Chorus", "Bridge", "Outro", "Intro"] or
-             "куплет" in item.get("tag", "").lower() or "припев" in item.get("tag", "").lower() or
-             "мост" in item.get("tag", "").lower() or "аутро" in item.get("tag", "").lower() or
-             "интро" in item.get("tag", "").lower() or "преприпев" in item.get("tag", "").lower())
+            item.get("tag", "").lower() not in ("body", "")
+            and (
+                item.get("tag", "")
+                in [
+                    "Verse 1",
+                    "Verse 2",
+                    "Verse 3",
+                    "Final Chorus",
+                    "Pre - Chorus",
+                    "Chorus",
+                    "Bridge",
+                    "Outro",
+                    "Intro",
+                ]
+                or "куплет" in item.get("tag", "").lower()
+                or "припев" in item.get("tag", "").lower()
+                or "мост" in item.get("tag", "").lower()
+                or "аутро" in item.get("tag", "").lower()
+                or "интро" in item.get("tag", "").lower()
+                or "преприпев" in item.get("tag", "").lower()
+            )
             for item in structured
         )
-        
+
         # Если есть пользовательские маркеры - НЕ вызываем _assign_section_names
         # Она вызывается только для текстов без явных маркеров
-        # НО: проверяем повторяющиеся секции и аннотируем их, даже если есть пользовательские маркеры
+        # НО: проверяем повторяющиеся секции и аннотируем их, даже если есть
+        # пользовательские маркеры
         if not has_user_markers and structured:
-            # Вызываем _assign_section_names только если нет пользовательских маркеров
+            # Вызываем _assign_section_names только если нет пользовательских
+            # маркеров
             from .text_utils import _assign_section_names
+
             _assign_section_names(structured)
         elif has_user_markers and structured:
-            # Если есть пользовательские маркеры, все равно проверяем повторяющиеся секции
+            # Если есть пользовательские маркеры, все равно проверяем
+            # повторяющиеся секции
             from .text_utils import _detect_duplicate_sections
+
             duplicates = _detect_duplicate_sections(structured)
             if duplicates:
                 # Группируем повторяющиеся секции
-                from typing import Dict, List
                 section_groups: Dict[str, List[int]] = {}
-                
+
                 for i, sec in enumerate(structured):
                     lines = sec.get("lines", [])
                     text_content = "\n".join(lines).strip()
                     normalized = text_content.lower().replace(" ", "").replace("\n", "")
-                    
+
                     if normalized not in section_groups:
                         section_groups[normalized] = []
                     section_groups[normalized].append(i)
-                
+
                 # Аннотируем повторяющиеся секции
                 for normalized, indices in section_groups.items():
                     if len(indices) > 1:
                         indices.sort()
                         first_tag = structured[indices[0]].get("tag", "Section")
-                        base_name = "Chorus" if "chorus" in first_tag.lower() or "припев" in first_tag.lower() else first_tag.split()[0] if first_tag.split() else "Section"
-                        
+                        base_name = (
+                            "Chorus"
+                            if "chorus" in first_tag.lower()
+                            or "припев" in first_tag.lower()
+                            else first_tag.split()[0]
+                            if first_tag.split()
+                            else "Section"
+                        )
+
                         for idx, sec_idx in enumerate(indices, 1):
                             structured[sec_idx]["tag"] = f"{base_name} {idx}"
-        
+
         for item in structured:
             lines = item.get("lines", [])
             section_text = "\n".join(lines).strip()
             if section_text:
                 sections.append(section_text)
-            # Используем тег из structured (который сохранен из маркеров или установлен _assign_section_names)
+            # Используем тег из structured (который сохранен из маркеров или
+            # установлен _assign_section_names)
             tag = item.get("tag", "Body")
             metadata.append(
                 {
                     "tag": tag,
                     "label": tag,  # Добавляем label для совместимости
-                    "name": tag,    # Добавляем name для совместимости
+                    "name": tag,  # Добавляем name для совместимости
                     "lines": list(lines),
                     "line_count": len(lines),
                 }
             )
         if not sections and text.strip():
             sections = [text.strip()]
-            metadata = [{"tag": "Verse", "label": "Verse", "name": "Verse", "lines": text.strip().split("\n"), "line_count": len(text.strip().split("\n"))}]
+            metadata = [
+                {
+                    "tag": "Verse",
+                    "label": "Verse",
+                    "name": "Verse",
+                    "lines": text.strip().split("\n"),
+                    "line_count": len(text.strip().split("\n")),
+                }
+            ]
         self._section_metadata = []
         for item in metadata:
             tag = item.get("tag", "Body")
-            self._section_metadata.append({
-                "tag": tag,
-                "label": tag,  # Используем tag как label
-                "name": tag,   # Используем tag как name
-                "lines": list(item.get("lines", [])),
-                "line_count": item.get("line_count", len(item.get("lines", []))),
-            })
+            self._section_metadata.append(
+                {
+                    "tag": tag,
+                    "label": tag,  # Используем tag как label
+                    "name": tag,  # Используем tag как name
+                    "lines": list(item.get("lines", [])),
+                    "line_count": item.get("line_count", len(item.get("lines", []))),
+                }
+            )
         return sections
 
     def _resolve_sections(self, text: str, sections: Sequence[str] | None) -> List[str]:
@@ -170,7 +216,9 @@ class TextStructureEngine:
             return [section for section in sections if isinstance(section, str)]
         return self.auto_section_split(text)
 
-    def _resolve_section(self, label: str, text: str, sections: Sequence[str] | None, fallback_index: int) -> Dict[str, Any]:
+    def _resolve_section(
+        self, label: str, text: str, sections: Sequence[str] | None, fallback_index: int
+    ) -> Dict[str, Any]:
         sections = self._resolve_sections(text, sections)
         if not sections:
             return {"label": label, "index": None, "text": "", "confidence": 0.0}
@@ -208,37 +256,65 @@ class TextStructureEngine:
             for item in self._section_metadata
         ]
 
-    def detect_intro(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+    def detect_intro(
+        self, text: str, *, sections: Sequence[str] | None = None
+    ) -> Dict[str, Any]:
         return self._resolve_section("intro", text, sections, 0)
 
-    def detect_verse(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+    def detect_verse(
+        self, text: str, *, sections: Sequence[str] | None = None
+    ) -> Dict[str, Any]:
         resolved = self._resolve_sections(text, sections)
-        return self._resolve_section("verse", text, resolved, 0 if len(resolved) == 1 else 1)
+        return self._resolve_section(
+            "verse", text, resolved, 0 if len(resolved) == 1 else 1
+        )
 
-    def detect_prechorus(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+    def detect_prechorus(
+        self, text: str, *, sections: Sequence[str] | None = None
+    ) -> Dict[str, Any]:
         return self._resolve_section("prechorus", text, sections, 1)
 
-    def detect_chorus(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+    def detect_chorus(
+        self, text: str, *, sections: Sequence[str] | None = None
+    ) -> Dict[str, Any]:
         return self._resolve_section("chorus", text, sections, 1)
 
-    def detect_bridge(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+    def detect_bridge(
+        self, text: str, *, sections: Sequence[str] | None = None
+    ) -> Dict[str, Any]:
         resolved = self._resolve_sections(text, sections)
-        return self._resolve_section("bridge", text, resolved, max(len(resolved) - 2, 0))
+        return self._resolve_section(
+            "bridge", text, resolved, max(len(resolved) - 2, 0)
+        )
 
-    def detect_outro(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+    def detect_outro(
+        self, text: str, *, sections: Sequence[str] | None = None
+    ) -> Dict[str, Any]:
         resolved = self._resolve_sections(text, sections)
         return self._resolve_section("outro", text, resolved, max(len(resolved) - 1, 0))
 
-    def detect_meta_pause(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+    def detect_meta_pause(
+        self, text: str, *, sections: Sequence[str] | None = None
+    ) -> Dict[str, Any]:
         sections = self._resolve_sections(text, sections)
         pause_locations: List[int] = []
         for idx, section in enumerate(sections):
-            if "..." in section or "(pause" in section.lower() or "[pause" in section.lower():
+            if (
+                "..." in section
+                or "(pause" in section.lower()
+                or "[pause" in section.lower()
+            ):
                 pause_locations.append(idx)
         confidence = 0.8 if pause_locations else 0.2
-        return {"count": len(pause_locations), "locations": pause_locations, "confidence": confidence}
+        return {
+            "count": len(pause_locations),
+            "locations": pause_locations,
+            "confidence": confidence,
+        }
 
-    def detect_zero_pulse(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+    def detect_zero_pulse(
+        self, text: str, *, sections: Sequence[str] | None = None
+    ) -> Dict[str, Any]:
         sections = self._resolve_sections(text, sections)
         zero_sections: List[int] = []
         for idx, section in enumerate(sections):
@@ -252,52 +328,55 @@ class TextStructureEngine:
 
 
 class EmotionEngine:
-    """High-level wrapper above the heuristic emotional analyzers."""
+    """High - level wrapper above the heuristic emotional analyzers."""
 
     def __init__(self) -> None:
         self._analyzer = AutoEmotionalAnalyzer()
-        self._tlp_engine = TruthLovePainEngine()  # Initialize TLP for vector calculation
+        # Initialize TLP for vector calculation
+        self._tlp_engine = TruthLovePainEngine()
 
     def emotion_detection(self, text: str) -> Dict[str, float]:
         """
-        MASTER-PATCH v2: Добавляем пост-фильтр для дорожной исповеди.
-        MASTER-PATCH v4.0: Добавляем Rage-mode конфликт резолвер.
+        MASTER - PATCH v2: Добавляем пост - фильтр для дорожной исповеди.
+        MASTER - PATCH v4.0: Добавляем Rage - mode конфликт резолвер.
         """
         emo = self._analyzer.analyze(text)
-        
-        # Мягкий фильтр для дорожной исповеди: sensual не доминирует над sorrow/determination.
+
+        # Мягкий фильтр для дорожной исповеди: sensual не доминирует над sorrow
+        # / determination.
         sorrow = emo.get("sorrow", 0.0)
         determination = emo.get("determination", 0.0)
         sensual = emo.get("sensual", 0.0)
 
         if sensual > 0.15 and (sorrow + determination) > 0.5:
-            # чутка режем sensual, перераспределяя в sorrow/determination
+            # чутка режем sensual, перераспределяя в sorrow / determination
             delta = sensual - 0.15
             emo["sensual"] = 0.15
             emo["sorrow"] = sorrow + 0.6 * delta
             emo["determination"] = determination + 0.4 * delta
-        
-        # MASTER-PATCH v6.0 — Rage-mode conflict resolver (только anger/tension)
+
+        # MASTER - PATCH v6.0 — Rage - mode conflict resolver (только anger /
+        # tension)
         anger = emo.get("anger", 0.0)
         tension = emo.get("tension", 0.0)
-        
+
         # Rage mode: anger > 0.22 ИЛИ tension > 0.25 (НЕ epic)
         is_rage = anger > 0.22 or tension > 0.25
-        
+
         if is_rage:
-            # Remove peace/calm/serenity if rage mode detected
+            # Remove peace / calm / serenity if rage mode detected
             if "peace" in emo:
                 emo["peace"] = 0.0
             if "calm" in emo:
                 emo["calm"] = 0.0
             if "serenity" in emo:
                 emo["serenity"] = 0.0
-            
+
             # Boost tension if anger > 0.20
             if anger > 0.20:
                 tension = emo.get("tension", 0.0)
                 emo["tension"] = max(tension, 0.25)
-        
+
         return emo
 
     def export_emotion_vector(self, text: str) -> EmotionVector:
@@ -318,14 +397,18 @@ class EmotionEngine:
             curve.append(round(intensity, 3))
         return curve
 
-    def emotion_pivot_points(self, text: str, *, intensity_curve: Sequence[float] | None = None) -> List[int]:
+    def emotion_pivot_points(
+        self, text: str, *, intensity_curve: Sequence[float] | None = None
+    ) -> List[int]:
         curve = list(intensity_curve or self.emotion_intensity_curve(text))
         if not curve:
             return []
         indexed = sorted(enumerate(curve), key=lambda item: item[1], reverse=True)
         return [idx for idx, _ in indexed[:3]]
 
-    def secondary_emotion_detection(self, text: str | Dict[str, float]) -> Dict[str, float]:
+    def secondary_emotion_detection(
+        self, text: str | Dict[str, float]
+    ) -> Dict[str, float]:
         if isinstance(text, dict):
             scores = dict(text)
         else:
@@ -355,7 +438,11 @@ class ColorEmotionEngine:
     def assign_color_by_emotion(self, emotions: Dict[str, float]) -> Dict[str, Any]:
         if not emotions:
             palette = EMOTION_COLOR_MAP["neutral"]
-            return {"primary_color": palette[0], "accent_color": palette[-1], "confidence": 0.2}
+            return {
+                "primary_color": palette[0],
+                "accent_color": palette[-1],
+                "confidence": 0.2,
+            }
         dominant = max(emotions, key=emotions.get)
         palette = get_emotion_colors(dominant, default=EMOTION_COLOR_MAP["neutral"])
         return {
@@ -364,13 +451,17 @@ class ColorEmotionEngine:
             "confidence": round(emotions.get(dominant, 0.0), 3),
         }
 
-    def generate_color_wave(self, emotions: Dict[str, float], *, steps: int = 5) -> List[str]:
+    def generate_color_wave(
+        self, emotions: Dict[str, float], *, steps: int = 5
+    ) -> List[str]:
         if not emotions:
             return [EMOTION_COLOR_MAP["neutral"][0] for _ in range(steps)]
         ordered = sorted(emotions.items(), key=lambda item: item[1], reverse=True)
         palette = []
         for name, _ in ordered:
-            palette.extend(get_emotion_colors(name, default=EMOTION_COLOR_MAP["neutral"]))
+            palette.extend(
+                get_emotion_colors(name, default=EMOTION_COLOR_MAP["neutral"])
+            )
             if len(palette) >= steps:
                 break
         if len(palette) >= steps:
@@ -393,38 +484,43 @@ class VocalEngine:
     def detect_voice_gender(self, text: str) -> str:
         """Определяет пол вокала по местоимениям и грамматике глаголов."""
         import re
-        
+
         tokens = [t.lower() for t in _words(text)]
         # 1. Анализ местоимений третьего лица
-        feminine = sum(tokens.count(pronoun) for pronoun in ("she", "her", "она", "её", "ей"))
-        masculine = sum(tokens.count(pronoun) for pronoun in ("he", "him", "он", "его", "ему"))
-        
+        feminine = sum(
+            tokens.count(pronoun) for pronoun in ("she", "her", "она", "её", "ей")
+        )
+        masculine = sum(
+            tokens.count(pronoun) for pronoun in ("he", "him", "он", "его", "ему")
+        )
+
         # 2. Анализ грамматики глаголов прошедшего времени (для русского языка)
         # Мужские формы: "я стоял", "я был", "я шел", "я знал", "я искал"
         # Ищем "я" + глагол с окончанием на "л" (но не "ла", "ли", "ло")
-        male_verbs = len(re.findall(r"\bя\s+\w*л(?![аеиоуыэюяё])\b", text, re.I))
+        male_verbs = len(re.findall(r"\bя\s+\w * л(?![аеиоуыэюяё])\b", text, re.I))
         # Женские формы: "я стояла", "я была", "я шла", "я знала", "я искала"
-        female_verbs = len(re.findall(r"\bя\s+\w*ла\b", text, re.I))
-        
+        female_verbs = len(re.findall(r"\bя\s+\w * ла\b", text, re.I))
+
         # 3. Анализ притяжательных местоимений и прилагательных
-        # Мужские: "мой", "моя" (в контексте мужского рода), "мой дом", "моя работа" (но это сложнее)
-        male_possessive = len(re.findall(r"\b(мой|свой)\s+\w+[^ая]\b", text, re.I))
+        # Мужские: "мой", "моя" (в контексте мужского рода), "мой дом", "моя
+        # работа" (но это сложнее)
+        male_possessive = len(re.findall(r"\b(мой|свой)\s+\w + [^ая]\b", text, re.I))
         # Женские: "моя" (в контексте женского рода), но это сложнее определить
-        
+
         # 4. Анализ глаголов настоящего времени с окончаниями
         # Мужские: "я иду", "я делаю" (но это не всегда работает)
         # Женские: "я иду", "я делаю" (одинаково)
-        
+
         # 5. Анализ причастий и деепричастий
         # Мужские: "сделавший", "увидевший"
-        male_participles = len(re.findall(r"\b\w+вший\b", text, re.I))
+        male_participles = len(re.findall(r"\b\w + вший\b", text, re.I))
         # Женские: "сделавшая", "увидевшая"
-        female_participles = len(re.findall(r"\b\w+вшая\b", text, re.I))
-        
+        female_participles = len(re.findall(r"\b\w + вшая\b", text, re.I))
+
         # Подсчет общего количества индикаторов
         total_feminine = feminine + female_verbs + female_participles
         total_masculine = masculine + male_verbs + male_possessive + male_participles
-        
+
         if total_feminine > total_masculine:
             return "female"
         if total_masculine > total_feminine:
@@ -460,11 +556,13 @@ class VocalEngine:
 
         return timbre
 
-    def detect_vocal_style(self, text: str, *, voice_type: str | None = None, voice_tone: str | None = None) -> str:
+    def detect_vocal_style(
+        self, text: str, *, voice_type: str | None = None, voice_tone: str | None = None
+    ) -> str:
         voice_type = voice_type or self.detect_voice_type(text)
         voice_tone = voice_tone or self.detect_voice_tone(text)
         if voice_type == "spoken":
-            return "spoken-word"
+            return "spoken - word"
         if voice_tone == "intense":
             return "belting"
         if voice_tone == "soft":
@@ -517,7 +615,9 @@ class BreathingEngine:
         lines = self._lines(text)
         return [idx for idx, line in enumerate(lines) if "?!" in line or "!!" in line]
 
-    def detect_emotional_breathing(self, text: str, emotions: Dict[str, float] | None = None) -> Dict[str, Any]:
+    def detect_emotional_breathing(
+        self, text: str, emotions: Dict[str, float] | None = None
+    ) -> Dict[str, Any]:
         emotions = emotions or {}
         inhale = self.detect_inhale_points(text)
         spasms = self.detect_spasms(text)
@@ -525,10 +625,14 @@ class BreathingEngine:
             "inhale_points": inhale,
             "spasm_points": spasms,
             "emotional_weight": emotions,
-            "intensity": round(min(1.0, len(spasms) * 0.1 + emotions.get("anger", 0) * 0.5), 3),
+            "intensity": round(
+                min(1.0, len(spasms) * 0.1 + emotions.get("anger", 0) * 0.5), 3
+            ),
         }
 
-    def breath_to_emotion_sync(self, text: str, emotions: Dict[str, float]) -> Dict[str, Any]:
+    def breath_to_emotion_sync(
+        self, text: str, emotions: Dict[str, float]
+    ) -> Dict[str, Any]:
         inhale = self.detect_inhale_points(text)
         short = self.detect_short_breath(text)
         density = len(inhale) / max(1, len(short))
@@ -541,7 +645,7 @@ class BreathingEngine:
 
 
 class BPMEngine:
-    """Expose BPM-related helpers from the lyric meter."""
+    """Expose BPM - related helpers from the lyric meter."""
 
     def __init__(self) -> None:
         self._meter = LyricMeter()
@@ -550,7 +654,9 @@ class BPMEngine:
         analysis = self._meter.analyze(normalize_text_preserve_symbols(text))
         return int(round(analysis.get("global_bpm", 120.0)))
 
-    def emotion_bpm_mapping(self, emotions: Dict[str, float], *, base_bpm: int | None = None) -> Dict[str, Any]:
+    def emotion_bpm_mapping(
+        self, emotions: Dict[str, float], *, base_bpm: int | None = None
+    ) -> Dict[str, Any]:
         if not emotions:
             return {"map": {}, "target_bpm": base_bpm or 120, "target_energy": 0.5}
         base = float(base_bpm or 120)
@@ -564,9 +670,15 @@ class BPMEngine:
             total_weight += weight
         target_bpm = round(weighted_sum / max(total_weight, 1e-6), 1)
         target_energy = round(min(1.0, max(0.0, (target_bpm - 90) / 80)), 3)
-        return {"map": mapping, "target_bpm": target_bpm, "target_energy": target_energy}
+        return {
+            "map": mapping,
+            "target_bpm": target_bpm,
+            "target_energy": target_energy,
+        }
 
-    def meaning_bpm_curve(self, sections: Sequence[str], *, base_bpm: int | None = None) -> List[float]:
+    def meaning_bpm_curve(
+        self, sections: Sequence[str], *, base_bpm: int | None = None
+    ) -> List[float]:
         if not sections:
             return []
         base = float(base_bpm or 120)
@@ -578,7 +690,9 @@ class BPMEngine:
             curve.append(round(base + (density - 3) * 8, 2))
         return curve
 
-    def breathing_bpm_integration(self, breathing: Dict[str, Any], base_bpm: int) -> Dict[str, Any]:
+    def breathing_bpm_integration(
+        self, breathing: Dict[str, Any], base_bpm: int
+    ) -> Dict[str, Any]:
         inhale = breathing.get("inhale_points", [])
         spasm = breathing.get("spasm_points", [])
         modifier = len(spasm) * 2 - len(inhale)
@@ -619,7 +733,9 @@ class MeaningVelocityEngine:
             acceleration.append(round(curve[idx] - curve[idx - 1], 3))
         return acceleration
 
-    def meaning_fracture_detection(self, shifts: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    def meaning_fracture_detection(
+        self, shifts: Sequence[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         fractures = [shift for shift in shifts if shift.get("overlap", 0.0) < 0.15]
         return {"fractures": fractures, "count": len(fractures)}
 
@@ -640,7 +756,9 @@ class TonalityEngine:
     def __init__(self) -> None:
         self._tone = ToneSyncEngine()
 
-    def mode_detection(self, emotions: Dict[str, float], tlp: Dict[str, float]) -> Dict[str, Any]:
+    def mode_detection(
+        self, emotions: Dict[str, float], tlp: Dict[str, float]
+    ) -> Dict[str, Any]:
         love = emotions.get("joy", 0) + emotions.get("peace", 0)
         sadness = emotions.get("sadness", 0)
         anger = emotions.get("anger", 0)
@@ -651,15 +769,25 @@ class TonalityEngine:
         else:
             mode = "major"
         confidence = round(max(love, sadness, anger), 3)
-        return {"mode": mode, "confidence": confidence, "tlp_cf": tlp.get("conscious_frequency")}
+        return {
+            "mode": mode,
+            "confidence": confidence,
+            "tlp_cf": tlp.get("conscious_frequency"),
+        }
 
     def major_minor_classifier(self, sections: Sequence[str], mode: str) -> str:
         if not sections:
             return mode
-        melancholy_lines = sum("""sad""" in section.lower() or """тоск""" in section.lower() for section in sections)
+        melancholy_lines = sum(
+            """sad""" in section.lower() or """тоск""" in section.lower()
+            for section in sections
+        )
         if melancholy_lines > len(sections) // 2:
             return "minor"
-        if any("rise" in section.lower() or "свет" in section.lower() for section in sections):
+        if any(
+            "rise" in section.lower() or "свет" in section.lower()
+            for section in sections
+        ):
             return "major"
         return mode
 
@@ -696,13 +824,19 @@ class InstrumentationEngine:
     def instrument_selection(self, **kwargs: Any) -> Dict[str, Any]:
         return _instrument_selection(**kwargs)
 
-    def instrument_based_on_emotion(self, emotions: Dict[str, float], **kwargs: Any) -> Dict[str, Any]:
+    def instrument_based_on_emotion(
+        self, emotions: Dict[str, float], **kwargs: Any
+    ) -> Dict[str, Any]:
         return _instrument_based_on_emotion(emotions, **kwargs)
 
-    def instrument_based_on_voice(self, voice_profile: str | None, **kwargs: Any) -> Dict[str, Any]:
+    def instrument_based_on_voice(
+        self, voice_profile: str | None, **kwargs: Any
+    ) -> Dict[str, Any]:
         return _instrument_based_on_voice(voice_profile, **kwargs)
 
-    def instrument_color_sync(self, color_profile: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+    def instrument_color_sync(
+        self, color_profile: Dict[str, Any], **kwargs: Any
+    ) -> Dict[str, Any]:
         return _instrument_color_sync(color_profile, **kwargs)
 
     def instrument_rhythm_sync(self, bpm: float, **kwargs: Any) -> Dict[str, Any]:
@@ -710,7 +844,7 @@ class InstrumentationEngine:
 
 
 class REM_Synchronizer:
-    """Coordinate cross-layer alignment for REM (Rhythmic Emotional Matrix)."""
+    """Coordinate cross - layer alignment for REM (Rhythmic Emotional Matrix)."""
 
     def detect_layer_conflicts(
         self,
@@ -738,14 +872,19 @@ class REM_Synchronizer:
         if not conflicts.get("has_conflict"):
             return {"actions": ["No adjustments required."], "status": "stable"}
         actions = [
-            "Re-balance percussion energy",
+            "Re - balance percussion energy",
             "Adjust arrangement dynamics",
         ]
         return {"actions": actions, "status": "mitigated"}
 
-    def assign_dominant_layer(self, *, structure: Dict[str, Any], emotion: Dict[str, Any]) -> Dict[str, Any]:
+    def assign_dominant_layer(
+        self, *, structure: Dict[str, Any], emotion: Dict[str, Any]
+    ) -> Dict[str, Any]:
         sections = structure.get("sections", [])
-        dominant_emotion = max(emotion.get("profile", {"peace": 1.0}), key=emotion.get("profile", {"peace": 1.0}).get)
+        dominant_emotion = max(
+            emotion.get("profile", {"peace": 1.0}),
+            key=emotion.get("profile", {"peace": 1.0}).get,
+        )
         if len(sections) >= 4 and dominant_emotion in {"joy", "epic"}:
             layer = "rhythm"
         elif dominant_emotion in {"sadness", "fear"}:
@@ -773,7 +912,11 @@ class ZeroPulseEngine:
 
     def detect_zero_pulse(self, text: str) -> Dict[str, Any]:
         sections = _section_texts(text)
-        zero_sections = [idx for idx, section in enumerate(sections) if not section.strip() or "[silence]" in section.lower()]
+        zero_sections = [
+            idx
+            for idx, section in enumerate(sections)
+            if not section.strip() or "[silence]" in section.lower()
+        ]
         return {"has_zero_pulse": bool(zero_sections), "sections": zero_sections}
 
     def vacuum_beat_state(self, text: str) -> Dict[str, Any]:
@@ -781,7 +924,9 @@ class ZeroPulseEngine:
         state = "active" if zero["has_zero_pulse"] else "inactive"
         return {"state": state, "count": len(zero["sections"])}
 
-    def silence_as_emotion(self, text: str, emotions: Dict[str, float]) -> Dict[str, Any]:
+    def silence_as_emotion(
+        self, text: str, emotions: Dict[str, float]
+    ) -> Dict[str, Any]:
         zero = self.detect_zero_pulse(text)
         peace = emotions.get("peace", 0.0)
         return {
@@ -792,7 +937,7 @@ class ZeroPulseEngine:
     def silence_as_transition(self, text: str) -> Dict[str, Any]:
         zero = self.detect_zero_pulse(text)
         transitions = [
-            {"from": idx, "to": idx + 1, "type": "silence-gap"}
+            {"from": idx, "to": idx + 1, "type": "silence - gap"}
             for idx in zero["sections"]
         ]
         return {"transitions": transitions}
@@ -814,7 +959,9 @@ class CommandInterpreter:
             )
         return commands
 
-    def _extract_command(self, commands: Iterable[Dict[str, Any]], names: Sequence[str]) -> Dict[str, Any] | None:
+    def _extract_command(
+        self, commands: Iterable[Dict[str, Any]], names: Sequence[str]
+    ) -> Dict[str, Any] | None:
         for command in commands:
             if command.get("type") in names:
                 return command
@@ -845,7 +992,9 @@ class CommandInterpreter:
                 values.append(num)
         return values
 
-    def execute_bpm_commands(self, commands: Iterable[Dict[str, Any]], base_bpm: int | None = None) -> Dict[str, Any]:
+    def execute_bpm_commands(
+        self, commands: Iterable[Dict[str, Any]], base_bpm: int | None = None
+    ) -> Dict[str, Any]:
         payload: Dict[str, Any] = {"bpm": base_bpm}
         fallback = base_bpm if base_bpm is not None else 120
         offset = 0.0
@@ -882,19 +1031,25 @@ class CommandInterpreter:
             payload["fracture"] = fractures
         return payload
 
-    def execute_key_commands(self, commands: Iterable[Dict[str, Any]], default_key: str | None = None) -> Dict[str, Any]:
+    def execute_key_commands(
+        self, commands: Iterable[Dict[str, Any]], default_key: str | None = None
+    ) -> Dict[str, Any]:
         command = self._extract_command(commands, ["key", "scale", "set key"])
         if not command:
             return {"key": default_key}
         return {"key": command["value"], "source": command["raw"]}
 
-    def execute_rhythm_commands(self, commands: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    def execute_rhythm_commands(
+        self, commands: Iterable[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         command = self._extract_command(commands, ["rhythm", "groove", "set intensity"])
         if not command:
             return {"rhythm": None}
         return {"rhythm": command["value"], "source": command["raw"]}
 
-    def execute_emotion_commands(self, commands: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    def execute_emotion_commands(
+        self, commands: Iterable[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         emotion_cmd = self._extract_command(commands, ["emotion", "set emotion"])
         mood_cmd = self._extract_command(commands, ["mood", "set mood"])
         intensity_cmd = self._extract_command(commands, ["intensity", "set intensity"])
@@ -912,7 +1067,9 @@ class CommandInterpreter:
             result["emotion"] = None
         return result
 
-    def execute_style_commands(self, commands: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    def execute_style_commands(
+        self, commands: Iterable[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         result: Dict[str, Any] = {}
         for command in commands:
             ctype = command.get("type")
@@ -941,7 +1098,7 @@ class StyleEngine:
         "sadness": "ambient ballad",
         "anger": "industrial rock",
         "fear": "cinematic darkwave",
-        "peace": "neo-classical",
+        "peace": "neo - classical",
         "epic": "epic orchestral",
     }
 
@@ -960,7 +1117,9 @@ class StyleEngine:
         return "reflective"
 
     def instrumentation_style(self, instrumentation: Dict[str, Any]) -> str:
-        palette = instrumentation.get("selected") or instrumentation.get("toolkit") or []
+        palette = (
+            instrumentation.get("selected") or instrumentation.get("toolkit") or []
+        )
         return ", ".join(palette) if palette else "minimal instrumentation"
 
     def vocal_style(self, vocal: Dict[str, Any]) -> str:
@@ -976,7 +1135,16 @@ class StyleEngine:
     def tone_style(self, tonality: Dict[str, Any]) -> str:
         return f"{tonality.get('mode', 'major')} mood, keys {', '.join(tonality.get('section_keys', []))}"
 
-    def final_style_prompt_build(self, *, genre: str, mood: str, instrumentation: str, vocal: str, visual: str, tone: str) -> str:
+    def final_style_prompt_build(
+        self,
+        *,
+        genre: str,
+        mood: str,
+        instrumentation: str,
+        vocal: str,
+        visual: str,
+        tone: str,
+    ) -> str:
         entries = [
             ("GENRE", genre),
             ("MOOD", mood),
@@ -994,16 +1162,24 @@ class StyleEngine:
 class UserOverrideEngine:
     """Bridge between overrides and the logical engine payloads."""
 
-    def resolve_bpm(self, manager: UserOverrideManager, auto_bpm: float | None) -> float | None:
+    def resolve_bpm(
+        self, manager: UserOverrideManager, auto_bpm: float | None
+    ) -> float | None:
         return manager.resolve_bpm(auto_bpm)
 
-    def apply_to_rhythm(self, rhythm_payload: Dict[str, Any], manager: UserOverrideManager) -> Dict[str, Any]:
+    def apply_to_rhythm(
+        self, rhythm_payload: Dict[str, Any], manager: UserOverrideManager
+    ) -> Dict[str, Any]:
         return manager.apply_to_rhythm(rhythm_payload)
 
-    def apply_to_style(self, style_payload: Dict[str, Any], manager: UserOverrideManager) -> Dict[str, Any]:
+    def apply_to_style(
+        self, style_payload: Dict[str, Any], manager: UserOverrideManager
+    ) -> Dict[str, Any]:
         return manager.apply_to_style(style_payload)
 
-    def apply_to_vocals(self, vocal_payload: Dict[str, Any], manager: UserOverrideManager) -> Dict[str, Any]:
+    def apply_to_vocals(
+        self, vocal_payload: Dict[str, Any], manager: UserOverrideManager
+    ) -> Dict[str, Any]:
         return manager.apply_to_vocals(vocal_payload)
 
 
@@ -1013,7 +1189,9 @@ class UserAdaptiveSymbiosisEngine:
     def collect_user_params(self, manager: UserOverrideManager) -> Dict[str, Any]:
         return manager.debug_summary()
 
-    def merge_user_with_auto_core(self, manager: UserOverrideManager, auto_payload: Dict[str, Any]) -> Dict[str, Any]:
+    def merge_user_with_auto_core(
+        self, manager: UserOverrideManager, auto_payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
         merged = dict(auto_payload)
         merged["user"] = self.collect_user_params(manager)
         return merged
@@ -1062,10 +1240,18 @@ class UserAdaptiveSymbiosisEngine:
             snapshot["instrumentation"] = payload.get("instrumentation", {})
             return snapshot
 
-        rhythm = self.recalculate_rhythm_under_user_settings(manager, payload.get("bpm", {}))
-        tone = self.recalculate_tone_under_user_settings(manager, payload.get("tonality", {}))
-        vocal = self.recalculate_vocals_under_user_settings(manager, payload.get("vocal", {}))
-        instrumentation = self.recalculate_instrumental_under_user_settings(manager, payload.get("instrumentation", {}))
+        rhythm = self.recalculate_rhythm_under_user_settings(
+            manager, payload.get("bpm", {})
+        )
+        tone = self.recalculate_tone_under_user_settings(
+            manager, payload.get("tonality", {})
+        )
+        vocal = self.recalculate_vocals_under_user_settings(
+            manager, payload.get("vocal", {})
+        )
+        instrumentation = self.recalculate_instrumental_under_user_settings(
+            manager, payload.get("instrumentation", {})
+        )
         merged = self.merge_user_with_auto_core(manager, payload)
         merged.update(
             {
@@ -1081,29 +1267,55 @@ class UserAdaptiveSymbiosisEngine:
 class LyricsAnnotationEngine:
     """Produce lightweight annotations for UI or downstream exporters."""
 
-    def add_vocal_annotations(self, sections: Sequence[str], vocal: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def add_vocal_annotations(
+        self, sections: Sequence[str], vocal: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         intensity_curve = vocal.get("intensity_curve", [])
         annotations: List[Dict[str, Any]] = []
         for idx, section in enumerate(sections):
-            intensity = intensity_curve[idx] if idx < len(intensity_curve) else vocal.get("average_intensity", 0.5)
-            annotations.append({"section": idx, "type": "vocal", "intensity": round(float(intensity), 3)})
+            intensity = (
+                intensity_curve[idx]
+                if idx < len(intensity_curve)
+                else vocal.get("average_intensity", 0.5)
+            )
+            annotations.append(
+                {
+                    "section": idx,
+                    "type": "vocal",
+                    "intensity": round(float(intensity), 3),
+                }
+            )
         return annotations
 
-    def add_breath_annotations(self, sections: Sequence[str], breathing: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def add_breath_annotations(
+        self, sections: Sequence[str], breathing: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         inhale = set(breathing.get("inhale_points", []))
         return [
-            {"section": idx, "type": "breath", "marker": "inhale" if idx in inhale else "flow"}
+            {
+                "section": idx,
+                "type": "breath",
+                "marker": "inhale" if idx in inhale else "flow",
+            }
             for idx in range(len(sections))
         ]
 
-    def add_tonal_annotations(self, sections: Sequence[str], tonality: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def add_tonal_annotations(
+        self, sections: Sequence[str], tonality: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         keys = tonality.get("section_keys", [])
         return [
-            {"section": idx, "type": "tonality", "key": keys[idx] if idx < len(keys) else tonality.get("mode")}
+            {
+                "section": idx,
+                "type": "tonality",
+                "key": keys[idx] if idx < len(keys) else tonality.get("mode"),
+            }
             for idx in range(len(sections))
         ]
 
-    def add_emotional_annotations(self, sections: Sequence[str], emotions: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def add_emotional_annotations(
+        self, sections: Sequence[str], emotions: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         profile = emotions.get("profile", {})
         dominant = max(profile, key=profile.get) if profile else "neutral"
         return [
@@ -1111,9 +1323,15 @@ class LyricsAnnotationEngine:
             for idx in range(len(sections))
         ]
 
-    def add_rhythm_annotations(self, sections: Sequence[str], bpm_curve: Sequence[float]) -> List[Dict[str, Any]]:
+    def add_rhythm_annotations(
+        self, sections: Sequence[str], bpm_curve: Sequence[float]
+    ) -> List[Dict[str, Any]]:
         return [
-            {"section": idx, "type": "rhythm", "bpm": bpm_curve[idx] if idx < len(bpm_curve) else None}
+            {
+                "section": idx,
+                "type": "rhythm",
+                "bpm": bpm_curve[idx] if idx < len(bpm_curve) else None,
+            }
             for idx in range(len(sections))
         ]
 
@@ -1173,7 +1391,8 @@ class FinalCompiler:
             issues.append("Style prompt missing")
         return {"issues": issues, "is_consistent": not issues}
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

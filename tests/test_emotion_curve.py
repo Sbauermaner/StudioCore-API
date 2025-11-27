@@ -58,6 +58,7 @@ def test_core_exposes_emotion_curve():
     assert "auto_context" in result
     assert "dynamic_bias" in result["auto_context"]
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27

@@ -1,24 +1,22 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """Public wrapper for the Truth × Love × Pain engine."""
-
-from __future__ import annotations
 
 import math
 from typing import Any, Dict, List, Tuple
 
 from .config import DEFAULT_CONFIG
 
-from studiocore.emotion_profile import EmotionVector, EmotionAggregator
+from studiocore.emotion_profile import EmotionVector
 
 from .emotion import TruthLovePainEngine as _TruthLovePainEngine
 
 
 def _harmonic_mean(x: float, y: float, z: float) -> float:
-    """Return harmonic mean with zero-protection fallback."""
+    """Return harmonic mean with zero - protection fallback."""
 
     if x <= 0.01 or y <= 0.01 or z <= 0.01:
         return (x + y + z) / 3.0
@@ -31,10 +29,16 @@ class TruthLovePainEngine(_TruthLovePainEngine):
 
     def describe(self, text: str) -> Dict[str, Any]:
         profile = self.analyze(text)
-        ordered: List[Tuple[str, float]] = sorted(profile.items(), key=lambda item: item[1], reverse=True)
+        ordered: List[Tuple[str, float]] = sorted(
+            profile.items(), key=lambda item: item[1], reverse=True
+        )
         dominant = ordered[0][0] if ordered else "truth"
         profile["dominant_axis"] = dominant
-        profile["balance"] = round((profile.get("truth", 0.0) + profile.get("love", 0.0)) - profile.get("pain", 0.0), 3)
+        profile["balance"] = round(
+            (profile.get("truth", 0.0) + profile.get("love", 0.0))
+            - profile.get("pain", 0.0),
+            3,
+        )
         return profile
 
     def truth_score(self, text: str) -> float:
@@ -46,7 +50,9 @@ class TruthLovePainEngine(_TruthLovePainEngine):
     def pain_score(self, text: str) -> float:
         return float(self.analyze(text).get("pain", 0.0))
 
-    def tlp_vector(self, text: str, emotion_matrix: Dict[str, float]) -> Dict[str, float]:
+    def tlp_vector(
+        self, text: str, emotion_matrix: Dict[str, float]
+    ) -> Dict[str, float]:
         """Return normalized TLP axis."""
         low = text.lower()
 
@@ -55,7 +61,14 @@ class TruthLovePainEngine(_TruthLovePainEngine):
         pain_score = 0.0
 
         # Простые эвристики (можно расширять)
-        truth_keywords = ("правда", "честно", "искренне", "правдивый", "honest", "truth")
+        truth_keywords = (
+            "правда",
+            "честно",
+            "искренне",
+            "правдивый",
+            "honest",
+            "truth",
+        )
         love_keywords = ("любовь", "люблю", "сердце", "обнимаю", "love", "dear")
         pain_keywords = ("боль", "страдание", "рана", "кровь", "слёзы", "pain", "hurt")
 
@@ -70,8 +83,13 @@ class TruthLovePainEngine(_TruthLovePainEngine):
                 pain_score += 1.0
 
         # Эмоции подмешиваем к осям
-        love_score += emotion_matrix.get("joy", 0.0) * 0.6 + emotion_matrix.get("hope", 0.0) * 0.4
-        pain_score += emotion_matrix.get("sadness", 0.0) * 0.6 + emotion_matrix.get("anger", 0.0) * 0.4
+        love_score += (
+            emotion_matrix.get("joy", 0.0) * 0.6 + emotion_matrix.get("hope", 0.0) * 0.4
+        )
+        pain_score += (
+            emotion_matrix.get("sadness", 0.0) * 0.6
+            + emotion_matrix.get("anger", 0.0) * 0.4
+        )
 
         # Нормализация
         maximum = max(truth_score, love_score, pain_score, 1e-6)
@@ -91,7 +109,9 @@ class TruthLovePainEngine(_TruthLovePainEngine):
             0.0,
             min(1.0, round(_harmonic_mean(tlp["truth"], tlp["love"], tlp["pain"]), 4)),
         )
-        tlp["dominant_axis"] = max(("truth", "love", "pain"), key=lambda axis: tlp[axis])
+        tlp["dominant_axis"] = max(
+            ("truth", "love", "pain"), key=lambda axis: tlp[axis]
+        )
         values = (tlp["truth"], tlp["love"], tlp["pain"])
         mean = sum(values) / 3.0
         tlp["balance"] = round(math.sqrt(sum((v - mean) ** 2 for v in values) / 3.0), 4)
@@ -107,10 +127,12 @@ class TruthLovePainEngine(_TruthLovePainEngine):
         pain = profile.get("pain", 0.0)
         weight = profile.get("conscious_frequency", 0.5)
 
-        # Valence (V): Positivity/Negativity (Love - Pain). Clamped to [-1, 1].
+        # Valence (V): Positivity / Negativity (Love - Pain). Clamped to [-1,
+        # 1].
         valence = love - pain
 
-        # Arousal (A): Intensity/Energy (Average of all axes). Clamped to [0, 1].
+        # Arousal (A): Intensity / Energy (Average of all axes). Clamped to [0,
+        # 1].
         arousal = (love + pain + truth) / 3.0
 
         return EmotionVector(
@@ -128,5 +150,5 @@ __all__ = ["TruthLovePainEngine"]
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

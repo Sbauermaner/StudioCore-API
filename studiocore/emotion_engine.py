@@ -1,28 +1,27 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 EmotionEngine v6.4 — full emotional spectrum engine.
 
 Добавлено:
 - Полный эмоциональный ряд (24 ключевые эмоции)
-- Rage-spectrum (rage, rage_extreme)
-- Love-spectrum (love_soft, love_bright)
+- Rage - spectrum (rage, rage_extreme)
+- Love - spectrum (love_soft, love_bright)
 - Sadness / disappointment spectrum
-- Gothic / dark-poetic spectrum
+- Gothic / dark - poetic spectrum
 - HipHop / aggressive street spectrum
-- Adaptive weight-learning: каждый анализ корректирует внутренние веса
+- Adaptive weight - learning: каждый анализ корректирует внутренние веса
 """
 
-from __future__ import annotations
-from typing import Dict, Tuple
+from typing import Dict
 import math
 
 
@@ -33,25 +32,102 @@ class EmotionEngineV64:
         """Initializes instance-level state to ensure statelessness per-request (Fix #1.1)."""
         # === 24 базовых эмоции (универсальный спектр) ===
         self.EMOTIONS = [
-            "joy", "joy_bright", "happiness", "delight",  # Joy Spectrum
-            "calm", "serenity", "trust",  # Calm Spectrum
-            "love", "love_soft", "love_deep", "infinite_love", "healing_love", "maternal_love", "radiant_love", "longing_love", "gentle_love", "unconditional_love",  # Love Spectrum
-            "sadness", "disappointment", "melancholy", "sorrow", "loneliness", "grief", "regret", "guilt", "shame",  # Sadness Spectrum
-            "deep_pain", "phantom_pain", "burning_pain", "soul_pain", "silent_pain", "explosive_pain", "collapsing_pain",  # Pain Spectrum
-            "rage", "rage_extreme", "aggression", "anger", "bitterness", "jealousy", "envy", "betrayal", "resentment",  # Rage Spectrum
-            "fear", "anxiety", "panic", "disgust", "aversion", "confusion", "frustration",  # Fear/Conflict Spectrum
-            "awe", "wonder", "hope", "relief", "admiration",  # Awe/Hope Spectrum
-            "gothic_dark", "dark_poetic", "dark_romantic",  # Dark Spectrum
-            "hiphop_conflict", "street_power",  # Hiphop Spectrum
-            "clear_truth", "cold_truth", "sharp_truth", "brutal_honesty", "revelation", "righteous_truth",  # Truth Spectrum
-            "resolve", "determination",  # Action/Resolve
-            "calm_flow", "warm_pulse", "cold_pulse", "frantic", "trembling", "escalating", "descending", "pressure", "static_tension", "breathless",  # Rhythmic/Structural
-            "peace", "neutral",  # Core States
+            "joy",
+            "joy_bright",
+            "happiness",
+            "delight",  # Joy Spectrum
+            "calm",
+            "serenity",
+            "trust",  # Calm Spectrum
+            "love",
+            "love_soft",
+            "love_deep",
+            "infinite_love",  # Love Spectrum
+            "healing_love",
+            "maternal_love",
+            "radiant_love",
+            "longing_love",
+            "gentle_love",
+            "unconditional_love",
+            "sadness",
+            "disappointment",
+            "melancholy",
+            "sorrow",  # Sadness
+            "loneliness",
+            "grief",
+            "regret",
+            "guilt",
+            "shame",
+            "deep_pain",
+            "phantom_pain",
+            "burning_pain",
+            "soul_pain",  # Pain
+            "silent_pain",
+            "explosive_pain",
+            "collapsing_pain",
+            "rage",
+            "rage_extreme",
+            "aggression",
+            "anger",  # Rage Spectrum
+            "bitterness",
+            "jealousy",
+            "envy",
+            "betrayal",
+            "resentment",
+            # Fear / Conflict Spectrum
+            "fear",
+            "anxiety",
+            "panic",
+            "disgust",
+            "aversion",
+            "confusion",
+            "frustration",
+            "awe",
+            "wonder",
+            "hope",
+            "relief",
+            "admiration",  # Awe / Hope Spectrum
+            "gothic_dark",
+            "dark_poetic",
+            "dark_romantic",  # Dark Spectrum
+            "hiphop_conflict",
+            "street_power",  # Hiphop Spectrum
+            "clear_truth",
+            "cold_truth",
+            "sharp_truth",  # Truth Spectrum
+            "brutal_honesty",
+            "revelation",
+            "righteous_truth",
+            "resolve",
+            "determination",  # Action / Resolve
+            "calm_flow",
+            "warm_pulse",
+            "cold_pulse",
+            "frantic",  # Rhythmic
+            "trembling",
+            "escalating",
+            "descending",
+            "pressure",
+            "static_tension",
+            "breathless",
+            "peace",
+            "neutral",  # Core States
         ]
 
         # базовые ключевые слова (instance scope)
         self.LEXICON = {
-            "rage": ["убей", "бей", "гнев", "ярость", "разрывать", "сломать", "враг", "anger", "fury", "rage"],
+            "rage": [
+                "убей",
+                "бей",
+                "гнев",
+                "ярость",
+                "разрывать",
+                "сломать",
+                "враг",
+                "anger",
+                "fury",
+                "rage",
+            ],
             "rage_extreme": ["уничтожь", "смерть", "ненавижу", "истреби"],
             "sadness": ["печаль", "слёзы", "одиноко", "грусть"],
             "sorrow": ["скорбь", "горечь", "плач", "тоска", "sorrow", "weeping"],
@@ -64,20 +140,54 @@ class EmotionEngineV64:
             "frustration": ["бессилие", "ярость", "frustration", "powerless"],
             "deep_pain": ["глубокая боль", "разлом", "бездна", "deep wound", "abyss"],
             "phantom_pain": ["фантомная боль", "невидимая", "phantom ache"],
-            "burning_pain": ["жжение", "огонь боли", "пламя", "burning ache", "fire of sorrow"],
+            "burning_pain": [
+                "жжение",
+                "огонь боли",
+                "пламя",
+                "burning ache",
+                "fire of sorrow",
+            ],
             "soul_pain": ["боль души", "сердце разбито", "soul ache", "heart broken"],
-            "silent_pain": ["тихая боль", "немой крик", "silent scream", "mute suffering"],
+            "silent_pain": [
+                "тихая боль",
+                "немой крик",
+                "silent scream",
+                "mute suffering",
+            ],
             "explosive_pain": ["взрыв", "рвёт", "крик", "explosion", "tearing apart"],
-            "collapsing_pain": ["рухнул", "сломлен", "обрушение", "collapsed", "broken down"],
+            "collapsing_pain": [
+                "рухнул",
+                "сломлен",
+                "обрушение",
+                "collapsed",
+                "broken down",
+            ],
             "love": ["люблю", "поцелуй", "ласка"],
             "love_soft": ["нежный", "ласковый", "тёплый"],
             "love_deep": ["страсть", "союз", "вечность"],
-            "infinite_love": ["бесконечная любовь", "навсегда", "eternal love", "boundless"],
+            "infinite_love": [
+                "бесконечная любовь",
+                "навсегда",
+                "eternal love",
+                "boundless",
+            ],
             "healing_love": ["исцеление", "заживет", "healing", "mend"],
-            "maternal_love": ["материнский", "забота", "оберег", "motherly", "care", "guardian"],
+            "maternal_love": [
+                "материнский",
+                "забота",
+                "оберег",
+                "motherly",
+                "care",
+                "guardian",
+            ],
             "radiant_love": ["сияющая любовь", "свет", "radiant", "shining"],
             "longing_love": ["тоска по любви", "ждать", "longing", "yearning"],
-            "unconditional_love": ["безусловная", "без условий", "unconditional", "pure"],
+            "unconditional_love": [
+                "безусловная",
+                "без условий",
+                "unconditional",
+                "pure",
+            ],
             "joy": ["свет", "улыбка", "радость"],
             "happiness": ["счастье", "радостно", "веселье", "happy", "cheer"],
             "delight": ["восторг", "наслаждение", "delight", "pleasure"],
@@ -85,29 +195,97 @@ class EmotionEngineV64:
             "serenity": ["безмятежность", "гармония", "serenity", "harmony"],
             "trust": ["доверие", "вера", "уверенность", "trust", "confidence"],
             "clear_truth": ["ясная правда", "прозрение", "clear sight", "realization"],
-            "cold_truth": ["ледяное прозрение", "холодная правда", "icy clarity", "cold hard fact"],
-            "sharp_truth": ["острая ясность", "болезненная правда", "sharp clarity", "painful truth"],
+            "cold_truth": [
+                "ледяное прозрение",
+                "холодная правда",
+                "icy clarity",
+                "cold hard fact",
+            ],
+            "sharp_truth": [
+                "острая ясность",
+                "болезненная правда",
+                "sharp clarity",
+                "painful truth",
+            ],
             "brutal_honesty": ["жестокая правда", "честность", "brutal honesty"],
-            "revelation": ["озарение", "внезапно", "открытие", "epiphany", "revelation"],
-            "righteous_truth": ["праведная истина", "суд", "righteous", "divine justice"],
+            "revelation": [
+                "озарение",
+                "внезапно",
+                "открытие",
+                "epiphany",
+                "revelation",
+            ],
+            "righteous_truth": [
+                "праведная истина",
+                "суд",
+                "righteous",
+                "divine justice",
+            ],
             "fear": ["страх", "тревога", "боязнь", "fear", "anxiety", "dread"],
             "panic": ["паника", "ужас", "шок", "panic", "terror"],
             "disgust": ["отвращение", "мерзко", "противно", "disgust", "repulsive"],
             "bitterness": ["горечь", "желчь", "bitterness", "resentment", "gall"],
             "jealousy": ["ревность", "зависть", "хочу", "jealousy", "envy"],
-            "betrayal": ["предательство", "измена", "удар в спину", "betrayal", "treachery"],
+            "betrayal": [
+                "предательство",
+                "измена",
+                "удар в спину",
+                "betrayal",
+                "treachery",
+            ],
             "resentment": ["негодование", "обида", "злой", "indignation", "offense"],
-            "resolve": ["решимость", "цель", "точно", "resolve", "purpose", "certainty"],
+            "resolve": [
+                "решимость",
+                "цель",
+                "точно",
+                "resolve",
+                "purpose",
+                "certainty",
+            ],
             "determination": ["воля", "твердо", "determination", "will", "firmly"],
             "calm_flow": ["ровный ритм", "мягкий ход", "steady tempo", "gentle flow"],
             "warm_pulse": ["тёплая волна", "мягкий бит", "warm wave", "soft pulse"],
             "cold_pulse": ["холодный ритм", "ледяной бит", "cold beat", "icy pulse"],
             "frantic": ["безумный", "крайний темп", "быстро", "frantic", "mad speed"],
-            "trembling": ["дрожание", "трясет", "нервно", "trembling", "shaking", "nervous"],
-            "escalating": ["нарастание", "вверх", "рост", "escalating", "rising", "upward"],
-            "descending": ["спад", "вниз", "снижение", "descending", "falling", "decline"],
-            "pressure": ["давление", "тяжесть", "тьма", "pressure", "heavy", "darkness"],
-            "static_tension": ["серый статик", "замер", "ожидание", "gray tension", "motionless"],
+            "trembling": [
+                "дрожание",
+                "трясет",
+                "нервно",
+                "trembling",
+                "shaking",
+                "nervous",
+            ],
+            "escalating": [
+                "нарастание",
+                "вверх",
+                "рост",
+                "escalating",
+                "rising",
+                "upward",
+            ],
+            "descending": [
+                "спад",
+                "вниз",
+                "снижение",
+                "descending",
+                "falling",
+                "decline",
+            ],
+            "pressure": [
+                "давление",
+                "тяжесть",
+                "тьма",
+                "pressure",
+                "heavy",
+                "darkness",
+            ],
+            "static_tension": [
+                "серый статик",
+                "замер",
+                "ожидание",
+                "gray tension",
+                "motionless",
+            ],
             "breathless": ["задыхаясь", "без воздуха", "breathless", "gasping"],
             "gothic_dark": ["луна", "мрак", "готика", "тьма", "пан", "кровь"],
             "hiphop_conflict": ["улица", "правда", "деньги", "силой"],
@@ -129,7 +307,8 @@ class EmotionEngineV64:
         for emotion, words in self.LEXICON.items():
             for w in words:
                 if w in lower_text:
-                    # FIX: Enforcing statelessness by removing reliance on self.WEIGHTS
+                    # FIX: Enforcing statelessness by removing reliance on
+                    # self.WEIGHTS
                     vector[emotion] += 1.0
 
         # нормализация
@@ -147,17 +326,24 @@ class EmotionEngineV64:
         Truth / Love / Pain — три эмоциональные оси.
         """
         return {
-            "truth": round(vector.get("hiphop_conflict", 0) +
-                           vector.get("rage", 0) * 0.3 +
-                           vector.get("street_power", 0) * 0.2, 3),
-
-            "love": round(vector.get("love", 0) +
-                          vector.get("love_soft", 0) +
-                          vector.get("love_deep", 0), 3),
-
-            "pain": round(vector.get("rage_extreme", 0) +
-                          vector.get("sadness", 0) +
-                          vector.get("disappointment", 0), 3),
+            "truth": round(
+                vector.get("hiphop_conflict", 0)
+                + vector.get("rage", 0) * 0.3
+                + vector.get("street_power", 0) * 0.2,
+                3,
+            ),
+            "love": round(
+                vector.get("love", 0)
+                + vector.get("love_soft", 0)
+                + vector.get("love_deep", 0),
+                3,
+            ),
+            "pain": round(
+                vector.get("rage_extreme", 0)
+                + vector.get("sadness", 0)
+                + vector.get("disappointment", 0),
+                3,
+            ),
         }
 
     def update_weights(self, vector: Dict[str, float]) -> Dict[str, float]:
@@ -187,7 +373,8 @@ class EmotionEngineV64:
         tlp = self.compute_TLP(dominant, vector)
 
         # динамическое обновление веса
-        # self.update_weights(vector) # COMMENTED OUT: Removing state leak for stateless architecture
+        # self.update_weights(vector) # COMMENTED OUT: Removing state leak for
+        # stateless architecture
 
         return {
             "vector": vector,
@@ -196,7 +383,8 @@ class EmotionEngineV64:
             "dominant_name": dominant,
         }
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

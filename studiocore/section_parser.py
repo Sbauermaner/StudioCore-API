@@ -1,7 +1,7 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """Structured section parser used by the MAXI orchestrator."""
 
@@ -25,7 +25,7 @@ class SectionParseResult:
 
 
 class SectionParser:
-    """High-level helper that unifies structural parsing and annotations."""
+    """High - level helper that unifies structural parsing and annotations."""
 
     def _safe_reset_engine(self) -> None:
         """Reset underlying text engine if it provides a reset() method."""
@@ -48,34 +48,50 @@ class SectionParser:
 
     def _estimate_rde_emotion(self, text: str) -> float:
         exclaim_weight = text.count("!") * 0.01
-        caps_weight = sum(1 for line in text.splitlines() if line.strip().isupper()) * 0.05
+        caps_weight = (
+            sum(1 for line in text.splitlines() if line.strip().isupper()) * 0.05
+        )
         return round(min(1.0, exclaim_weight + caps_weight), 3)
 
-    def parse(self, text: str, *, sections: Sequence[str] | None = None) -> SectionParseResult:
+    def parse(
+        self, text: str, *, sections: Sequence[str] | None = None
+    ) -> SectionParseResult:
         # Reset text engine state and perform structural analysis
         self._safe_reset_engine()
-        resolved_sections = list(sections) if sections is not None else self._text_engine.auto_section_split(text)
+        resolved_sections = (
+            list(sections)
+            if sections is not None
+            else self._text_engine.auto_section_split(text)
+        )
         prefer_strict_boundary = False
 
         # Ensure metadata is accessible (it should be populated by auto_section_split)
-        # FIX: Если sections переданы, нужно убедиться, что метаданные сохранены
+        # FIX: Если sections переданы, нужно убедиться, что метаданные
+        # сохранены
         if sections is not None:
             # Если sections переданы, но метаданные пустые, пытаемся получить их из text_engine
             # без сброса состояния (метаданные уже должны быть установлены)
             metadata = self._text_engine.section_metadata()
-            # Если метаданные пустые, но sections переданы, значит нужно их восстановить
-            if not metadata or not any(m.get("tag") for m in metadata if isinstance(m, dict)):
-                # Пытаемся получить метаданные, вызвав auto_section_split для обновления состояния
+            # Если метаданные пустые, но sections переданы, значит нужно их
+            # восстановить
+            if not metadata or not any(
+                m.get("tag") for m in metadata if isinstance(m, dict)
+            ):
+                # Пытаемся получить метаданные, вызвав auto_section_split для
+                # обновления состояния
                 self._text_engine.auto_section_split(text)
                 metadata = self._text_engine.section_metadata()
         else:
             metadata = self._text_engine.section_metadata()
 
         annotations = self._annotation_engine.parse(text)
-        lyrical_density = self._estimate_lyrical_density("\n".join(resolved_sections) or text)
+        lyrical_density = self._estimate_lyrical_density(
+            "\n".join(resolved_sections) or text
+        )
         rde_emotion_hint = self._estimate_rde_emotion(text)
         # RELAXATION: Only force strict boundary if there is extreme lyrical tension (e.g., all caps shout)
-        # Default mode prioritizes repetition recognition, essential for Chorus detection.
+        # Default mode prioritizes repetition recognition, essential for Chorus
+        # detection.
         prefer_strict_boundary = rde_emotion_hint > 0.85
         metadata = [
             {
@@ -86,18 +102,23 @@ class SectionParser:
             }
             for entry in metadata
         ]
-        # Force-update internal engine state (required for consistency with section_metadata calls)
+        # Force - update internal engine state (required for consistency with section_metadata calls)
         # FIX: Direct access to private member is removed to enforce encapsulation.
         # self._text_engine._section_metadata = metadata
 
-        # Final safety check on metadata length to prevent downstream misalignment (Fix #1.2)
+        # Final safety check on metadata length to prevent downstream
+        # misalignment (Fix #1.2)
         if len(metadata) < len(resolved_sections):
             # Pad with empty dicts if annotation logic somehow lost entries
-            metadata = metadata + [{} for _ in range(len(resolved_sections) - len(metadata))]
+            metadata = metadata + [
+                {} for _ in range(len(resolved_sections) - len(metadata))
+            ]
         elif len(metadata) > len(resolved_sections):
             # Truncate if previous state somehow leaked extra entries
             metadata = metadata[: len(resolved_sections)]
-        return SectionParseResult(resolved_sections, metadata, annotations, prefer_strict_boundary)
+        return SectionParseResult(
+            resolved_sections, metadata, annotations, prefer_strict_boundary
+        )
 
     def apply_annotation_effects(
         self,
@@ -107,7 +128,9 @@ class SectionParser:
         annotations: Sequence[Dict[str, Any]],
     ) -> Dict[str, Any]:
         payload = {"emotions": dict(emotions), "bpm": bpm}
-        adjusted = self._annotation_engine.integrate_with_core(payload, list(annotations))
+        adjusted = self._annotation_engine.integrate_with_core(
+            payload, list(annotations)
+        )
         return {
             "emotions": adjusted.get("emotions", {}),
             "bpm": adjusted.get("bpm", bpm),
@@ -119,5 +142,5 @@ __all__ = ["SectionParser", "SectionParseResult"]
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

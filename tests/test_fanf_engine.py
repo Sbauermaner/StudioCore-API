@@ -14,7 +14,9 @@ def test_fanf_choir_activation_on_elevated_text():
         "tonality": {"section_keys": ["Am"], "modal_shifts": ["aeolian"]},
         "style": {"genre": "cinematic", "mood": "dramatic"},
     }
-    annotation = engine.build_annotations("sacred cathedral chorus", ["intro"], analysis)
+    annotation = engine.build_annotations(
+        "sacred cathedral chorus", ["intro"], analysis
+    )
     assert annotation.choir_active is True
     assert "ChoirLayers" in annotation.annotated_text_fanf
 
@@ -27,9 +29,12 @@ def test_fanf_choir_disabled_for_intimate_text():
         "tonality": {"section_keys": ["C"], "modal_shifts": ["stable"]},
         "style": {"genre": "lofi", "mood": "intimate"},
     }
-    annotation = engine.build_annotations("soft whisper under blankets", ["intro"], analysis)
+    annotation = engine.build_annotations(
+        "soft whisper under blankets", ["intro"], analysis
+    )
     assert annotation.choir_active is False
     assert "No choir" in annotation.annotated_text_suno
+
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)

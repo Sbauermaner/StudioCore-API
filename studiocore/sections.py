@@ -1,14 +1,14 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 import re
 from typing import List, Dict, Any
 
 ANNOTATION_PATTERN = re.compile(
-    r"\[(?P<section>[A-Za-zА-Яа-я0-9\s\-]+)\s*[-–]\s*(?P<tags>[^\]]+)\]",
-    flags=re.I
+    r"\[(?P < section > [A - Za - zА - Яа - я0 - 9\s\-]+)\s * [-–]\s * (?P < tags > [^\]]+)\]",
+    flags=re.I,
 )
 
 EMO_MAP = {
@@ -22,6 +22,7 @@ EMO_MAP = {
     "soft": {"warmth": +0.2},
     "breathy": {"intimacy": +0.3},
 }
+
 
 class SectionTagAnalyzer:
     """Dynamic section parser that applies emotional hints to analyzed text."""
@@ -37,22 +38,20 @@ class SectionTagAnalyzer:
                 if tag in EMO_MAP:
                     for k, v in EMO_MAP[tag].items():
                         emo_effects[k] = emo_effects.get(k, 0) + v
-            result.append({
-                "section": section,
-                "tags": tags,
-                "emo_mod": emo_effects
-            })
+            result.append({"section": section, "tags": tags, "emo_mod": emo_effects})
         return result
 
-    def integrate_with_core(self, core_result: Dict[str, Any], annotations: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Applies annotation-based emotional corrections to the core result."""
+    def integrate_with_core(
+        self, core_result: Dict[str, Any], annotations: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Applies annotation - based emotional corrections to the core result."""
         emo = core_result.get("emotions", {})
         bpm = core_result.get("bpm", 120)
 
         for a in annotations:
             for key, val in a["emo_mod"].items():
                 emo[key] = emo.get(key, 0) + val
-            # belt/cry/scream ⇒ BPM повышается немного
+            # belt / cry / scream ⇒ BPM повышается немного
             if any(t in a["tags"] for t in ["belt", "scream", "cry"]):
                 bpm += 3
 
@@ -61,7 +60,8 @@ class SectionTagAnalyzer:
         core_result["annotations"] = annotations
         return core_result
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

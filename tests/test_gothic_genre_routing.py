@@ -39,6 +39,7 @@ def test_gothic_material_not_classified_as_edm():
     sections = result.get("structure", {}).get("sections", [])
     assert sections and not (len(sections) == 1 and "BODY" in sections)
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27

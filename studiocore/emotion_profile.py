@@ -1,13 +1,13 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 Emotion Profile v1 — единый формат эмоций для StudioCore.
 
 Вводит базовые структуры:
-- EmotionVector: профиль эмоции строки/фразы/блока
+- EmotionVector: профиль эмоции строки / фразы / блока
 - EmotionAggregator: глобальное усреднение эмоции текста + локальные "spike" пики
 """
 
@@ -33,7 +33,7 @@ class EmotionVector:
 
         total_weight = sum(v.weight for v in vectors) or 1.0
         t = sum(v.truth * v.weight for v in vectors) / total_weight
-        l = sum(v.love * v.weight for v in vectors) / total_weight
+        l = sum(v.love * v.weight for v in vectors) / total_weight  # noqa: E741
         p = sum(v.pain * v.weight for v in vectors) / total_weight
         v_mean = sum(v.valence * v.weight for v in vectors) / total_weight
         a = sum(v.arousal * v.weight for v in vectors) / total_weight
@@ -67,7 +67,7 @@ class EmotionAggregator:
         total_weight = sum(max(v.weight, 0.0) for v in vectors) or 1.0
 
         t = sum(v.truth * v.weight for v in vectors) / total_weight
-        l = sum(v.love * v.weight for v in vectors) / total_weight
+        l = sum(v.love * v.weight for v in vectors) / total_weight  # noqa: E741
         p = sum(v.pain * v.weight for v in vectors) / total_weight
         v_mean = sum(v.valence * v.weight for v in vectors) / total_weight
         a = sum(v.arousal * v.weight for v in vectors) / total_weight
@@ -93,5 +93,5 @@ class EmotionAggregator:
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

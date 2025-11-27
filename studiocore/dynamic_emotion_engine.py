@@ -1,12 +1,12 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """DynamicEmotionEngine v1.0.
 
-This adapter normalises emotional readings into a 7-axis vector that can be
-used by downstream biasing logic.  It wraps the existing high-level
+This adapter normalises emotional readings into a 7 - axis vector that can be
+used by downstream biasing logic.  It wraps the existing high - level
 ``EmotionEngine`` heuristics to avoid duplicating lexicon logic while exposing
 an explicit ``emotion_profile`` interface for the new dynamic genre router.
 """
@@ -20,7 +20,7 @@ from .emotion import TruthLovePainEngine
 
 
 class DynamicEmotionEngine:
-    """Bridge between heuristic emotion detection and the new 7-axis profile."""
+    """Bridge between heuristic emotion detection and the new 7 - axis profile."""
 
     AXES = ("joy", "sadness", "anger", "fear", "awe", "love", "pain")
 
@@ -33,7 +33,7 @@ class DynamicEmotionEngine:
         self._tlp_engine = tlp_engine or TruthLovePainEngine()
 
     def emotion_profile(self, text: str) -> Dict[str, float]:
-        """Return a normalised 7-axis emotion vector.
+        """Return a normalised 7 - axis emotion vector.
 
         Falls back to a uniform neutral vector when no signal is present to
         prevent downstream consumers from crashing.
@@ -58,12 +58,15 @@ class DynamicEmotionEngine:
             neutral_value = round(1.0 / len(self.AXES), 3)
             return {axis: neutral_value for axis in self.AXES}
 
-        return {axis: round(max(score, 0.0) / total, 4) for axis, score in raw_vector.items()}
+        return {
+            axis: round(max(score, 0.0) / total, 4)
+            for axis, score in raw_vector.items()
+        }
 
 
 __all__ = ["DynamicEmotionEngine"]
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

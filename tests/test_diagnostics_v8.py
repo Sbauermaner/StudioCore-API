@@ -8,7 +8,9 @@ from typing import Any, Dict
 from studiocore.core_v6 import StudioCoreV6
 
 
-def _run_simple_analysis(text: str = "Тестовая строка для диагностики.") -> Dict[str, Any]:
+def _run_simple_analysis(
+    text: str = "Тестовая строка для диагностики.",
+) -> Dict[str, Any]:
     engine = StudioCoreV6()
     result = engine.analyze(text)
     assert isinstance(result, dict)
@@ -58,5 +60,3 @@ def test_diagnostics_v8_consistency_block_optional() -> None:
             "structure_coherence",
         ):
             assert key in consistency
-
-
