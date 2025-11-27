@@ -1,12 +1,12 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 StudioCore v5 — Integrity Scan Engine
@@ -25,11 +25,11 @@ class IntegrityScanEngine:
     def _symmetry_index(self, lines):
         if not lines:
             return 0.0
-        lengths = [len(l.strip()) for l in lines if l.strip()]
+        lengths = [len(line.strip()) for line in lines if line.strip()]
         if len(lengths) < 2:
             return 1.0
         mean_len = mean(lengths)
-        variance = mean(abs(l - mean_len) for l in lengths) / max(1, mean_len)
+        variance = mean(abs(item - mean_len) for item in lengths) / max(1, mean_len)
         return round(1.0 - min(1.0, variance), 3)
 
     def _punct_density(self, text: str) -> float:
@@ -37,12 +37,12 @@ class IntegrityScanEngine:
         return round(punct / max(1, len(text)) * 10, 3)
 
     def _harmonic_coherence(self, tlp: Dict[str, float]) -> float:
-        t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
-        diff = abs(t - l) + abs(l - p) + abs(t - p)
+        t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)  # noqa: E741
+        diff = abs(t - l) + abs(l - p) + abs(t - p)  # noqa: E741
         return round(1.0 - min(1.0, diff * 0.6), 3)
 
     def analyze(self, text: str) -> Dict[str, Any]:
-        lines = [l for l in text.split("\n") if l.strip()]
+        lines = [line for line in text.split("\n") if line.strip()]
         words = re.findall(r"[^\s]+", text)
         sents = re.split(r"[.!?]+", text)
 
@@ -61,13 +61,16 @@ class IntegrityScanEngine:
 
         # рефлексия — присутствие «я», «мы», «они»
         ref_words = set(
-            "i me my myself я мне меня сам себя думаю чувствую знаю понимаю "
-            "мы наш нас together united мы все".split()
+            "i me my myself я мне меня сам себя думаю чувствую знаю понимаю мы наш нас together united мы все".split()
         )
-        tokens = set(re.findall(r"[a-zA-Zа-яА-ЯёЁ]+", text.lower()))
+        tokens = set(re.findall(r"[a - zA - Zа - яА - ЯёЁ]+", text.lower()))
         reflection = len(tokens & ref_words) / max(1, len(tokens))
-        ego_density = len([w for w in tokens if w in {"я", "i", "my", "me"}]) / max(1, len(tokens))
-        collective_focus = len([w for w in tokens if w in {"мы", "наш", "together"}]) / max(1, len(tokens))
+        ego_density = len([w for w in tokens if w in {"я", "i", "my", "me"}]) / max(
+            1, len(tokens)
+        )
+        collective_focus = len(
+            [w for w in tokens if w in {"мы", "наш", "together"}]
+        ) / max(1, len(tokens))
 
         integrity_score = round(
             0.4 * form["symmetry_index"]
@@ -79,7 +82,11 @@ class IntegrityScanEngine:
 
         return {
             "form": form,
-            "essence": {"emotions": emo, "tlp": tlp, "harmonic_coherence": harmonic_coherence},
+            "essence": {
+                "emotions": emo,
+                "tlp": tlp,
+                "harmonic_coherence": harmonic_coherence,
+            },
             "reflection": {
                 "self_awareness": round(reflection, 3),
                 "ego_density": round(ego_density, 3),
@@ -88,7 +95,8 @@ class IntegrityScanEngine:
             "integrity_score": integrity_score,
         }
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

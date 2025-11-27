@@ -1,9 +1,10 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
-"""Helpers that produce Suno-safe annotations according to the Codex rules."""
+"""Helpers that produce Suno - safe annotations according to the Codex rules."""
+
 from __future__ import annotations
 
 import copy
@@ -14,11 +15,16 @@ from studiocore.color_engine_adapter import EMOTION_COLOR_MAP, get_emotion_color
 
 class EmotionDrivenSunoAdapter:
     """
-    Converts global_emotion_curve + section_emotions into dynamic Suno-style annotations.
-    Does NOT pick genre/BPM/key — only musical behavior (intensity, instruments, vocals).
+    Converts global_emotion_curve + section_emotions into dynamic Suno - style annotations.
+    Does NOT pick genre / BPM / key — only musical behavior (intensity, instruments, vocals).
     """
 
-    def __init__(self, text: str, sections: Sequence[Dict[str, Any]], emotion_curve: Dict[str, Any]):
+    def __init__(
+        self,
+        text: str,
+        sections: Sequence[Dict[str, Any]],
+        emotion_curve: Dict[str, Any],
+    ):
         self.text = text
         self.sections = list(sections or [])
         self.emotion_curve = emotion_curve or {}
@@ -39,6 +45,7 @@ class EmotionDrivenSunoAdapter:
         }
 
     # --- Internal helpers ---
+
     def _resolve_style(self) -> str:
         cluster = (self.emotion_curve or {}).get("dominant_cluster") or ""
         table = {
@@ -66,7 +73,12 @@ class EmotionDrivenSunoAdapter:
 
         if not profiles:
             # choose the strongest axis as a fallback
-            dominant_axis = max(("truth", truth), ("love", love), ("pain", pain), key=lambda item: item[1])
+            dominant_axis = max(
+                ("truth", truth),
+                ("love", love),
+                ("pain", pain),
+                key=lambda item: item[1],
+            )
             axis_map = {
                 "pain": "distorted male low + aggressive fry",
                 "love": "soft female airy + close mic",
@@ -79,8 +91,8 @@ class EmotionDrivenSunoAdapter:
     def _resolve_instrumentation(self) -> str:
         cluster = (self.emotion_curve or {}).get("dominant_cluster") or ""
         mapping = {
-            "rage": "distorted guitars, hard drums, sub-bass pulses",
-            "despair": "distorted guitars, hard drums, sub-bass pulses",
+            "rage": "distorted guitars, hard drums, sub - bass pulses",
+            "despair": "distorted guitars, hard drums, sub - bass pulses",
             "tender": "piano, cello, warm pads",
             "hope": "high strings, bells, shimmer layers",
             "narrative": "acoustic guitar, soft percussion",
@@ -207,7 +219,9 @@ def emotion_to_style(emotion: str) -> str:
     return table.get(emotion, "cinematic narrative")
 
 
-def build_suno_annotations(text: str, sections: Sequence[Dict[str, Any]], emotion_curve: Dict[str, Any]) -> Dict[str, Any]:
+def build_suno_annotations(
+    text: str, sections: Sequence[Dict[str, Any]], emotion_curve: Dict[str, Any]
+) -> Dict[str, Any]:
     adapter = EmotionDrivenSunoAdapter(text, sections, emotion_curve)
     return adapter.build()
 
@@ -215,7 +229,9 @@ def build_suno_annotations(text: str, sections: Sequence[Dict[str, Any]], emotio
 class SunoAnnotationEngine:
     """Wrap annotations with English parenthesised commands."""
 
-    def build_suno_safe_annotations(self, sections: Sequence[str], diagnostics: Dict[str, Any]) -> List[str]:
+    def build_suno_safe_annotations(
+        self, sections: Sequence[str], diagnostics: Dict[str, Any]
+    ) -> List[str]:
         # === Inject emotion_matrix so diagnostics can fill missing fields ===
         base_diag = diagnostics if isinstance(diagnostics, dict) else {}
         result = copy.deepcopy(base_diag)
@@ -230,17 +246,25 @@ class SunoAnnotationEngine:
             annotations.append(self.build_annotation(payload, section_label=header))
         return self.protect_annotations_from_lyrics(annotations)
 
-    def build_annotation(self, payload: Dict[str, Any], section_label: str = "Section") -> str:
-        legacy = payload.get("legacy", {}) if isinstance(payload.get("legacy"), dict) else {}
+    def build_annotation(
+        self, payload: Dict[str, Any], section_label: str = "Section"
+    ) -> str:
+        legacy = (
+            payload.get("legacy", {}) if isinstance(payload.get("legacy"), dict) else {}
+        )
         out = payload.get("out", {}) if isinstance(payload.get("out"), dict) else {}
         style = legacy.get("style", {}) if isinstance(legacy.get("style"), dict) else {}
 
-        emotion_matrix = out.get("emotion_matrix") if isinstance(out.get("emotion_matrix"), dict) else {}
+        emotion_matrix = (
+            out.get("emotion_matrix")
+            if isinstance(out.get("emotion_matrix"), dict)
+            else {}
+        )
 
         genre = style.get("genre") or "auto"
         if genre in (None, "auto") and emotion_matrix:
             genre = emotion_matrix.get("genre", {}).get("primary") or genre
-        # MASTER-PATCH v3.1 — Mood Override
+        # MASTER - PATCH v3.1 — Mood Override
         if style.get("_mood_corrected"):
             mood = style["mood"]
         else:
@@ -249,7 +273,11 @@ class SunoAnnotationEngine:
         arrangement = style.get("arrangement") or "auto"
         bpm_source = legacy.get("bpm") if isinstance(legacy, dict) else None
         if bpm_source is None:
-            bpm_source = out.get("bpm", {}).get("estimate") if isinstance(out.get("bpm"), dict) else None
+            bpm_source = (
+                out.get("bpm", {}).get("estimate")
+                if isinstance(out.get("bpm"), dict)
+                else None
+            )
         if bpm_source is None and emotion_matrix:
             bpm_source = emotion_matrix.get("bpm", {}).get("recommended")
 
@@ -273,9 +301,13 @@ class SunoAnnotationEngine:
         )
 
     def protect_annotations_from_lyrics(self, annotations: Sequence[str]) -> List[str]:
-        return [f"({item})" if not item.startswith("(") else item for item in annotations]
+        return [
+            f"({item})" if not item.startswith("(") else item for item in annotations
+        ]
 
-    def _prepare_diagnostics(self, diagnostics: Dict[str, Any] | None) -> Dict[str, Any]:
+    def _prepare_diagnostics(
+        self, diagnostics: Dict[str, Any] | None
+    ) -> Dict[str, Any]:
         prepared = dict(diagnostics or {})
         if isinstance(diagnostics, dict):
             if isinstance(diagnostics.get("bpm"), dict):
@@ -284,36 +316,52 @@ class SunoAnnotationEngine:
                 prepared["tonality"] = dict(diagnostics.get("tone", {}))
             if isinstance(diagnostics.get("vocal"), dict):
                 prepared["vocal"] = dict(diagnostics.get("vocal", {}))
-        emotion_matrix = prepared.get("emotion_matrix") if isinstance(prepared.get("emotion_matrix"), dict) else None
+        emotion_matrix = (
+            prepared.get("emotion_matrix")
+            if isinstance(prepared.get("emotion_matrix"), dict)
+            else None
+        )
 
         if emotion_matrix:
             # --- BPM FIX ---
-            bpm_block = prepared.get("bpm") if isinstance(prepared.get("bpm"), dict) else {}
+            bpm_block = (
+                prepared.get("bpm") if isinstance(prepared.get("bpm"), dict) else {}
+            )
             recommended_bpm = (emotion_matrix.get("bpm") or {}).get("recommended")
             if bpm_block.get("estimate") is None and recommended_bpm:
                 bpm_block = {**bpm_block, "estimate": recommended_bpm}
             prepared["bpm"] = bpm_block
 
             # --- KEY FIX ---
-            tonality_block = prepared.get("tonality") if isinstance(prepared.get("tonality"), dict) else {}
+            tonality_block = (
+                prepared.get("tonality")
+                if isinstance(prepared.get("tonality"), dict)
+                else {}
+            )
             key_mode = (emotion_matrix.get("key") or {}).get("mode")
             if (tonality_block.get("key") in (None, "auto")) and key_mode:
                 tonality_block = {**tonality_block, "key": key_mode}
             prepared["tonality"] = tonality_block
 
             # --- VOCAL FIX (supports dict or list) ---
-            vocal_block = prepared.get("vocal") if isinstance(prepared.get("vocal"), dict) else {}
+            vocal_block = (
+                prepared.get("vocal") if isinstance(prepared.get("vocal"), dict) else {}
+            )
             matrix_vocals = emotion_matrix.get("vocals") or {}
             notes = matrix_vocals.get("notes")
             if not vocal_block.get("style") and notes:
                 vocal_block = {
                     **vocal_block,
-                    "style": notes if isinstance(notes, str) else ", ".join(notes)
+                    "style": notes if isinstance(notes, str) else ", ".join(notes),
                 }
             prepared["vocal"] = vocal_block
 
             # --- INSTRUMENTATION FIX (core + accent + texture) ---
-            inst_block = prepared.get("instrumentation") if isinstance(prepared.get("instrumentation"), dict) else {}
+            inst_block = (
+                prepared.get("instrumentation")
+                if isinstance(prepared.get("instrumentation"), dict)
+                else {}
+            )
             matrix_instruments = emotion_matrix.get("instruments") or {}
 
             core = matrix_instruments.get("core") or []
@@ -321,9 +369,12 @@ class SunoAnnotationEngine:
             texture = matrix_instruments.get("texture") or []
 
             palette = []
-            if core: palette.extend(core)
-            if accent: palette.extend(accent)
-            if texture: palette.extend(texture)
+            if core:
+                palette.extend(core)
+            if accent:
+                palette.extend(accent)
+            if texture:
+                palette.extend(texture)
 
             if palette and not inst_block.get("palette"):
                 inst_block = {**inst_block, "palette": palette}
@@ -332,8 +383,14 @@ class SunoAnnotationEngine:
 
         return prepared
 
-    def insert_parenthesized_commands(self, command_payload: Dict[str, Any], index: int) -> List[str]:
-        detected = command_payload.get("detected", []) if isinstance(command_payload, dict) else []
+    def insert_parenthesized_commands(
+        self, command_payload: Dict[str, Any], index: int
+    ) -> List[str]:
+        detected = (
+            command_payload.get("detected", [])
+            if isinstance(command_payload, dict)
+            else []
+        )
         result = []
         for cmd in detected:
             raw = cmd.get("raw") if isinstance(cmd, dict) else None
@@ -344,21 +401,29 @@ class SunoAnnotationEngine:
     def _starts_with_ljubimaya(self, section: str) -> bool:
         return section.strip().startswith("Любимая!")
 
-    def _has_direct_address_peak(self, section: str, diagnostics: Dict[str, Any] | None) -> bool:
+    def _has_direct_address_peak(
+        self, section: str, diagnostics: Dict[str, Any] | None
+    ) -> bool:
         lowered = section.lower()
         direct_tokens = ("ты", "тебя", "тебе", "твой", "любимая", "дорогая", "друг мой")
         address_hit = any(token in lowered for token in direct_tokens)
-        emotional_peak = section.count("!") >= 1 or section.count("!") + section.count("?") >= 2
+        emotional_peak = (
+            section.count("!") >= 1 or section.count("!") + section.count("?") >= 2
+        )
         if not address_hit:
             return False
         if emotional_peak:
             return True
-        commands = diagnostics.get("commands", {}) if isinstance(diagnostics, dict) else {}
+        commands = (
+            diagnostics.get("commands", {}) if isinstance(diagnostics, dict) else {}
+        )
         return bool(commands)
 
-    def generate_section_headers(self, sections: Sequence[str], diagnostics: Dict[str, Any] | None = None) -> List[str]:
+    def generate_section_headers(
+        self, sections: Sequence[str], diagnostics: Dict[str, Any] | None = None
+    ) -> List[str]:
         headers = []
-        labels = ("Intro", "Verse", "Pre-Chorus", "Chorus", "Bridge", "Outro")
+        labels = ("Intro", "Verse", "Pre - Chorus", "Chorus", "Bridge", "Outro")
         for idx in range(len(sections)):
             section_text = sections[idx] if idx < len(sections) else ""
             label = labels[idx % len(labels)]
@@ -375,9 +440,19 @@ class SunoAnnotationEngine:
             headers.append(header)
         return headers
 
-    def attach_bpm_and_fracture_commands(self, diagnostics: Dict[str, Any], index: int) -> List[str]:
-        bpm = diagnostics.get("bpm", {}).get("estimate") if isinstance(diagnostics.get("bpm"), dict) else None
-        fractures = diagnostics.get("instrumentation", {}).get("fractures") if isinstance(diagnostics.get("instrumentation"), dict) else []
+    def attach_bpm_and_fracture_commands(
+        self, diagnostics: Dict[str, Any], index: int
+    ) -> List[str]:
+        bpm = (
+            diagnostics.get("bpm", {}).get("estimate")
+            if isinstance(diagnostics.get("bpm"), dict)
+            else None
+        )
+        fractures = (
+            diagnostics.get("instrumentation", {}).get("fractures")
+            if isinstance(diagnostics.get("instrumentation"), dict)
+            else []
+        )
         result = []
         if bpm:
             result.append(f"(BPM ~ {int(bpm)})")
@@ -385,18 +460,30 @@ class SunoAnnotationEngine:
             result.append("(BPM Fracture)")
         return result
 
-    def attach_vocal_and_instrumental_commands(self, diagnostics: Dict[str, Any], index: int) -> List[str]:
-        vocal = diagnostics.get("vocal", {}) if isinstance(diagnostics.get("vocal"), dict) else {}
-        instrumentation = diagnostics.get("instrumentation", {}).get("palette") if isinstance(diagnostics.get("instrumentation"), dict) else []
+    def attach_vocal_and_instrumental_commands(
+        self, diagnostics: Dict[str, Any], index: int
+    ) -> List[str]:
+        vocal = (
+            diagnostics.get("vocal", {})
+            if isinstance(diagnostics.get("vocal"), dict)
+            else {}
+        )
+        instrumentation = (
+            diagnostics.get("instrumentation", {}).get("palette")
+            if isinstance(diagnostics.get("instrumentation"), dict)
+            else []
+        )
         result = []
         if vocal.get("style"):
             result.append(f"(Vocal: {vocal['style']})")
         if instrumentation:
-            result.append(f"(Instruments IN: {instrumentation[index % len(instrumentation)]})")
+            result.append(
+                f"(Instruments IN: {instrumentation[index % len(instrumentation)]})"
+            )
         return result
 
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

@@ -2,7 +2,6 @@
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27
 # Hash: 22ae-df91-bc11-6c7e
-import math
 
 from studiocore.emotion import EmotionEngine, load_emotion_model
 
@@ -27,7 +26,9 @@ def test_emotion_profile_shape():
 def test_integration_aggression_and_love():
     engine = EmotionEngine()
 
-    aggressive_text = "rage anger hatred fury fight scream burn the stage with metal thunder"
+    aggressive_text = (
+        "rage anger hatred fury fight scream burn the stage with metal thunder"
+    )
     aggressive_profile = engine.build_emotion_profile(aggressive_text)
     aggressive_genres = [
         genre
@@ -37,7 +38,9 @@ def test_integration_aggression_and_love():
     assert aggressive_genres
     assert aggressive_profile.get("bpm", 0) > 110
 
-    love_text = "love tenderness warmth embrace forever gentle melody soft heart full of hope"
+    love_text = (
+        "love tenderness warmth embrace forever gentle melody soft heart full of hope"
+    )
     love_profile = engine.build_emotion_profile(love_text)
     soft_genres = (
         "pop_ballad",
@@ -46,9 +49,12 @@ def test_integration_aggression_and_love():
         "soft_rock",
         "lyrical_ballad",
     )
-    assert any(love_profile.get("genre_scores", {}).get(name, 0) >= 0 for name in soft_genres)
+    assert any(
+        love_profile.get("genre_scores", {}).get(name, 0) >= 0 for name in soft_genres
+    )
     assert 70 <= love_profile.get("bpm", 0) <= 110
     assert str(love_profile.get("key", {}).get("scale", "")).startswith("major")
+
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)

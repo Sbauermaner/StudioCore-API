@@ -1,29 +1,29 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
-Большой эмоционально-стилистический словарь:
+Большой эмоционально - стилистический словарь:
 - тональность текста
 - эмоциональные оттенки
 - регистр речи
 - драматическая насыщенность
 """
+
 from __future__ import annotations
 from typing import Any, Dict, List
 
 
 class EmotionLexiconExtended:
-    """Rule-based helper that tags the text with broad emotional buckets."""
+    """Rule - based helper that tags the text with broad emotional buckets."""
 
     def __init__(self) -> None:
-
         # Основные эмоциональные категории
         self.emotion_words: Dict[str, List[str]] = {
             "love": ["люблю", "любовь", "нежность", "ласка", "страсть"],
@@ -109,7 +109,8 @@ class EmotionLexiconExtended:
 
         return round(min(1.0, base + punctuation_bonus), 3)
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

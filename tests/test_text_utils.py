@@ -11,7 +11,9 @@ def test_translate_text_for_analysis_passthrough_languages(caplog):
         assert translated == "пример"
         assert was_translated is False
         assert not [
-            record for record in caplog.records if "Simulating translation" in record.message
+            record
+            for record in caplog.records
+            if "Simulating translation" in record.message
         ]
         caplog.clear()
 
@@ -22,6 +24,4 @@ def test_translate_text_for_analysis_simulates_for_unsupported(caplog):
 
     assert translated == "texto"
     assert was_translated is True
-    assert any(
-        "Simulating translation" in record.message for record in caplog.records
-    )
+    assert any("Simulating translation" in record.message for record in caplog.records)

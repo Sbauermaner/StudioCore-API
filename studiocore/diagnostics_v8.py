@@ -1,16 +1,14 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf - 8 -*-
 """
 DiagnosticsBuilderV8 — structured diagnostics wrapper for StudioCore.
 
-This module introduces a stable, schema-based view over the raw diagnostics
+This module introduces a stable, schema - based view over the raw diagnostics
 produced by the engines while preserving all legacy keys at the top level.
 
 Schema version: v8.0
 """
 
-from __future__ import annotations
-
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 
 class DiagnosticsBuilderV8:
@@ -18,7 +16,9 @@ class DiagnosticsBuilderV8:
 
     SCHEMA_VERSION = "v8.0"
 
-    def __init__(self, base: Dict[str, Any], payload: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(
+        self, base: Dict[str, Any], payload: Optional[Dict[str, Any]] = None
+    ) -> None:
         # base is the raw diagnostics dict built by core_v6 / monolith
         self._base = base or {}
         self._payload = payload or {}
@@ -26,7 +26,7 @@ class DiagnosticsBuilderV8:
     # --- small helpers -------------------------------------------------
 
     def _extract_engines_block(self) -> Dict[str, Any]:
-        """Group engine-related fields into a nested 'engines' block."""
+        """Group engine - related fields into a nested 'engines' block."""
         base = self._base
 
         engines: Dict[str, Any] = {}
@@ -43,7 +43,9 @@ class DiagnosticsBuilderV8:
         if "tone_profile" in base:
             engines["tone"] = base.get("tone_profile")
         if "frequency_profile" in base or "frequency" in base:
-            engines["frequency"] = base.get("frequency_profile") or base.get("frequency")
+            engines["frequency"] = base.get("frequency_profile") or base.get(
+                "frequency"
+            )
 
         return engines
 
@@ -68,7 +70,7 @@ class DiagnosticsBuilderV8:
         return summary_blocks
 
     def _extract_meta(self) -> Dict[str, Any]:
-        """Basic meta-information about diagnostics."""
+        """Basic meta - information about diagnostics."""
         meta: Dict[str, Any] = {
             "schema": self.SCHEMA_VERSION,
         }
@@ -98,7 +100,7 @@ class DiagnosticsBuilderV8:
                - 'summary_blocks'
                - 'consistency' (if present in base)
                - 'meta'
-          3) Do NOT delete or rename existing keys to avoid breaking tests/clients.
+          3) Do NOT delete or rename existing keys to avoid breaking tests / clients.
         """
         result: Dict[str, Any] = dict(self._base)  # preserve legacy keys
 
@@ -113,7 +115,7 @@ class DiagnosticsBuilderV8:
         # Meta section
         result["meta"] = self._extract_meta()
 
-        # Mark diagnostics schema version explicitly (top-level key)
+        # Mark diagnostics schema version explicitly (top - level key)
         result["diagnostic_schema"] = self.SCHEMA_VERSION
 
         return result

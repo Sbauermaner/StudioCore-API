@@ -1,26 +1,36 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-
-"""StudioCore loader with MAXI fallback orchestration."""
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 from __future__ import annotations
-
 import importlib
 import logging
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Tuple, Type
+import glob
+import os as _os
+import re
 
-FINGERPRINT = "StudioCore-FP-2025-SB-9fd72e27"
+# Опциональный импорт core_v6 (может не существовать)
+try:
+    from .core_v6 import StudioCoreV6
+except ImportError:
+    StudioCoreV6 = None
 
-from .core_v6 import StudioCoreV6
 from .fallback import StudioCoreFallback
 
-# Version fingerprint linked to FINGERPRINT: StudioCore-FP-2025-SB-9fd72e27
-# NOTE: This is the canonical public version; config.py mirrors this value for consistency.
-STUDIOCORE_VERSION = "v6.4-maxi"
+"""StudioCore loader with MAXI fallback orchestration."""
+
+
+FINGERPRINT = "StudioCore - FP - 2025 - SB - 9fd72e27"
+
+
+# Version fingerprint linked to FINGERPRINT: StudioCore - FP - 2025 - SB - 9fd72e27
+# NOTE: This is the canonical public version; config.py mirrors this value
+# for consistency.
+STUDIOCORE_VERSION = "v6.4 - maxi"
 DEFAULT_MONOLITH = "monolith_v4_3_1"
 DEFAULT_LOADER_ORDER = ("v6", "v5", "monolith", "fallback")
 
@@ -60,10 +70,6 @@ def _setup_loader_logging() -> logging.Logger:
 
 
 def _detect_latest_monolith() -> str:
-    import glob
-    import os as _os
-    import re
-
     base = _os.path.dirname(__file__)
     candidates = glob.glob(_os.path.join(base, "monolith_*.py"))
     if not candidates:
@@ -77,7 +83,9 @@ def _detect_latest_monolith() -> str:
     return os.path.splitext(os.path.basename(latest))[0]
 
 
-def _import_monolith(name: str) -> Tuple[Type[Any] | None, Type[Any] | None, str, str, str | None]:
+def _import_monolith(
+    name: str,
+) -> Tuple[Type[Any] | None, Type[Any] | None, str, str, str | None]:
     try:
         module = importlib.import_module(f".{name}", package=__name__)
     except ImportError as exc:  # pragma: no cover - diagnostics only
@@ -130,8 +138,8 @@ _LOGGER = _setup_loader_logging()
 _FORCE_V5 = os.getenv("STUDIOCORE_FORCE_V5", "").strip().lower() in {"1", "true", "yes"}
 _MONOLITH_OVERRIDE = os.getenv("STUDIOCORE_MONOLITH")
 
-_MONOLITH_CLS, _MONOLITH_V5, MONOLITH_NAME, MONOLITH_VERSION, _LOAD_ERROR = _import_monolith(
-    _MONOLITH_OVERRIDE or _detect_latest_monolith()
+_MONOLITH_CLS, _MONOLITH_V5, MONOLITH_NAME, MONOLITH_VERSION, _LOAD_ERROR = (
+    _import_monolith(_MONOLITH_OVERRIDE or _detect_latest_monolith())
 )
 if _LOAD_ERROR:
     _LOGGER.warning("Monolith import issue (%s): %s", MONOLITH_NAME, _LOAD_ERROR)
@@ -189,7 +197,9 @@ _LOADER_DIAGNOSTICS = LoaderDiagnostics(
 )
 
 
-def _update_diagnostics(*, active: str | None, attempted: List[str], errors: List[str]) -> None:
+def _update_diagnostics(
+    *, active: str | None, attempted: List[str], errors: List[str]
+) -> None:
     global _LOADER_DIAGNOSTICS
     _LOADER_DIAGNOSTICS = LoaderDiagnostics(
         monolith_module=MONOLITH_NAME,
@@ -259,7 +269,7 @@ __all__ = [
 ]
 
 
-if __name__ == "__main__":  # pragma: no cover - manual smoke-test only
+if __name__ == "__main__":  # pragma: no cover - manual smoke - test only
     print(f"\n🧠 Инициализация StudioCore {STUDIOCORE_VERSION}...")
     try:
         core = get_core()
@@ -288,5 +298,5 @@ if __name__ == "__main__":  # pragma: no cover - manual smoke-test only
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

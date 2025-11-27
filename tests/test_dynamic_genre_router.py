@@ -25,6 +25,7 @@ def test_dynamic_genre_router_basic_sanity():
     assert macro2 == "jazz"
     assert reason2 == "user_override"
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27

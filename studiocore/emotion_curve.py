@@ -1,7 +1,7 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 """Global emotion curve construction utilities."""
 
 from __future__ import annotations
@@ -38,7 +38,9 @@ def _ordered_sections(section_emotions: Sequence[Dict]) -> List[Dict]:
     augmented: List[Dict] = []
     for idx, section in enumerate(section_emotions):
         section_name = str(section.get("section", "")).lower()
-        augmented.append((order_index.get(section_name, len(order_index) + idx), idx, dict(section)))
+        augmented.append(
+            (order_index.get(section_name, len(order_index) + idx), idx, dict(section))
+        )
 
     augmented.sort(key=lambda item: (item[0], item[1]))
     ordered = []
@@ -97,7 +99,9 @@ def _dominant_cluster(sections: Sequence[Dict]) -> str | None:
     best_cluster = None
     best_intensity = -1.0
     for cluster in candidates:
-        avg_intensity = intensity_sum.get(cluster, 0.0) / max(frequency.get(cluster, 1), 1)
+        avg_intensity = intensity_sum.get(cluster, 0.0) / max(
+            frequency.get(cluster, 1), 1
+        )
         if avg_intensity > best_intensity:
             best_cluster = cluster
             best_intensity = avg_intensity
@@ -113,11 +117,15 @@ def _peaks_and_valleys(intensities: Sequence[float]) -> tuple[List[int], List[in
     peak_threshold = max_intensity - 0.05
     valley_threshold = min_intensity + 0.05
     peaks = [idx for idx, value in enumerate(safe_values) if value >= peak_threshold]
-    valleys = [idx for idx, value in enumerate(safe_values) if value <= valley_threshold]
+    valleys = [
+        idx for idx, value in enumerate(safe_values) if value <= valley_threshold
+    ]
     return peaks, valleys
 
 
-def _compute_dynamic_bias(global_tlp: Dict[str, float], cluster: str | None) -> Dict[str, object]:
+def _compute_dynamic_bias(
+    global_tlp: Dict[str, float], cluster: str | None
+) -> Dict[str, object]:
     bias = {"bpm_delta": 0.0, "key_hint": None, "genre_hint": None}
     cluster_key = (cluster or "").lower()
     truth = float(global_tlp.get("truth", 0.0) or 0.0)
@@ -140,7 +148,9 @@ def _compute_dynamic_bias(global_tlp: Dict[str, float], cluster: str | None) -> 
     elif love > pain and love > truth and cluster_key in {"tender", "hope"}:
         bias["bpm_delta"] = -6.0
         bias["key_hint"] = "major"
-    elif truth > pain and truth > love and cluster_key in {"contemplative", "narrative"}:
+    elif (
+        truth > pain and truth > love and cluster_key in {"contemplative", "narrative"}
+    ):
         bias["bpm_delta"] = -3.0
         bias["key_hint"] = None
 
@@ -169,5 +179,5 @@ __all__ = ["GlobalEmotionCurve", "build_global_emotion_curve"]
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

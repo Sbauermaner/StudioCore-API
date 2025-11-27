@@ -23,6 +23,7 @@ def test_compute_genre_bias_variant_a_rules():
     assert bias["orchestral"] >= bias["hip_hop"]
     assert all(0.0 <= val <= 1.0 for val in bias.values())
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27

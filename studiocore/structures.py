@@ -1,10 +1,18 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+
 
 class PhraseEmotionPacket:
-    def __init__(self, phrase: str, emotions: dict, weight: float, impact_zone: str, semantic_role: str):
+    def __init__(
+        self,
+        phrase: str,
+        emotions: dict,
+        weight: float,
+        impact_zone: str,
+        semantic_role: str,
+    ):
         self.phrase = phrase
         self.emotions = emotions
         self.weight = weight
@@ -22,7 +30,9 @@ class PhraseEmotionPacket:
 
 
 class SectionEmotionWave:
-    def __init__(self, section, tlp_mean, cluster_peak, intensity, emotional_shape, hot_phrases):
+    def __init__(
+        self, section, tlp_mean, cluster_peak, intensity, emotional_shape, hot_phrases
+    ):
         self.section = section
         self.tlp_mean = tlp_mean
         self.cluster_peak = cluster_peak
@@ -40,7 +50,8 @@ class SectionEmotionWave:
             "hot_phrases": self.hot_phrases,
         }
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

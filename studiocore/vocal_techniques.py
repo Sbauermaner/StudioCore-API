@@ -1,7 +1,7 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 Расширенный реестр вокальных техник и типов для StudioCore.
@@ -14,6 +14,7 @@ from enum import Enum
 
 class VocalCategory(Enum):
     """Категории вокальных техник."""
+
     ACADEMIC = "academic"
     POPULAR = "popular"
     JAZZ = "jazz"
@@ -95,7 +96,7 @@ POPULAR_VOCALS = [
 ]
 
 # =========================
-# 3. ДЖАЗОВЫЙ И СОУЛ-ВОКАЛ
+# 3. ДЖАЗОВЫЙ И СОУЛ - ВОКАЛ
 # =========================
 JAZZ_VOCALS = [
     "scat_singing",
@@ -215,7 +216,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("head_voice", 0.3),
         ("bright_tone", 0.3),
     ],
-    
     # Calm / Serenity
     "calm": [
         ("lyric_baritone", 0.3),
@@ -232,7 +232,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("mixed_voice", 0.3),
         ("resonant", 0.3),
     ],
-    
     # Love
     "love": [
         ("lyric_soprano", 0.3),
@@ -285,7 +284,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("baritone", 0.3),
         ("choir", 0.4),
     ],
-    
     # Sadness
     "sadness": [
         ("baritone", 0.4),
@@ -332,7 +330,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("soft", 0.4),
         ("breathy", 0.2),
     ],
-    
     # Pain
     "deep_pain": [
         ("dramatic_baritone", 0.4),
@@ -369,7 +366,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("guttural", 0.3),
         ("low", 0.3),
     ],
-    
     # Rage / Anger
     "rage": [
         ("dramatic_tenor", 0.3),
@@ -416,7 +412,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("grit", 0.3),
         ("rasp", 0.3),
     ],
-    
     # Fear / Anxiety
     "fear": [
         ("soprano", 0.3),
@@ -453,7 +448,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("rasp", 0.3),
         ("grit", 0.3),
     ],
-    
     # Awe / Wonder
     "awe": [
         ("soprano", 0.3),
@@ -480,7 +474,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("baritone", 0.3),
         ("harmonious", 0.4),
     ],
-    
     # Dark / Gothic
     "gothic_dark": [
         ("bass", 0.4),
@@ -497,7 +490,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("warm", 0.3),
         ("emotional", 0.3),
     ],
-    
     # Truth
     "clear_truth": [
         ("tenor", 0.4),
@@ -529,7 +521,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("powerful", 0.3),
         ("clear", 0.3),
     ],
-    
     # Resolve / Determination
     "resolve": [
         ("baritone", 0.4),
@@ -541,7 +532,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("belting", 0.3),
         ("powerful", 0.3),
     ],
-    
     # Rhythmic / Structural
     "calm_flow": [
         ("tenor", 0.4),
@@ -593,7 +583,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("fast", 0.4),
         ("intense", 0.2),
     ],
-    
     # Core States
     "peace": [
         ("lyric_soprano", 0.3),
@@ -605,7 +594,6 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
         ("baritone", 0.3),
         ("balanced", 0.4),
     ],
-    
     # Epic
     "epic": [
         ("soprano", 0.3),
@@ -618,11 +606,11 @@ EMOTION_TO_VOCAL_MAP: Dict[str, List[Tuple[str, float]]] = {
 def get_vocal_for_emotion(emotion: str, intensity: float = 1.0) -> List[str]:
     """
     Получить список вокальных техник для эмоции с учетом интенсивности.
-    
+
     Args:
         emotion: Название эмоции
-        intensity: Интенсивность эмоции (0.0-1.0)
-    
+        intensity: Интенсивность эмоции (0.0 - 1.0)
+
     Returns:
         Список вокальных техник, отсортированный по релевантности
     """
@@ -635,27 +623,27 @@ def get_vocal_for_emotion(emotion: str, intensity: float = 1.0) -> List[str]:
         "confessional": "clear_truth",  # Чистый, исповедальный вокал
         "confessional_nostalgia": "sadness",  # Меланхоличный исповедальный вокал
     }
-    
+
     # Используем маппинг если есть
     mapped_emotion = emotion_mapping.get(emotion, emotion)
-    
+
     techniques = EMOTION_TO_VOCAL_MAP.get(mapped_emotion, [])
     if not techniques:
         # Fallback для неизвестных эмоций
         return ["tenor", "baritone", "balanced"]
-    
+
     # Фильтруем по интенсивности и сортируем
     filtered = [
         (tech, weight * intensity)
         for tech, weight in techniques
         if weight * intensity >= 0.15  # Минимальный порог
     ]
-    
+
     # Сортируем по весу (убывание)
     filtered.sort(key=lambda x: x[1], reverse=True)
-    
+
     # Возвращаем только техники (без весов)
-    return [tech for tech, _ in filtered[:3]]  # Топ-3 техники
+    return [tech for tech, _ in filtered[:3]]  # Топ - 3 техники
 
 
 def get_vocal_for_section(
@@ -667,19 +655,19 @@ def get_vocal_for_section(
 ) -> str:
     """
     Получить вокальную технику для секции на основе эмоций и жанра.
-    
+
     Args:
         section_emotion: Доминирующая эмоция секции
         section_intensity: Интенсивность эмоции в секции
         global_emotion: Глобальная эмоция (опционально)
         genre: Жанр (опционально)
         section_name: Название секции (Verse, Chorus, Bridge, Outro и т.д.) для вариативности
-    
+
     Returns:
         Строка с описанием вокальной техники для секции
     """
     techniques = get_vocal_for_emotion(section_emotion, section_intensity)
-    
+
     # Вариативность по типу секции
     if section_name:
         section_lower = section_name.lower()
@@ -693,14 +681,18 @@ def get_vocal_for_section(
                 techniques = ["expanded_tenor", "belting", "emotional"] + techniques
             elif "final" in section_lower:
                 # Final Chorus: эмоциональный пик
-                techniques = ["powerful_tenor", "belting", "emotional_peak"] + techniques
+                techniques = [
+                    "powerful_tenor",
+                    "belting",
+                    "emotional_peak",
+                ] + techniques
         elif "bridge" in section_lower:
             # Bridge: дыхательный, напряженный вокал
             techniques = ["breathy", "tension", "emotional"] + techniques
         elif "outro" in section_lower:
             # Outro: шёпот, низкая энергия
             techniques = ["whisper", "soft", "low_energy"] + techniques
-    
+
     # Жанровые модификации
     if genre:
         genre_lower = genre.lower()
@@ -711,13 +703,19 @@ def get_vocal_for_section(
             techniques = ["scat_singing", "crooning"] + techniques
         elif "classical" in genre_lower or "orchestral" in genre_lower:
             # Приоритет академическим техникам
-            academic_techs = [t for t in techniques if any(cat in t for cat in ["soprano", "tenor", "baritone", "bass", "alto"])]
+            academic_techs = [
+                t
+                for t in techniques
+                if any(
+                    cat in t for cat in ["soprano", "tenor", "baritone", "bass", "alto"]
+                )
+            ]
             if academic_techs:
                 techniques = academic_techs + techniques
-    
+
     # Выбираем основную технику
     primary = techniques[0] if techniques else "tenor"
-    
+
     # Формируем описание
     if len(techniques) > 1:
         return f"{primary} with {', '.join(techniques[1:3])}"
@@ -727,31 +725,30 @@ def get_vocal_for_section(
 def get_all_vocal_techniques() -> List[str]:
     """Получить полный список всех доступных вокальных техник."""
     all_techs = []
-    
+
     # Академические
     for category, techs in ACADEMIC_VOCALS.items():
         all_techs.extend(techs)
-    
+
     # Популярные
     all_techs.extend(POPULAR_VOCALS)
-    
+
     # Джазовые
     all_techs.extend(JAZZ_VOCALS)
-    
+
     # Этнические
     all_techs.extend(ETHNIC_VOCALS)
-    
+
     # Экстремальные
     all_techs.extend(EXTREME_VOCALS)
-    
+
     # Экспериментальные
     all_techs.extend(EXPERIMENTAL_VOCALS)
-    
+
     return sorted(list(set(all_techs)))
 
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

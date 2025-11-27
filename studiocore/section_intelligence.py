@@ -1,9 +1,10 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """Advanced section detection helpers mandated by the Codex specification."""
+
 from __future__ import annotations
 
 from collections import Counter
@@ -16,7 +17,7 @@ from .text_utils import extract_phrases_from_section, extract_sections
 
 
 class SectionIntelligenceEngine:
-    """Detect chorus/mantra/transition cues beyond naive splitting."""
+    """Detect chorus / mantra / transition cues beyond naive splitting."""
 
     LONGFORM_SECTION_RULES = (
         "semantic_markers_strict",
@@ -24,14 +25,20 @@ class SectionIntelligenceEngine:
         "no_block_merging",
     )
 
-    def _prepare_sections(self, sections: Sequence[str] | None, text: str | None) -> List[str]:
+    def _prepare_sections(
+        self, sections: Sequence[str] | None, text: str | None
+    ) -> List[str]:
         if sections:
-            return [section.strip() for section in sections if section and section.strip()]
+            return [
+                section.strip() for section in sections if section and section.strip()
+            ]
         if text:
             return [block.strip() for block in text.split("\n\n") if block.strip()]
         return []
 
-    def detect_repeated_motif(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+    def detect_repeated_motif(
+        self, sections: Sequence[str] | None, text: str
+    ) -> Dict[str, Any]:
         sections = self._prepare_sections(sections, text)
         motif_counter: Counter[str] = Counter()
         for section in sections:
@@ -42,7 +49,9 @@ class SectionIntelligenceEngine:
         repeated = [line for line, count in motif_counter.items() if count > 1]
         return {"motifs": repeated[:8], "count": len(repeated)}
 
-    def detect_chorus_by_pattern(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+    def detect_chorus_by_pattern(
+        self, sections: Sequence[str] | None, text: str
+    ) -> Dict[str, Any]:
         sections = self._prepare_sections(sections, text)
         candidate = None
         highest_repeat = -1
@@ -55,21 +64,30 @@ class SectionIntelligenceEngine:
                 candidate = idx
         return {"index": candidate, "score": round(highest_repeat, 3)}
 
-    def detect_emotional_peak_chorus(self, emotion_curve: Sequence[float] | None) -> Dict[str, Any]:
+    def detect_emotional_peak_chorus(
+        self, emotion_curve: Sequence[float] | None
+    ) -> Dict[str, Any]:
         if not emotion_curve:
             return {"index": None, "intensity": 0.0}
         max_idx = max(range(len(emotion_curve)), key=emotion_curve.__getitem__)
         return {"index": max_idx, "intensity": round(float(emotion_curve[max_idx]), 3)}
 
-    def detect_prechorus(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+    def detect_prechorus(
+        self, sections: Sequence[str] | None, text: str
+    ) -> Dict[str, Any]:
         sections = self._prepare_sections(sections, text)
         if not sections:
             return {"index": None, "confidence": 0.0}
         if len(sections) < 3:
             return {"index": 0, "confidence": 0.3}
-        return {"index": max(0, self.detect_chorus_by_pattern(sections, text)["index"] - 1), "confidence": 0.6}
+        return {
+            "index": max(0, self.detect_chorus_by_pattern(sections, text)["index"] - 1),
+            "confidence": 0.6,
+        }
 
-    def detect_semantic_block_shift(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+    def detect_semantic_block_shift(
+        self, sections: Sequence[str] | None, text: str
+    ) -> Dict[str, Any]:
         sections = self._prepare_sections(sections, text)
         deltas: List[int] = []
         prev_len = None
@@ -81,7 +99,9 @@ class SectionIntelligenceEngine:
         shift_index = deltas.index(max(deltas)) + 1 if deltas else None
         return {"index": shift_index, "delta": max(deltas) if deltas else 0}
 
-    def detect_mantra_section(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+    def detect_mantra_section(
+        self, sections: Sequence[str] | None, text: str
+    ) -> Dict[str, Any]:
         sections = self._prepare_sections(sections, text)
         mantra_idx = None
         for idx, section in enumerate(sections):
@@ -89,18 +109,28 @@ class SectionIntelligenceEngine:
             if lines and len(set(lines)) <= max(1, len(lines) // 2):
                 mantra_idx = idx
                 break
-        return {"index": mantra_idx, "confidence": 0.8 if mantra_idx is not None else 0.0}
+        return {
+            "index": mantra_idx,
+            "confidence": 0.8 if mantra_idx is not None else 0.0,
+        }
 
-    def detect_transition_drop(self, emotion_curve: Sequence[float] | None) -> Dict[str, Any]:
+    def detect_transition_drop(
+        self, emotion_curve: Sequence[float] | None
+    ) -> Dict[str, Any]:
         if not emotion_curve:
             return {"index": None, "delta": 0.0}
-        drops = [emotion_curve[i] - emotion_curve[i + 1] for i in range(len(emotion_curve) - 1)]
+        drops = [
+            emotion_curve[i] - emotion_curve[i + 1]
+            for i in range(len(emotion_curve) - 1)
+        ]
         if not drops:
             return {"index": None, "delta": 0.0}
         idx = drops.index(max(drops))
         return {"index": idx + 1, "delta": round(drops[idx], 3)}
 
-    def detect_intro_ending(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+    def detect_intro_ending(
+        self, sections: Sequence[str] | None, text: str
+    ) -> Dict[str, Any]:
         sections = self._prepare_sections(sections, text)
         if not sections:
             return {"index": None, "confidence": 0.0}
@@ -108,7 +138,9 @@ class SectionIntelligenceEngine:
         confidence = 1.0 if intro_length < 30 else 0.4
         return {"index": 0, "confidence": confidence}
 
-    def detect_outro_fade(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+    def detect_outro_fade(
+        self, sections: Sequence[str] | None, text: str
+    ) -> Dict[str, Any]:
         sections = self._prepare_sections(sections, text)
         if not sections:
             return {"index": None, "confidence": 0.0}
@@ -116,9 +148,14 @@ class SectionIntelligenceEngine:
         confidence = 1.0 if outro_length < 20 else 0.5
         return {"index": len(sections) - 1, "confidence": confidence}
 
-    def detect_chorus(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
+    def detect_chorus(
+        self, sections: Sequence[str] | None, text: str
+    ) -> Dict[str, Any]:
         motif = self.detect_chorus_by_pattern(sections, text)
-        return {"index": motif.get("index"), "confidence": min(1.0, (motif.get("score") or 0) / 3)}
+        return {
+            "index": motif.get("index"),
+            "confidence": min(1.0, (motif.get("score") or 0) / 3),
+        }
 
     def detect_intro(self, sections: Sequence[str] | None, text: str) -> Dict[str, Any]:
         intro = self.detect_intro_ending(sections, text)
@@ -130,9 +167,13 @@ class SectionIntelligenceEngine:
         outro["label"] = "outro"
         return outro
 
-    def detect_longform(self, text: str, sections: Sequence[str] | None) -> Dict[str, Any]:
+    def detect_longform(
+        self, text: str, sections: Sequence[str] | None
+    ) -> Dict[str, Any]:
         resolved = self._prepare_sections(sections, text)
-        line_count = sum(len(section.splitlines()) for section in resolved) or len(text.splitlines())
+        line_count = sum(len(section.splitlines()) for section in resolved) or len(
+            text.splitlines()
+        )
         mode = "default"
         rules: List[str] = []
         if line_count > 120:
@@ -146,14 +187,18 @@ class SectionIntelligenceEngine:
         }
 
     def compute_structure_tension(self, sections: Sequence[str] | None) -> float:
-        segments = [section.strip() for section in (sections or []) if section and section.strip()]
+        segments = [
+            section.strip()
+            for section in (sections or [])
+            if section and section.strip()
+        ]
         if not segments:
             return 0.0
 
         def _section_energy(payload: str) -> float:
             words = payload.split()
             unique = len(set(words)) or 1
-            punctuation = sum(payload.count(symbol) for symbol in "!?" )
+            punctuation = sum(payload.count(symbol) for symbol in "!?")
             density = len(words) / max(unique, 1)
             return density + punctuation * 0.1
 
@@ -247,7 +292,9 @@ class SectionIntelligenceEngine:
             "section_emotions": [wave.to_dict() for wave in section_waves],
         }
 
-    def _build_section_wave(self, section_label: str, packets: Sequence[PhraseEmotionPacket]) -> SectionEmotionWave:
+    def _build_section_wave(
+        self, section_label: str, packets: Sequence[PhraseEmotionPacket]
+    ) -> SectionEmotionWave:
         count = len(packets) or 1
         truth_sum = sum((p.emotions.get("tlp", {}).get("truth", 0.0) for p in packets))
         love_sum = sum((p.emotions.get("tlp", {}).get("love", 0.0) for p in packets))
@@ -278,7 +325,10 @@ class SectionIntelligenceEngine:
         if any(packet.weight > 0.8 for packet in packets):
             emotional_shape = "spike"
         elif len(pain_love_series) >= 2:
-            deltas = [pain_love_series[i + 1] - pain_love_series[i] for i in range(len(pain_love_series) - 1)]
+            deltas = [
+                pain_love_series[i + 1] - pain_love_series[i]
+                for i in range(len(pain_love_series) - 1)
+            ]
             if deltas and all(delta > 0.15 for delta in deltas):
                 emotional_shape = "rising"
             elif deltas and all(delta < -0.15 for delta in deltas):
@@ -306,10 +356,13 @@ class SectionIntelligence:
 
     def parse(self, text: str, sections: Sequence[str] | None = None) -> Dict[str, Any]:
         self.engine.reset_phrase_packets()
-        result = self._engine.analyze(text, sections, emotion_curve=None, emotion_engine=self.engine)
+        result = self._engine.analyze(
+            text, sections, emotion_curve=None, emotion_engine=self.engine
+        )
         return result
+
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

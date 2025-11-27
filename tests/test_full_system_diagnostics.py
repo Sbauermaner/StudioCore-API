@@ -26,7 +26,9 @@ def test_full_system_diagnostics_passes_for_valid_workflows():
 def test_full_system_diagnostics_fails_on_invalid_workflow():
     workflows_dir = REPO_ROOT / ".github" / "workflows"
     bad_workflow = workflows_dir / "invalid.yml"
-    bad_workflow.write_text(textwrap.dedent("""
+    bad_workflow.write_text(
+        textwrap.dedent(
+            """
         name: invalid workflow
         on: [push]
         jobs:
@@ -35,7 +37,10 @@ def test_full_system_diagnostics_fails_on_invalid_workflow():
             steps:
               - run: echo "unterminated
               - run: [missing-closing-bracket
-    """), encoding="utf-8")
+    """
+        ),
+        encoding="utf-8",
+    )
 
     try:
         result = subprocess.run(

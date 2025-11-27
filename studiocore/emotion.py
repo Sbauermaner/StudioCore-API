@@ -1,14 +1,12 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 """
 StudioCore Emotion Engines (v15 - Имена ИСПРАВЛЕНЫ)
 Быстрый эвристический анализ (не ИИ) + Расширенные словари v3.
 """
-
-from __future__ import annotations
 
 import json
 import os
@@ -18,15 +16,15 @@ from dataclasses import dataclass
 from typing import Dict, Any, Optional
 import logging
 
-from studiocore.emotion_profile import EmotionVector, EmotionAggregator
+from studiocore.emotion_profile import EmotionVector
 from studiocore.emotion_dictionary_extended import EmotionLexiconExtended
 from studiocore.structures import PhraseEmotionPacket
 from .config import DEFAULT_CONFIG
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 # AI_TRAINING_PROHIBITED: Redistribution or training of AI models on this codebase
 # without explicit written permission from the Author is prohibited.
@@ -35,60 +33,289 @@ from .config import DEFAULT_CONFIG
 log = logging.getLogger(__name__)
 
 # === Весовые карты ===
-PUNCT_WEIGHTS = {"!": 0.6, "?": 0.4, ".": 0.1, ",": 0.05, "…": 0.5, "—": 0.2, ":": 0.15, ";": 0.1}
+PUNCT_WEIGHTS = {
+    "!": 0.6,
+    "?": 0.4,
+    ".": 0.1,
+    ", ": 0.05,
+    "…": 0.5,
+    "—": 0.2,
+    ":": 0.15,
+    ";": 0.1,
+}
 EMOJI_WEIGHTS = {ch: 0.5 for ch in "❤💔💖🔥😭😢✨🌌🌅🌙🌈☀⚡💫"}
-
 
 # =====================================================
 # 💠 Truth × Love × Pain Engine (v3 Словари)
 # =====================================================
-class TruthLovePainEngine: # <-- v15: Оригинальное имя
+
+
+class TruthLovePainEngine:  # <-- v15: Оригинальное имя
     """Balances TLP axes using expanded v3 dictionaries."""
 
     # v3 - Расширенные словари с "корнями"
     TRUTH_WORDS = [
-        "правд", "истин", "честн", "смысл", "знан", "позна", "созна", # ru
-        "мудро", "осозна", "голос", "суть", "reason", "судьб",
-        "помню", "вспоминаю", "вспомнить", "память", "памят", "исповед", "откровен", # ru - исповедальность
-        "признан", "рассказ", "повеств", "история", "вспомин", "воспомина",
-        # 1-е лицо и саморефлексия
-        "я ", "я ", "мне", "меня", "мой", "моя", "мое", "мои", "моим", "моих", # ru - 1-е лицо
-        "я сам", "я сама", "сам", "сама", "само", "самому", "самой", # ru - саморефлексия
-        "думаю", "чувствую", "знаю", "понимаю", "вижу", "слышу", "ощущаю", # ru - саморефлексия
-        "truth", "honest", "real", "meaning", "wisdom", "soul", "mind", # en
-        "see", "know", "understand", "realize", "reflect",
-        "remember", "recall", "memory", "confess", "confession", "revelation", # en - исповедальность
-        "admit", "story", "narrative", "history", "reminisce", "recollection",
-        # 1-е лицо и саморефлексия (en)
-        "i ", "i'm", "i am", "my ", "me ", "myself", "i feel", "i know", "i see", "i understand", # en - 1-е лицо
-        "i think", "i remember", "i recall", "i realize", "i reflect" # en - саморефлексия
+        "правд",
+        "истин",
+        "честн",
+        "смысл",
+        "знан",
+        "позна",
+        "созна",  # ru
+        "мудро",
+        "осозна",
+        "голос",
+        "суть",
+        "reason",
+        "судьб",
+        # ru - исповедальность
+        "помню",
+        "вспоминаю",
+        "вспомнить",
+        "память",
+        "памят",
+        "исповед",
+        "откровен",
+        "признан",
+        "рассказ",
+        "повеств",
+        "история",
+        "вспомин",
+        "воспомина",
+        # 1 - е лицо и саморефлексия
+        "я ",
+        "я ",
+        "мне",
+        "меня",
+        "мой",
+        "моя",
+        "мое",
+        "мои",
+        "моим",
+        "моих",  # ru - 1 - е лицо
+        "я сам",
+        "я сама",
+        "сам",
+        "сама",
+        "само",
+        "самому",
+        "самой",  # ru - саморефлексия
+        "думаю",
+        "чувствую",
+        "знаю",
+        "понимаю",
+        "вижу",
+        "слышу",
+        "ощущаю",  # ru - саморефлексия
+        "truth",
+        "honest",
+        "real",
+        "meaning",
+        "wisdom",
+        "soul",
+        "mind",  # en
+        "see",
+        "know",
+        "understand",
+        "realize",
+        "reflect",
+        # en - исповедальность
+        "remember",
+        "recall",
+        "memory",
+        "confess",
+        "confession",
+        "revelation",
+        "admit",
+        "story",
+        "narrative",
+        "history",
+        "reminisce",
+        "recollection",
+        # 1 - е лицо и саморефлексия (en)
+        # en - 1 - е лицо
+        "i ",
+        "i'm",
+        "i am",
+        "my ",
+        "me ",
+        "myself",
+        "i feel",
+        "i know",
+        "i see",
+        "i understand",
+        "i think",
+        "i remember",
+        "i recall",
+        "i realize",
+        "i reflect",  # en - саморефлексия
     ]
 
     LOVE_WORDS = [
-        "люб", "нежн", "сердц", "забот", "свет", "тепл", "солнц", "жизн", # ru
-        "мир", "надежд", "вер", "добр", "друг", "вмест", "простит", "дом",
-        "тело", "прикосновен", "обнима", "объятия", "наслажден", "мягк", "шелк", # ru - телесность и нежность
-        "плотск", "сенсуальн", "ласк", "каса", "запах", "вкус", "пожар", "страст", # ru - сенсуальность
+        "люб",
+        "нежн",
+        "сердц",
+        "забот",
+        "свет",
+        "тепл",
+        "солнц",
+        "жизн",  # ru
+        "мир",
+        "надежд",
+        "вер",
+        "добр",
+        "друг",
+        "вмест",
+        "простит",
+        "дом",
+        # ru - телесность и нежность
+        "тело",
+        "прикосновен",
+        "обнима",
+        "объятия",
+        "наслажден",
+        "мягк",
+        "шелк",
+        # ru - сенсуальность
+        "плотск",
+        "сенсуальн",
+        "ласк",
+        "каса",
+        "запах",
+        "вкус",
+        "пожар",
+        "страст",
         # Романтические символы
-        "лун", "вечер", "вино", "свеч", "весн", "лет", "ноч", "утр", "день", # ru - романтика
-        "звезд", "неб", "море", "океан", "река", "озер", "лес", "сад", "цвет", # ru - природа/романтика
-        "love", "care", "unity", "light", "heart", "peace", "hope", "faith", # en
-        "warm", "sun", "life", "friend", "together", "forgive", "home", "kind",
-        "touch", "embrace", "body", "sensual", "tender", "soft", "silk", "pleasure", # en - телесность
-        "passion", "intimate", "caress", "scent", "taste", "fire", "desire", # en - сенсуальность
+        "лун",
+        "вечер",
+        "вино",
+        "свеч",
+        "весн",
+        "лет",
+        "ноч",
+        "утр",
+        "день",  # ru - романтика
+        # ru - природа / романтика
+        "звезд",
+        "неб",
+        "море",
+        "океан",
+        "река",
+        "озер",
+        "лес",
+        "сад",
+        "цвет",
+        "love",
+        "care",
+        "unity",
+        "light",
+        "heart",
+        "peace",
+        "hope",
+        "faith",  # en
+        "warm",
+        "sun",
+        "life",
+        "friend",
+        "together",
+        "forgive",
+        "home",
+        "kind",
+        # en - телесность
+        "touch",
+        "embrace",
+        "body",
+        "sensual",
+        "tender",
+        "soft",
+        "silk",
+        "pleasure",
+        "passion",
+        "intimate",
+        "caress",
+        "scent",
+        "taste",
+        "fire",
+        "desire",  # en - сенсуальность
         # Романтические символы (en)
-        "moon", "evening", "wine", "candle", "spring", "summer", "night", "morning", "day", # en - романтика
-        "star", "sky", "sea", "ocean", "river", "lake", "forest", "garden", "flower" # en - природа/романтика
+        # en - романтика
+        "moon",
+        "evening",
+        "wine",
+        "candle",
+        "spring",
+        "summer",
+        "night",
+        "morning",
+        "day",
+        # en - природа / романтика
+        "star",
+        "sky",
+        "sea",
+        "ocean",
+        "river",
+        "lake",
+        "forest",
+        "garden",
+        "flower",
     ]
 
     PAIN_WORDS = [
-        "боль", "страда", "мук", "горе", "плач", "слез", "рана", "потер", # ru
-        "ненави", "гнев", "зл", "яд", "лож", "тьм", "мрак", "смерт", "крик",
-        "холод", "пусто", "один", "тоск", "пепел", "кров", "воин", "бо", # (бой, боль...)
-        "страх", "ужас", "тревог", "тону", "камен", "груз", "обман", "рухн",
-        "pain", "hate", "fear", "lie", "dark", "death", "anger", "cry", "cold", # en
-        "war", "suffer", "grief", "loss", "scream", "alone", "empty", "blood",
-        "broken", "fall", "lost", "scared"
+        "боль",
+        "страда",
+        "мук",
+        "горе",
+        "плач",
+        "слез",
+        "рана",
+        "потер",  # ru
+        "ненави",
+        "гнев",
+        "зл",
+        "яд",
+        "лож",
+        "тьм",
+        "мрак",
+        "смерт",
+        "крик",
+        # (бой, боль...)
+        "холод",
+        "пусто",
+        "один",
+        "тоск",
+        "пепел",
+        "кров",
+        "воин",
+        "бо",
+        "страх",
+        "ужас",
+        "тревог",
+        "тону",
+        "камен",
+        "груз",
+        "обман",
+        "рухн",
+        "pain",
+        "hate",
+        "fear",
+        "lie",
+        "dark",
+        "death",
+        "anger",
+        "cry",
+        "cold",  # en
+        "war",
+        "suffer",
+        "grief",
+        "loss",
+        "scream",
+        "alone",
+        "empty",
+        "blood",
+        "broken",
+        "fall",
+        "lost",
+        "scared",
     ]
 
     def __init__(self):
@@ -96,10 +323,12 @@ class TruthLovePainEngine: # <-- v15: Оригинальное имя
         self.TRUTH = re.compile(r"(" + "|".join(self.TRUTH_WORDS) + r")", re.I)
         self.LOVE = re.compile(r"(" + "|".join(self.LOVE_WORDS) + r")", re.I)
         self.PAIN = re.compile(r"(" + "|".join(self.PAIN_WORDS) + r")", re.I)
-        log.debug(f"TLP Engine (v15) инициализирован с {len(self.TRUTH_WORDS)}+{len(self.LOVE_WORDS)}+{len(self.PAIN_WORDS)} словами.")
+        log.debug(
+            f"TLP Engine (v15) инициализирован с {len(self.TRUTH_WORDS)} + {len(self.LOVE_WORDS)} + {len(self.PAIN_WORDS)} словами."
+        )
 
     def analyze(self, text: str) -> Dict[str, float]:
-        log.debug(f"Вызов функции: TruthLovePainEngine.analyze")
+        log.debug("Вызов функции: TruthLovePainEngine.analyze")
         s = text.lower()
 
         truth_hits = len(self.TRUTH.findall(s))
@@ -108,11 +337,13 @@ class TruthLovePainEngine: # <-- v15: Оригинальное имя
 
         total = truth_hits + love_hits + pain_hits
 
-        log.debug(f"TLP хиты: T={truth_hits}, L={love_hits}, P={pain_hits}, Total={total}")
+        log.debug(
+            f"TLP хиты: T={truth_hits}, L={love_hits}, P={pain_hits}, Total={total}"
+        )
 
         if total == 0:
             # Если нет TLP слов, вычисляем "частоту" (CF)
-            word_count = len(re.findall(r"[a-zа-яё]+", s))
+            word_count = len(re.findall(r"[a - zа - яё]+", s))
             cf = 1.0 - min(1.0, word_count / 100.0) * 0.5
             truth, love, pain = 0.0, 0.0, 0.0
         else:
@@ -144,6 +375,7 @@ class TruthLovePainEngine: # <-- v15: Оригинальное имя
         """
         # Import here to avoid circular dependencies
         from .tlp_engine import TruthLovePainEngine as TLPEngine
+
         tlp_engine = TLPEngine()
         return tlp_engine.export_emotion_vector(text)
 
@@ -151,30 +383,143 @@ class TruthLovePainEngine: # <-- v15: Оригинальное имя
 # =====================================================
 # 💫 AutoEmotionalAnalyzer (v3 Словари)
 # =====================================================
-class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
-    """Heuristic emotion-field classifier (v15, +Logging)."""
+
+
+class AutoEmotionalAnalyzer:  # <-- v15: Оригинальное имя
+    """Heuristic emotion - field classifier (v15, +Logging)."""
 
     EMO_FIELDS = {
-        "joy": ["joy", "happy", "laugh", "смех", "рад", "улыб", "счаст", "весел", "hope", "bright", "солнц"],
-        "sadness": ["sad", "печал", "груст", "слез", "плач", "cry", "lonely", "утрат", "страда", "тоск", "один"],
-        "anger": ["anger", "rage", "злост", "гнев", "ярост", "fight", "burn", "ненави", "крик", "воин"],
+        "joy": [
+            "joy",
+            "happy",
+            "laugh",
+            "смех",
+            "рад",
+            "улыб",
+            "счаст",
+            "весел",
+            "hope",
+            "bright",
+            "солнц",
+        ],
+        "sadness": [
+            "sad",
+            "печал",
+            "груст",
+            "слез",
+            "плач",
+            "cry",
+            "lonely",
+            "утрат",
+            "страда",
+            "тоск",
+            "один",
+        ],
+        "anger": [
+            "anger",
+            "rage",
+            "злост",
+            "гнев",
+            "ярост",
+            "fight",
+            "burn",
+            "ненави",
+            "крик",
+            "воин",
+        ],
         "fear": ["fear", "страх", "ужас", "паник", "тревог", "боят", "scared"],
-        "peace": ["мир", "тишин", "calm", "still", "тихо", "равновес", "спокой", "умиротвор"],
-        # Примечание: "вечер" и "тишина" имеют низкий вес для peace, чтобы не перетягивать эмоцию
-        "epic": ["epic", "велич", "геро", "легенд", "immortal", "battle", "rise", "бог", "судьб", "огон", "шторм", "неб", "гимн"],
+        "peace": [
+            "мир",
+            "тишин",
+            "calm",
+            "still",
+            "тихо",
+            "равновес",
+            "спокой",
+            "умиротвор",
+        ],
+        # Примечание: "вечер" и "тишина" имеют низкий вес для peace, чтобы не
+        # перетягивать эмоцию
+        "epic": [
+            "epic",
+            "велич",
+            "геро",
+            "легенд",
+            "immortal",
+            "battle",
+            "rise",
+            "бог",
+            "судьб",
+            "огон",
+            "шторм",
+            "неб",
+            "гимн",
+        ],
         "awe": ["восторг", "awe", "wow", "чудо", "вдохнов", "удив", "прекрас"],
-        "sensual": ["тело", "прикосновен", "обнима", "объятия", "наслажден", "мягк", "шелк", "плотск", "сенсуальн", "ласк", "каса", "запах", "вкус", "пожар", "страст", "touch", "embrace", "body", "sensual", "tender", "soft", "silk", "pleasure", "passion", "intimate", "caress", "scent", "taste", "fire", "desire"],
-        "nostalgia": ["помню", "вспоминаю", "вспомнить", "память", "памят", "вспомин", "воспомина", "прошл", "был", "было", "была", "remember", "recall", "memory", "reminisce", "recollection", "past", "was", "were"],
-        "neutral": [] # Остается пустым
+        "sensual": [
+            "тело",
+            "прикосновен",
+            "обнима",
+            "объятия",
+            "наслажден",
+            "мягк",
+            "шелк",
+            "плотск",
+            "сенсуальн",
+            "ласк",
+            "каса",
+            "запах",
+            "вкус",
+            "пожар",
+            "страст",
+            "touch",
+            "embrace",
+            "body",
+            "sensual",
+            "tender",
+            "soft",
+            "silk",
+            "pleasure",
+            "passion",
+            "intimate",
+            "caress",
+            "scent",
+            "taste",
+            "fire",
+            "desire",
+        ],
+        "nostalgia": [
+            "помню",
+            "вспоминаю",
+            "вспомнить",
+            "память",
+            "памят",
+            "вспомин",
+            "воспомина",
+            "прошл",
+            "был",
+            "было",
+            "была",
+            "remember",
+            "recall",
+            "memory",
+            "reminisce",
+            "recollection",
+            "past",
+            "was",
+            "were",
+        ],
+        "neutral": [],  # Остается пустым
     }
 
     def __init__(self):
         self.LEXICON = {}
         for field, tokens in self.EMO_FIELDS.items():
             if tokens:
-                # v13: Компилируем регекспы для *корней* слов (быстрее и точнее)
+                # v13: Компилируем регекспы для *корней* слов (быстрее и
+                # точнее)
                 self.LEXICON[field] = re.compile(r"(" + "|".join(tokens) + r")", re.I)
-        log.debug(f"AutoEmotionalAnalyzer (v15) инициализирован.")
+        log.debug("AutoEmotionalAnalyzer (v15) инициализирован.")
 
     def _softmax(self, scores: Dict[str, float]) -> Dict[str, float]:
         if not scores:
@@ -191,14 +536,14 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
         return {k: exps[k] / total for k in scores}
 
     def analyze(self, text: str) -> Dict[str, float]:
-        log.debug(f"Вызов функции: AutoEmotionalAnalyzer.analyze")
+        log.debug("Вызов функции: AutoEmotionalAnalyzer.analyze")
         s = text.lower()
 
         # 1️⃣ Энергия пунктуации и эмодзи
         punct_energy = sum(PUNCT_WEIGHTS.get(ch, 0.0) for ch in s)
         emoji_energy = sum(EMOJI_WEIGHTS.get(ch, 0.0) for ch in s)
         energy = min(1.0, (punct_energy + emoji_energy) ** 0.7)
-        log.debug(f"Энергия пунктуации/эмодзи: {energy:.2f}")
+        log.debug(f"Энергия пунктуации / эмодзи: {energy:.2f}")
 
         # 2️⃣ Подсчёт совпадений по токенам
         scores: Dict[str, float] = {}
@@ -213,7 +558,7 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
         # 3️⃣ Усиление (Amplification)
         if energy > 0.1 and total_hits > 0:
             for field in scores:
-                scores[field] *= (1 + energy ** 2)
+                scores[field] *= 1 + energy**2
             log.debug(f"Хиты по эмоциям (усиленные): {scores}")
 
         # 4️⃣ Нормализация (softmax)
@@ -223,11 +568,17 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
         if total_hits == 0 or all(v < 0.05 for v in normalized.values()):
             log.debug("Сигналы эмоций не найдены. Возврат 'peace'.")
             normalized = {"peace": 0.6, "joy": 0.3, "neutral": 0.1}
-        
+
         # 6️⃣ Снижаем вес "peace" для текстов с высокой телесностью или сенсуальностью
-        # чтобы "тишина/вечер" не перетягивали эмоцию
+        # чтобы "тишина / вечер" не перетягивали эмоцию
         if normalized.get("peace", 0) > 0.5:
-            sensual_words = len(re.findall(r"\b(тело|прикосновен|обнима|объятия|наслажден|мягк|шелк|плотск|сенсуальн|touch|embrace|body|sensual|tender|soft|silk|pleasure)\b", s, re.I))
+            sensual_words = len(
+                re.findall(
+                    r"\b(тело|прикосновен|обнима|объятия|наслажден|мягк|шелк|плотск|сенсуальн|touch|embrace|body|sensual|tender|soft|silk|pleasure)\b",
+                    s,
+                    re.I,
+                )
+            )
             if sensual_words > 2:
                 # Снижаем peace и перераспределяем на sensual
                 peace_value = normalized.get("peace", 0)
@@ -240,7 +591,11 @@ class AutoEmotionalAnalyzer: # <-- v15: Оригинальное имя
                     normalized = {k: v / total for k, v in normalized.items()}
 
         # 6. Очистка (убираем 'neutral' и нули)
-        final_scores = {k: round(v, 3) for k, v in normalized.items() if k != "neutral" and v > 0.001}
+        final_scores = {
+            k: round(v, 3)
+            for k, v in normalized.items()
+            if k != "neutral" and v > 0.001
+        }
         log.debug(f"Результат EMO (финал): {final_scores}")
         return final_scores
 
@@ -362,7 +717,7 @@ class EmotionEngineV2:
 
 
 # =====================================================
-# 🎼 EmotionModel v1 (66 → 12 → GENRE/BPM/KEY)
+# 🎼 EmotionModel v1 (66 → 12 → GENRE / BPM / KEY)
 # =====================================================
 _EMOTION_MODEL_CACHE: Optional[Dict[str, Any]] = None
 
@@ -376,7 +731,7 @@ def load_emotion_model() -> Dict[str, Any]:
 
     model_path = os.path.join(os.path.dirname(__file__), "emotion_model_v1.json")
     try:
-        with open(model_path, "r", encoding="utf-8") as fp:
+        with open(model_path, "r", encoding="utf - 8") as fp:
             _EMOTION_MODEL_CACHE = json.load(fp)
     except FileNotFoundError:
         log.warning("emotion_model_v1.json not found; using empty model")
@@ -385,7 +740,7 @@ def load_emotion_model() -> Dict[str, Any]:
 
 
 class EmotionEngine:
-    """Emotion inference pipeline that maps raw cues → clusters → genre/BPM/key."""
+    """Emotion inference pipeline that maps raw cues → clusters → genre / BPM / key."""
 
     def __init__(self) -> None:
         self.lexicon = EmotionLexiconExtended()
@@ -413,7 +768,7 @@ class EmotionEngine:
         return list(self._phrase_packets)
 
     def analyze_phrase(self, phrase: str) -> PhraseEmotionPacket:
-        """Phrase-level analyzer that leverages the v1 emotion model."""
+        """Phrase - level analyzer that leverages the v1 emotion model."""
 
         safe_phrase = phrase or ""
         normalized = " ".join(safe_phrase.lower().strip().split())
@@ -439,7 +794,9 @@ class EmotionEngine:
             # Normalize cluster values if they exceed 1.0
             max_cluster = max(cluster_vector.values()) if cluster_vector else 0.0
             if max_cluster > 1.0:
-                cluster_vector = {k: round(v / max_cluster, 3) for k, v in cluster_vector.items()}
+                cluster_vector = {
+                    k: round(v / max_cluster, 3) for k, v in cluster_vector.items()
+                }
 
             tlp_profile = self.tlp_engine.analyze(normalized)
 
@@ -487,7 +844,7 @@ class EmotionEngine:
             hits = len(re.findall(pattern, lowered))
             raw_scores[emotion] += float(hits)
 
-        # Lexicon-driven boosts
+        # Lexicon - driven boosts
         lexicon_result = self.lexicon.get_emotion(text)
         for bucket, active in lexicon_result.get("emotions", {}).items():
             if not active:
@@ -496,7 +853,7 @@ class EmotionEngine:
                 if bucket in emotion:
                     raw_scores[emotion] += 1.0
 
-        # Heuristic analyzer (joy/sadness/etc.) mapped onto similar tokens
+        # Heuristic analyzer (joy / sadness / etc.) mapped onto similar tokens
         auto_scores = self.auto_analyzer.analyze(text)
         for bucket, value in auto_scores.items():
             for emotion in self._base_emotions:
@@ -506,7 +863,10 @@ class EmotionEngine:
         max_score = max(raw_scores.values()) if raw_scores else 0.0
         if max_score <= 0:
             return raw_scores
-        return {emotion: round(score / max_score, 3) for emotion, score in raw_scores.items()}
+        return {
+            emotion: round(score / max_score, 3)
+            for emotion, score in raw_scores.items()
+        }
 
     def project_to_clusters(self, raw: Dict[str, float]) -> Dict[str, float]:
         clusters = self._model.get("clusters", {})
@@ -531,15 +891,25 @@ class EmotionEngine:
         max_score = max(genre_scores.values()) if genre_scores else 0.0
         if max_score <= 0:
             return {genre: 0.0 for genre in genre_scores}
-        return {genre: round(score / max_score, 3) for genre, score in genre_scores.items()}
+        return {
+            genre: round(score / max_score, 3) for genre, score in genre_scores.items()
+        }
 
-    def pick_final_genre(self, genre_scores: Dict[str, float], legacy_genre: Optional[str] = None) -> str:
+    def pick_final_genre(
+        self, genre_scores: Dict[str, float], legacy_genre: Optional[str] = None
+    ) -> str:
         if not genre_scores:
             return legacy_genre or "unknown"
 
-        sorted_genres = sorted(genre_scores.items(), key=lambda item: item[1], reverse=True)
+        sorted_genres = sorted(
+            genre_scores.items(), key=lambda item: item[1], reverse=True
+        )
         top_genres = [item[0] for item in sorted_genres[:3]]
-        if legacy_genre and genre_scores.get(legacy_genre, 0.0) > 0 and legacy_genre in top_genres:
+        if (
+            legacy_genre
+            and genre_scores.get(legacy_genre, 0.0) > 0
+            and legacy_genre in top_genres
+        ):
             return legacy_genre
         return sorted_genres[0][0]
 
@@ -566,7 +936,11 @@ class EmotionEngine:
         return round(bpm, 2)
 
     def compute_key_and_mode(self, clusters: Dict[str, float]) -> Dict[str, str]:
-        sadness = clusters.get("sadness", 0.0) + clusters.get("pain", 0.0) + clusters.get("disappointment", 0.0)
+        sadness = (
+            clusters.get("sadness", 0.0)
+            + clusters.get("pain", 0.0)
+            + clusters.get("disappointment", 0.0)
+        )
         love = clusters.get("love", 0.0)
         hope = clusters.get("hope", 0.0)
         tenderness = love  # tenderness nested in love cluster
@@ -584,7 +958,9 @@ class EmotionEngine:
             key_info["mode_hint"] = "dark_minor"
         return key_info
 
-    def build_emotion_profile(self, text: str, legacy_context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def build_emotion_profile(
+        self, text: str, legacy_context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         raw = self.build_raw_emotion_vector(text)
         clusters = self.project_to_clusters(raw)
         genre_scores = self.compute_genre_scores(clusters)
@@ -615,5 +991,5 @@ __all__ = [
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

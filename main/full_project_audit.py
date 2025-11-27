@@ -27,7 +27,9 @@ def _run_compile_check() -> tuple[bool, str]:
         capture_output=True,
         text=True,
     )
-    output = "\n".join(part for part in [proc.stdout.strip(), proc.stderr.strip()] if part)
+    output = "\n".join(
+        part for part in [proc.stdout.strip(), proc.stderr.strip()] if part
+    )
     return proc.returncode == 0, output
 
 
@@ -103,7 +105,9 @@ def _check_requirements_duplicates() -> list[str]:
             seen.add(normalized.lower())
 
     if duplicates:
-        errors.append(f"[REQUIREMENTS] Duplicate entries detected: {', '.join(sorted(duplicates))}")
+        errors.append(
+            f"[REQUIREMENTS] Duplicate entries detected: {', '.join(sorted(duplicates))}"
+        )
 
     return errors
 

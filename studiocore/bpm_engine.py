@@ -1,7 +1,7 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """Public BPM helper built on top of the logical engines module."""
 
@@ -15,10 +15,10 @@ from .logical_engines import BPMEngine as _CoreBPMEngine
 
 
 class BPMEngine(_CoreBPMEngine):
-    """Expose a concise helper API for rhythm-aware tooling."""
+    """Expose a concise helper API for rhythm - aware tooling."""
 
     def compute_bpm_v2(self, lines: Sequence[str]) -> int:
-        """Грубый, но flow-aware расчёт BPM: длина строк + слоги + плотность."""
+        """Грубый, но flow - aware расчёт BPM: длина строк + слоги + плотность."""
         text_lines = [ln.strip() for ln in lines if ln.strip()]
         if not text_lines:
             return 90
@@ -54,7 +54,9 @@ class BPMEngine(_CoreBPMEngine):
         bpm = max(40, min(200, int(bpm)))
         return bpm
 
-    def describe(self, text: str, *, sections: Sequence[str] | None = None) -> Dict[str, Any]:
+    def describe(
+        self, text: str, *, sections: Sequence[str] | None = None
+    ) -> Dict[str, Any]:
         resolved_sections = list(sections) if sections else [text]
         joined_text = "\n\n".join(resolved_sections)
         estimate = float(self.text_bpm_estimation(joined_text))
@@ -70,7 +72,7 @@ class BPMEngine(_CoreBPMEngine):
 
     def apply_emotional_microshift(self, bpm: float, emotion: EmotionVector) -> float:
         """
-        Emotional BPM micro-adjustment.
+        Emotional BPM micro - adjustment.
         Soft shift: ±3% based on emotional arousal.
         """
         shift = (emotion.arousal - 0.5) * 0.06 * bpm
@@ -81,5 +83,5 @@ __all__ = ["BPMEngine"]
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

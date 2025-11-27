@@ -1,13 +1,13 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 from __future__ import annotations
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
@@ -28,7 +28,7 @@ class GenreContext:
 
 class DynamicGenreRouter:
     """
-    Stateless router from Emotion + BPM + structure → macro-genre.
+    Stateless router from Emotion + BPM + structure → macro - genre.
 
     ВАЖНО:
     - не хранит глобального состояния
@@ -50,7 +50,11 @@ class DynamicGenreRouter:
         valence = float(tlp.get("valence") or 0.0)
         arousal = float(tlp.get("arousal") or 0.0)
 
-        emotion = str(result.get("emotion", {}).get("label") or result.get("_emotion_label") or "neutral")
+        emotion = str(
+            result.get("emotion", {}).get("label")
+            or result.get("_emotion_label")
+            or "neutral"
+        )
 
         return GenreContext(
             emotion=emotion,
@@ -217,7 +221,8 @@ class DynamicGenreRouter:
         reason = "dynamic_router_emotion_bias" if bias else "dynamic_router"
         return macro_genre, reason
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

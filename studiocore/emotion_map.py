@@ -1,7 +1,7 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 from __future__ import annotations
 
 from typing import List
@@ -44,7 +44,7 @@ class EmotionMapEngine:
     def build_map(self, vectors: List[EmotionVector]) -> dict:
         """
         Produce:
-        - per-line color wave
+        - per - line color wave
         - global average color
         """
         if not vectors:
@@ -64,7 +64,8 @@ class EmotionMapEngine:
             "global": global_color,
         }
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

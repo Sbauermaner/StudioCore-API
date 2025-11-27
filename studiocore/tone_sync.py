@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf - 8 -*-
 """
 ToneSyncEngine v1
 Связка эмоций, тональности, BPM и цветовых профилей.
 
 Используется для:
-- вывода tone_profile в diagnostics/backend_payload
+- вывода tone_profile в diagnostics / backend_payload
 - стабилизации "атмосферы" трека
 """
 
@@ -25,8 +25,8 @@ class ToneProfile:
 
 
 class ToneSyncEngine:
-    """Stateless-движок: на вход — эмоции/TLP/BPM/тональность, на выход — tone_profile.
-    
+    """Stateless - движок: на вход — эмоции / TLP / BPM / тональность, на выход — tone_profile.
+
     ВАЖНО: Этот класс используется как основной ToneSyncEngine.
     Класс с тем же именем в tone.py используется как LegacyToneSyncEngine для обратной совместимости.
     """
@@ -47,7 +47,7 @@ class ToneSyncEngine:
                 color_hex="#222244",
                 density="high",
                 recommended_bpms=(60, 90),
-                preferred_keys=("B minor", "F# minor", "C# minor"),
+                preferred_keys=("B minor", "F  # minor", "C# minor"),
             ),
             "bright_major": ToneProfile(
                 name="bright_major",

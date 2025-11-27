@@ -26,7 +26,9 @@ def test_apply_user_overrides_once_idempotent_and_recalculates_bpm_curve():
 
     assert payload["_overrides_applied"] is True
     assert adjustments_first["bpm"]["estimate"] == 95.0
-    assert len(adjustments_first["bpm"]["curve"]) == len(payload["structure"]["sections"])
+    assert len(adjustments_first["bpm"]["curve"]) == len(
+        payload["structure"]["sections"]
+    )
     assert all(abs(value - 95.0) <= 5 for value in adjustments_first["bpm"]["curve"])
     assert payload["override_debug"]["applied_overrides"]["style"]["genre"] == "edm"
 
@@ -41,6 +43,7 @@ def test_apply_user_overrides_once_idempotent_and_recalculates_bpm_curve():
         payload["override_debug"]["applied_overrides"]["bpm"]["estimate"]
         == adjustments_first["bpm"]["estimate"]
     )
+
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)

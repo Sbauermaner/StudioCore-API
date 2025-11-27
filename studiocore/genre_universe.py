@@ -1,20 +1,20 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 GenreUniverse v2 — единый реестр жанров StudioCore.
 
 * Сохраняет обратную совместимость с v1 (публичные сигнатуры).
-* Добавляет отдельные коллекции для музыкальных/EDM/литературных/драматических
+* Добавляет отдельные коллекции для музыкальных / EDM / литературных / драматических
   и гибридных форм.
-* Поддерживает alias-map для синонимов (включая русскоязычные варианты).
+* Поддерживает alias - map для синонимов (включая русскоязычные варианты).
 """
 
 from __future__ import annotations
@@ -60,21 +60,28 @@ class GenreUniverse:
     def add_alias(self, alias: str, canonical: str) -> None:
         self.alias_map[self._canonical(alias)] = self._canonical(canonical)
 
-    def _add_unique(self, collection: List[str], name: str, tags: Optional[Set[str]] = None) -> str:
+    def _add_unique(
+        self, collection: List[str], name: str, tags: Optional[Set[str]] = None
+    ) -> str:
         canonical = self._canonical(name)
         if canonical not in collection:
             collection.append(canonical)
         # каждый зарегистрированный жанр сам себе алиас
         self.add_alias(canonical, canonical)
         if tags:
-            self.tags.setdefault(canonical, set()).update({self._canonical(tag) for tag in tags})
+            self.tags.setdefault(canonical, set()).update(
+                {self._canonical(tag) for tag in tags}
+            )
         return canonical
 
     # === MUSIC ===
-    def add_music(self, name: str, tags: Optional[List[str]] = None, **meta) -> None:  # meta сохраняем для совместимости
+
+    # meta сохраняем для совместимости
+    def add_music(self, name: str, tags: Optional[List[str]] = None, **meta) -> None:
         self._add_unique(self.music_genres, name, set(tags or []))
 
     # === EDM ===
+
     def add_edm(self, name: str, tags: Optional[List[str]] = None, **meta) -> None:
         self._add_unique(self.edm_styles, name, set(tags or []))
 
@@ -82,36 +89,54 @@ class GenreUniverse:
         self.add_edm(genre)
 
     # === LITERATURE ===
-    def add_literature_style(self, name: str, tags: Optional[List[str]] = None, **meta) -> None:
+
+    def add_literature_style(
+        self, name: str, tags: Optional[List[str]] = None, **meta
+    ) -> None:
         self._add_unique(self.literary_schools, name, set(tags or []))
 
     def add_literature(self, genre: str) -> None:  # v1 совместимость
         self.add_literature_style(genre)
 
     # === LYRIC FORMS ===
-    def add_lyric_form(self, form: str, tags: Optional[List[str]] = None, **meta) -> None:
+
+    def add_lyric_form(
+        self, form: str, tags: Optional[List[str]] = None, **meta
+    ) -> None:
         self._add_unique(self.lyric_forms, form, set(tags or []))
 
     # === DRAMA ===
-    def add_dramatic_genre(self, name: str, tags: Optional[List[str]] = None, **meta) -> None:
+
+    def add_dramatic_genre(
+        self, name: str, tags: Optional[List[str]] = None, **meta
+    ) -> None:
         self._add_unique(self.dramatic_genres, name, set(tags or []))
 
     def add_drama(self, form: str) -> None:  # v1 совместимость
         self.add_dramatic_genre(form)
 
     # === COMEDY ===
-    def add_comedy_genre(self, name: str, tags: Optional[List[str]] = None, **meta) -> None:
+
+    def add_comedy_genre(
+        self, name: str, tags: Optional[List[str]] = None, **meta
+    ) -> None:
         self._add_unique(self.comedy_forms, name, set(tags or []))
 
     def add_comedy(self, form: str) -> None:  # v1 совместимость
         self.add_comedy_genre(form)
 
     # === GOTHIC ===
-    def add_gothic_style(self, name: str, tags: Optional[List[str]] = None, **meta) -> None:
+
+    def add_gothic_style(
+        self, name: str, tags: Optional[List[str]] = None, **meta
+    ) -> None:
         self._add_unique(self.gothic_directions, name, set(tags or []))
 
     # === ETHNIC ===
-    def add_ethnic_school(self, name: str, region: str = "", tags: Optional[List[str]] = None, **meta) -> None:
+
+    def add_ethnic_school(
+        self, name: str, region: str = "", tags: Optional[List[str]] = None, **meta
+    ) -> None:
         canonical = self._add_unique(self.ethnic_music_schools, name, set(tags or []))
         if region:
             self.add_alias(region + "_" + canonical, canonical)
@@ -120,18 +145,27 @@ class GenreUniverse:
         self.add_ethnic_school(name)
 
     # === HYBRID ===
-    def add_hybrid(self, name: str, components: Optional[List[str]] = None, tags: Optional[List[str]] = None, **meta) -> None:
+
+    def add_hybrid(
+        self,
+        name: str,
+        components: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+        **meta,
+    ) -> None:
         self._add_unique(self.hybrids, name, set(tags or []))
         if components:
             for p in components:
                 self.add_alias(f"{p}_{name}", name)
 
     # === ALIAS / RESOLVE ===
+
     def resolve(self, name: str) -> str:
         canonical = self._canonical(name)
         return self.alias_map.get(canonical, canonical)
 
     # === DOMAIN DETECTION ===
+
     def detect_domain(self, name: str) -> Dict[str, str]:
         canonical = self.resolve(name)
         domain = "unknown"
@@ -157,7 +191,12 @@ class GenreUniverse:
         elif canonical in self.hybrids:
             domain, subdomain, gtype = "hybrid", "hybrid", "hybrid"
 
-        return {"domain": domain, "subdomain": subdomain, "type": gtype, "canonical": canonical}
+        return {
+            "domain": domain,
+            "subdomain": subdomain,
+            "type": gtype,
+            "canonical": canonical,
+        }
 
     def list_all(self) -> Dict[str, List[str]]:
         return {
@@ -172,7 +211,8 @@ class GenreUniverse:
             "hybrids": list(self.hybrids),
         }
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

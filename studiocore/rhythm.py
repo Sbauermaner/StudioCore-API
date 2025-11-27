@@ -1,14 +1,14 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 """Rhythm analysis engine for StudioCore v6.
 
 The engine extracts tempo information from lyric structure, respecting hints
 provided by the author (e.g. ``[BPM: 120]``) while still analysing the natural
 flow of the text. The output is a structured ``RhythmAnalysis`` dictionary that
-contains global tempo, per-section statistics, and micro-variations that other
+contains global tempo, per - section statistics, and micro - variations that other
 modules (emotion, meaning, breathing) can consume.
 """
 
@@ -21,8 +21,8 @@ from typing import Dict, List, Optional, Tuple, TypedDict
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 # AI_TRAINING_PROHIBITED: Redistribution or training of AI models on this codebase
 # without explicit written permission from the Author is prohibited.
@@ -33,20 +33,22 @@ PUNCT_WEIGHTS = {
     "!": 0.6,
     "?": 0.4,
     ".": 0.1,
-    ",": 0.05,
+    ", ": 0.05,
     "…": 0.5,
     "—": 0.2,
     ":": 0.15,
     ";": 0.1,
 }
 
-HEADER_BPM_RE = re.compile(r"\[\s*BPM\s*:?\s*(?P<bpm>[0-9]{2,3}(?:\.[0-9]+)?)\s*\]", re.I)
+HEADER_BPM_RE = re.compile(
+    r"\[\s*BPM\s*:?\s*(?P<bpm>[0-9]{2,3}(?:\.[0-9]+)?)\s*\]", re.I
+)
 SECTION_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "INTRO": ("intro", "интро", "start", "opening"),
     "VERSE": ("verse", "куплет", "kup", "strofa", "куплет"),
-    "PRE_CHORUS": ("pre-chorus", "prechorus", "преприпев"),
+    "PRE_CHORUS": ("pre - chorus", "prechorus", "преприпев"),
     "CHORUS": ("chorus", "припев", "hook", "drop"),
-    "POST_CHORUS": ("post-chorus", "postchorus", "постприпев"),
+    "POST_CHORUS": ("post - chorus", "postchorus", "постприпев"),
     "BRIDGE": ("bridge", "бридж", "middle 8", "middle8"),
     "BREAKDOWN": ("break", "breakdown", "drop", "beat switch"),
     "OUTRO": ("outro", "финал", "ending", "концовка"),
@@ -59,7 +61,7 @@ MICRO_MAX = 200.0
 
 
 class RhythmSection(TypedDict, total=False):
-    """Per-section rhythm metrics."""
+    """Per - section rhythm metrics."""
 
     mean_bpm: float
     micro_curve: List[float]
@@ -92,7 +94,9 @@ def clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
-def resolve_global_bpm(header_bpm: Optional[float], estimated_bpm: Optional[float]) -> float:
+def resolve_global_bpm(
+    header_bpm: Optional[float], estimated_bpm: Optional[float]
+) -> float:
     """Blend BPM estimates while respecting the explicit header value."""
 
     if header_bpm is not None:
@@ -111,7 +115,7 @@ def resolve_global_bpm(header_bpm: Optional[float], estimated_bpm: Optional[floa
 
 
 def calc_tension(curve: List[float]) -> float:
-    """Normalised rhythmic tension based on micro-curve variance."""
+    """Normalised rhythmic tension based on micro - curve variance."""
 
     if len(curve) <= 1:
         return 0.0
@@ -120,7 +124,7 @@ def calc_tension(curve: List[float]) -> float:
 
 
 class LyricMeter:
-    """Adaptive rhythm analyser with per-section awareness."""
+    """Adaptive rhythm analyser with per - section awareness."""
 
     vowels = set("aeiouyауоыиэяюёеAEIOUYАУОЫИЭЯЮЁЕ")
 
@@ -147,7 +151,9 @@ class LyricMeter:
             lines.append(ln)
         return "\n".join(lines).strip()
 
-    def _normalize_section_name(self, tag: str, counters: Dict[str, int], index: int) -> str:
+    def _normalize_section_name(
+        self, tag: str, counters: Dict[str, int], index: int
+    ) -> str:
         raw = tag.strip()
         tag_low = raw.lower()
         for canonical, keywords in SECTION_KEYWORDS.items():
@@ -159,7 +165,10 @@ class LyricMeter:
                 return f"{canonical}_{counters[canonical]}"
 
         # Try to preserve explicit numbering: "Verse 2" -> VERSE_2
-        number_match = re.search(r"(intro|verse|chorus|bridge|outro|куплет|припев)[^0-9]*([0-9]+)", tag_low)
+        number_match = re.search(
+            r"(intro|verse|chorus|bridge|outro|куплет|припев)[^0 - 9] * ([0 - 9]+)",
+            tag_low,
+        )
         if number_match:
             base = number_match.group(1)
             num = number_match.group(2)
@@ -168,7 +177,10 @@ class LyricMeter:
                     counters[canonical] = counters.get(canonical, 0) + 1
                     return f"{canonical}_{num}"
 
-        base = re.sub(r"[^A-Za-z0-9]+", "_", raw.upper()).strip("_") or f"SECTION_{index + 1}"
+        base = (
+            re.sub(r"[^A - Za - z0 - 9]+", "_", raw.upper()).strip("_")
+            or f"SECTION_{index + 1}"
+        )
         counters[base] = counters.get(base, 0) + 1
         if counters[base] > 1:
             return f"{base}_{counters[base]}"
@@ -200,11 +212,11 @@ class LyricMeter:
     ) -> float:
         emotions = emotions or {}
         tlp = tlp or {}
-        lines = [l.strip() for l in text.split("\n") if l.strip()]
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
         if not lines:
             return 0.0
 
-        syllables = [self._syllables(l) for l in lines]
+        syllables = [self._syllables(line) for line in lines]
         avg_syll = sum(syllables) / len(lines)
 
         base = 60 + 120 / (1 + math.exp((avg_syll - 8) / 2.5 * 0.8))
@@ -242,7 +254,7 @@ class LyricMeter:
         return clamp(bpm, MIN_BPM, MAX_BPM)
 
     def _heuristic_section_bpm(self, section_text: str) -> float:
-        lines = [l.strip() for l in section_text.split("\n") if l.strip()]
+        lines = [line.strip() for line in section_text.split("\n") if line.strip()]
         if not lines:
             return 0.0
 
@@ -252,13 +264,17 @@ class LyricMeter:
         char_count = sum(len(line) for line in lines)
         avg_word_len = char_count / max(total_words, 1)
 
-        punctuation_hits = sum(line.count(",") + line.count(";") + line.count(":") for line in lines)
+        punctuation_hits = sum(
+            line.count(", ") + line.count(";") + line.count(":") for line in lines
+        )
         accent_hits = sum(line.count("!") + line.count("?") for line in lines)
         dash_hits = sum(line.count("—") + line.count("-") for line in lines)
         ellipsis_hits = sum(line.count("…") for line in lines)
         breath_pauses = sum(line.count("/") for line in lines)
 
-        variation = statistics.pstdev(phrase_lengths) if len(phrase_lengths) > 1 else 0.0
+        variation = (
+            statistics.pstdev(phrase_lengths) if len(phrase_lengths) > 1 else 0.0
+        )
 
         base = 58.0 + avg_words * 3.2
         base += variation * 1.5
@@ -298,7 +314,7 @@ class LyricMeter:
         return clamp(blended, MIN_BPM - 10.0, MAX_BPM + 15.0)
 
     def _build_micro_curve(self, section_text: str, section_bpm: float) -> List[float]:
-        lines = [l.strip() for l in section_text.split("\n") if l.strip()]
+        lines = [line.strip() for line in section_text.split("\n") if line.strip()]
         if not lines:
             return []
 
@@ -312,7 +328,7 @@ class LyricMeter:
             accent = line.count("!") + line.count("?")
             ellipsis = line.count("…")
             dash = line.count("—") + line.count("-")
-            comma_breaks = line.count(",")
+            comma_breaks = line.count(", ")
 
             shift = 0.0
             shift += (avg_phrase - length) * 2.0
@@ -337,7 +353,11 @@ class LyricMeter:
         return curve
 
     def _phrase_pattern(self, section_text: str) -> List[int]:
-        return [max(1, len(line.split())) for line in section_text.split("\n") if line.strip()]
+        return [
+            max(1, len(line.split()))
+            for line in section_text.split("\n")
+            if line.strip()
+        ]
 
     def analyze(
         self,
@@ -353,7 +373,9 @@ class LyricMeter:
         emotions = emotions or {}
         tlp = tlp or {}
 
-        header = header_bpm if header_bpm is not None else self._extract_header_bpm(text)
+        header = (
+            header_bpm if header_bpm is not None else self._extract_header_bpm(text)
+        )
         text_without_header = self._strip_header_lines(text)
 
         sections = structured_sections or self._build_sections(text_without_header)
@@ -373,7 +395,9 @@ class LyricMeter:
         for name, body in sections.items():
             density_section = self._density_bpm(body, emotion_weight=0.0)
             heuristic_section = self._heuristic_section_bpm(body)
-            section_bpm = self._blend_section_bpm(density_section, heuristic_section, density_global)
+            section_bpm = self._blend_section_bpm(
+                density_section, heuristic_section, density_global
+            )
             micro_curve = self._build_micro_curve(body, section_bpm)
             section_results[name] = {
                 "mean_bpm": section_bpm,
@@ -392,7 +416,9 @@ class LyricMeter:
         if estimated_from_sections is not None and density_global > 0:
             estimated_global = 0.65 * estimated_from_sections + 0.35 * density_global
         else:
-            estimated_global = estimated_from_sections or (density_global if density_global > 0 else None)
+            estimated_global = estimated_from_sections or (
+                density_global if density_global > 0 else None
+            )
 
         global_bpm = resolve_global_bpm(header, estimated_global)
         global_bpm = clamp(global_bpm, MIN_BPM, MAX_BPM)
@@ -446,5 +472,5 @@ __all__ = [
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

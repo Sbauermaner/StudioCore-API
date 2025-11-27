@@ -46,6 +46,7 @@ def test_phrase_engine_neutral_on_empty():
     assert 0.0 <= tlp["love"] <= 1.0
     assert packet.weight <= 0.2
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27

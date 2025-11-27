@@ -1,12 +1,12 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 StudioCore v5.2.3 — Adaptive StyleMatrix Hybrid (v12 - NameError ИСПРАВЛЕН)
@@ -14,7 +14,7 @@ v12: Исправлена ошибка NameError: 'energy' is not defined.
      Логика EDM временно упрощена (только по BPM).
 """
 
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, Optional
 from statistics import mean
 import logging
 
@@ -23,34 +23,38 @@ log = logging.getLogger(__name__)
 # ==========================================================
 # 🧠 Адаптивный резолвер стиля (v12)
 # ==========================================================
+
+
 def resolve_style_and_form(
     tlp: Dict[str, float],
     cf: float,
-    mood: str, # Доминирующая эмоция из AutoEmotionalAnalyzer
+    mood: str,  # Доминирующая эмоция из AutoEmotionalAnalyzer
     bpm: int,
-    narrative: Tuple[str, str, str] | None = None,
-    key_hint: str | None = None,
-    voice_hint: str | None = None,
+    narrative: Optional[Tuple[str, str, str]] = None,
+    key_hint: Optional[str] = None,
+    voice_hint: Optional[str] = None,
 ) -> Dict[str, str]:
     """
     v12: Исправлена ошибка NameError: 'energy' is not defined.
     """
-    log.debug(f"Вызов функции: resolve_style_and_form. Mood={mood}, BPM={bpm}, CF={cf:.2f}, VoiceHint={voice_hint}")
+    log.debug(
+        f"Вызов функции: resolve_style_and_form. Mood={mood}, BPM={bpm}, CF={cf:.2f}, VoiceHint={voice_hint}"
+    )
     log.debug(f"TLP: {tlp}")
-    
+
     love = tlp.get("love", 0.0)
     pain = tlp.get("pain", 0.0)
     truth = tlp.get("truth", 0.0)
 
     user_mode = bool(voice_hint)
-    
+
     # ---------------------------------
-    # 1. USER-MODE (Прямые хинты)
+    # 1. USER - MODE (Прямые хинты)
     # ---------------------------------
     if user_mode and voice_hint:
-        log.debug("Режим: USER-MODE (по хинту)")
+        log.debug("Режим: USER - MODE (по хинту)")
         hint = voice_hint.lower()
-        
+
         if any(k in hint for k in ["growl", "scream", "хрип", "крич", "grit", "metal"]):
             genre, style, key_mode = "metal adaptive", "aggressive growl", "minor"
         elif any(k in hint for k in ["soft", "airy", "whisper", "шепот", "тихо"]):
@@ -59,44 +63,46 @@ def resolve_style_and_form(
             genre, style, key_mode = "pop emotional", "bright major", "major"
         elif any(k in hint for k in ["male", "мужск"]):
             genre, style, key_mode = "rock narrative", "warm baritone", "minor"
-        elif any(k in hint for k in ["rap", "рэп", "хип-хоп"]):
-            genre, style, key_mode = "hip-hop", "rhythmic flow", "minor"
+        elif any(k in hint for k in ["rap", "рэп", "хип - хоп"]):
+            genre, style, key_mode = "hip - hop", "rhythmic flow", "minor"
         elif any(k in hint for k in ["edm", "dance", "house", "trance"]):
-             genre, style, key_mode = "edm", "uplifting electronic", "minor"
+            genre, style, key_mode = "edm", "uplifting electronic", "minor"
         else:
             genre, style, key_mode = "cinematic adaptive", "neutral modal", "modal"
-    
+
     # ---------------------------------
-    # 2. AUTO-MODE (Анализ TLP/Mood/BPM)
+    # 2. AUTO - MODE (Анализ TLP / Mood / BPM)
     # ---------------------------------
     else:
-        log.debug("Режим: AUTO-MODE (по TLP/Mood/BPM)")
-        
-        # --- Определение СТИЛЯ (v11-logic) ---
+        log.debug("Режим: AUTO - MODE (по TLP / Mood / BPM)")
+
+        # --- Определение СТИЛЯ (v11 - logic) ---
         # СНАЧАЛА проверяем PAIN (v8 fix)
-        if (pain >= 0.01 and pain > love) or mood in ("sadness", "melancholy"): 
+        if (pain >= 0.01 and pain > love) or mood in ("sadness", "melancholy"):
             style, key_mode = "melancholic minor", "minor"
             log.debug("Стиль: 'melancholic minor' (Pain > Love или Mood=sadness)")
-            
+
         elif (love >= 0.01 and love >= pain) or mood in ("joy", "peace", "awe"):
             style, key_mode = "majestic major", "major"
-            log.debug("Стиль: 'majestic major' (Love >= Pain или Mood=joy/peace)")
+            log.debug("Стиль: 'majestic major' (Love >= Pain или Mood=joy / peace)")
 
         elif (cf > 0.6 and truth > 0.1) or mood in ("anger", "fear", "epic"):
             style, key_mode = "dramatic harmonic minor", "minor"
-            log.debug("Стиль: 'dramatic harmonic minor' (CF/Truth или Mood=anger/fear/epic)")
-            
+            log.debug(
+                "Стиль: 'dramatic harmonic minor' (CF / Truth или Mood=anger / fear / epic)"
+            )
+
         else:
             style, key_mode = "neutral modal", "modal"
             log.debug("Стиль: 'neutral modal' (по умолчанию)")
 
-        # --- Определение ЖАНРА (v12-logic) ---
-        
+        # --- Определение ЖАНРА (v12 - logic) ---
+
         # v12: Исправлен NameError. Убрана 'energy'.
         if bpm > 115 and pain < 0.2 and mood not in ("sadness", "anger", "fear"):
-             genre = "edm"
-             log.debug("Жанр: 'edm' (Высокий BPM + Низкий Pain/Fear)")
-        
+            genre = "edm"
+            log.debug("Жанр: 'edm' (Высокий BPM + Низкий Pain / Fear)")
+
         elif style == "melancholic minor":
             genre = "lyrical adaptive"
             log.debug("Жанр: 'lyrical adaptive' (Стиль=melancholic)")
@@ -104,12 +110,12 @@ def resolve_style_and_form(
         elif style == "majestic major":
             genre = "lyrical adaptive"
             log.debug("Жанр: 'lyrical adaptive' (Стиль=majestic)")
-            
+
         elif style == "dramatic harmonic minor":
             genre = "cinematic adaptive"
             log.debug("Жанр: 'cinematic adaptive' (Стиль=dramatic)")
-            
-        else: # neutral modal
+
+        else:  # neutral modal
             genre = "cinematic narrative"
             log.debug("Жанр: 'cinematic narrative' (Стиль=neutral)")
 
@@ -131,8 +137,10 @@ def resolve_style_and_form(
     elif genre == "edm":
         atmosphere = "energetic and uplifting"
     else:
-        atmosphere = "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
-    
+        atmosphere = (
+            "mystic and suspenseful" if cf >= 0.88 else "balanced and reflective"
+        )
+
     log.debug(f"Атмосфера: {atmosphere}")
 
     # ---------------------------------
@@ -142,7 +150,9 @@ def resolve_style_and_form(
         phases = "→".join(narrative)
         if "struggle" in phases and "transformation" in phases and cf >= 0.9:
             if not genre.startswith("cinematic"):
-                log.debug("Нарратив 'struggle→transformation' привел к смене жанра на 'cinematic narrative'")
+                log.debug(
+                    "Нарратив 'struggle→transformation' привел к смене жанра на 'cinematic narrative'"
+                )
                 genre = "cinematic narrative"
 
     return {
@@ -157,8 +167,10 @@ def resolve_style_and_form(
 # ==========================================================
 # 🎨 PatchedStyleMatrix (v5.2.3)
 # ==========================================================
+
+
 class PatchedStyleMatrix:
-    """Adaptive emotional-to-style mapping engine (v12 Logged)."""
+    """Adaptive emotional - to - style mapping engine (v12 Logged)."""
 
     def build(
         self,
@@ -166,12 +178,11 @@ class PatchedStyleMatrix:
         tlp: Dict[str, float],
         text: str,
         bpm: int,
-        semantic_hints: Dict[str, Any] | None = None,
-        voice_hint: str | None = None, # v4.3: Принимает хинт от monolith
+        semantic_hints: Optional[Dict[str, Any]] = None,
+        voice_hint: Optional[str] = None,  # v4.3: Принимает хинт от monolith
     ) -> Dict[str, Any]:
-        
         log.debug(f"Вызов функции: PatchedStyleMatrix.build. BPM={bpm}")
-        
+
         cf = tlp.get("conscious_frequency", 0.0)
         # v11: Mood (доминирующая эмоция) стал важнее
         dominant_mood = max(emo, key=emo.get) if emo else "peace"
@@ -182,21 +193,20 @@ class PatchedStyleMatrix:
         # 1. 🧠 Вызов Резолвера
         narrative = ("search", "struggle", "transformation")
         resolved = resolve_style_and_form(
-            tlp, cf, dominant_mood, bpm, narrative, 
-            key_hint=None, voice_hint=voice_hint
+            tlp, cf, dominant_mood, bpm, narrative, key_hint=None, voice_hint=voice_hint
         )
 
         # 2. 🎼 Определение Ключа (Тональности)
-        t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)
-        scale = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
+        t, l, p = tlp.get("truth", 0), tlp.get("love", 0), tlp.get("pain", 0)  # noqa: E741
+        scale = ["C", "C  #", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
         # (v10) Упрощенная и более предсказуемая логика ключа
-        
-        # v12: Приоритет минора, если mood/style минорный
-        if resolved['key_mode'] == "minor":
+
+        # v12: Приоритет минора, если mood / style минорный
+        if resolved["key_mode"] == "minor":
             index_shift = int(((bpm / 15) + (p * 5) + (t * 2)) % 12)
-        else: # major или modal
+        else:  # major или modal
             index_shift = int(((bpm / 12) + (l * 6) - (p * 2)) % 12)
-            
+
         key = f"{scale[index_shift]} ({scale[index_shift]} {resolved['key_mode']})"
         log.debug(f"Ключ: {key} (на основе BPM={bpm}, L={l}, P={p}, CF={cf})")
 
@@ -206,7 +216,7 @@ class PatchedStyleMatrix:
             "melancholic minor": "rain, fog, silhouettes, slow motion",
             "dramatic harmonic minor": "light and shadow interplay, emotional contrasts, dynamic framing",
             "aggressive growl": "fire, smoke, chaos, sharp cuts",
-            "soft whisper tone": "blurred lights, feathers, close-up breathing",
+            "soft whisper tone": "blurred lights, feathers, close - up breathing",
             "rhythmic flow": "city night lights, graffiti, street motion",
             "neutral modal": "shifting colors, abstract transitions",
             "uplifting electronic": "neon lights, fast motion, club atmosphere",
@@ -216,7 +226,7 @@ class PatchedStyleMatrix:
         # 4. 🎤 Вокальные техники
         techniques = []
         if resolved["user_mode"] and voice_hint:
-            log.debug("Применяем USER-MODE техники")
+            log.debug("Применяем USER - MODE техники")
             hint = voice_hint.lower()
             if any(k in hint for k in ["growl", "scream", "хрип", "grit"]):
                 techniques += ["growl", "scream", "chest drive"]
@@ -231,7 +241,7 @@ class PatchedStyleMatrix:
             else:
                 techniques += ["neutral blend", "harmonic balance"]
         else:
-            log.debug("Применяем AUTO-MODE техники")
+            log.debug("Применяем AUTO - MODE техники")
             # Основано на TLP и Emo
             if emo.get("anger", 0) > 0.3 or resolved["style"].startswith("dramatic"):
                 techniques += ["belt", "rasp", "grit"]
@@ -245,24 +255,28 @@ class PatchedStyleMatrix:
                 techniques += ["processed vocal", "staccato", "vocal chop"]
             if not techniques:
                 techniques += ["resonant layering", "harmonic blend"]
-        
-        techniques = sorted(list(set(techniques))) # Убираем дубликаты
+
+        techniques = sorted(list(set(techniques)))  # Убираем дубликаты
         log.debug(f"Техники: {techniques}")
 
-        # 5. 📊 Мета-данные
+        # 5. 📊 Мета - данные
         complexity_score = round(mean([emo[k] for k in emo]) * 10, 2) if emo else 0.5
         color_temperature = "warm" if l >= p else "cold"
-        adaptive_mode = "USER-MODE" if resolved["user_mode"] else ("stable" if cf > 0.6 else "transient")
-        
+        adaptive_mode = (
+            "USER - MODE"
+            if resolved["user_mode"]
+            else ("stable" if cf > 0.6 else "transient")
+        )
+
         # v12: Передаем BPM из резолвера, если он был изменен
-        bpm_final = resolved.get("bpm", bpm) 
+        bpm_final = resolved.get("bpm", bpm)
 
         result = {
             "genre": resolved["genre"],
             "style": resolved["style"],
             "key": key,
-            "bpm": bpm_final, # v12
-            "structure": "intro-verse-chorus-outro", 
+            "bpm": bpm_final,  # v12
+            "structure": "intro - verse - chorus - outro",
             "visual": visual,
             "narrative": "→".join(narrative),
             "atmosphere": resolved["atmosphere"],
@@ -276,22 +290,24 @@ class PatchedStyleMatrix:
 
 
 # ==========================================================
-STYLE_VERSION = "v5.2.3 adaptive hybrid (USER-MODE + AutoDetect)"
+STYLE_VERSION = "v5.2.3 adaptive hybrid (USER - MODE + AutoDetect)"
 log.info(f"🎨 [PatchedStyleMatrix {STYLE_VERSION}] loaded successfully.")
 
 # ==========================================================
 # 🔄 Compatibility alias
 # ==========================================================
 try:
-    StyleMatrix # type: ignore
+    StyleMatrix  # type: ignore
 except NameError:
     try:
         StyleMatrix = PatchedStyleMatrix
-        log.info("🎨 [StyleMatrix alias] PatchedStyleMatrix → StyleMatrix (compat mode active)")
+        log.info(
+            "🎨 [StyleMatrix alias] PatchedStyleMatrix → StyleMatrix (compat mode active)"
+        )
     except Exception as e:
         log.warning(f"⚠️ [StyleMatrix alias] failed: {e}")
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

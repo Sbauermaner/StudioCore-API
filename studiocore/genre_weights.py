@@ -1,24 +1,24 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
-GenreWeightsEngine v3.0 — Multi-Domain
+GenreWeightsEngine v3.0 — Multi - Domain
 
 Домены:
-- hard       (rock/metal/rap/агрессия)
-- electronic (edm/techno/trance/dnb/etc.)
-- jazz       (jazz/swing/bebop/nu_jazz/etc.)
-- lyrical    (поэтическая/песенная лирика, включая комическую)
+- hard       (rock / metal / rap / агрессия)
+- electronic (edm / techno / trance / dnb / etc.)
+- jazz       (jazz / swing / bebop / nu_jazz / etc.)
+- lyrical    (поэтическая / песенная лирика, включая комическую)
 - cinematic  (score, epic, trailer)
-- comedy     (комедийная музыка/пародии)
-- soft       (спокойные жанры: folk/ambient/lofi/etc.)
+- comedy     (комедийная музыка / пародии)
+- soft       (спокойные жанры: folk / ambient / lofi / etc.)
 
 Работает на feature map из core_v6:
 features = {
@@ -32,8 +32,7 @@ features = {
 }
 """
 
-from __future__ import annotations
-from typing import Dict, Any, List
+from typing import Dict, List, Optional
 
 from .genre_registry import GlobalGenreRegistry
 from .genre_universe_loader import load_genre_universe
@@ -65,7 +64,8 @@ class GenreWeightsEngine:
                 "structure_tension": 0.12,
             },
             "electronic": {
-                # Очень быстрый BPM (134.9), смешанный mode (21 major, 14 minor)
+                # Очень быстрый BPM (134.9), смешанный mode (21 major, 14
+                # minor)
                 "electronic_pressure": 0.26,
                 "rhythm_density": 0.22,
                 "power": 0.18,
@@ -129,14 +129,19 @@ class GenreWeightsEngine:
             },
         }
 
-        # Нормализация весов: гарантируем, что отрицательные веса зажаты, и опционально нормализуем суммы
+        # Нормализация весов: гарантируем, что отрицательные веса зажаты, и
+        # опционально нормализуем суммы
         self.domain_feature_weights: Dict[str, Dict[str, float]] = {}
         for domain, weights in raw_weights.items():
             normalized_weights: Dict[str, float] = {}
-            # Зажимаем отрицательные веса (они используются для вычитания, но должны быть в разумных пределах)
+            # Зажимаем отрицательные веса (они используются для вычитания, но
+            # должны быть в разумных пределах)
             for feat, w in weights.items():
-                # Отрицательные веса допустимы (для вычитания), но зажимаем их в разумные пределы
-                normalized_weights[feat] = max(-0.5, min(0.5, w)) if w < 0 else max(0.0, min(1.0, w))
+                # Отрицательные веса допустимы (для вычитания), но зажимаем их
+                # в разумные пределы
+                normalized_weights[feat] = (
+                    max(-0.5, min(0.5, w)) if w < 0 else max(0.0, min(1.0, w))
+                )
             self.domain_feature_weights[domain] = normalized_weights
 
         # === 2. Порог по доменам (выровнены на основе статистики базы данных) ===
@@ -161,7 +166,9 @@ class GenreWeightsEngine:
             "soft": "folk",
         }
 
-        self.genre_profiles: Dict[str, Dict[str, float]] = getattr(self, "genre_profiles", {})
+        self.genre_profiles: Dict[str, Dict[str, float]] = getattr(
+            self, "genre_profiles", {}
+        )
         self.genre_profiles.update(
             {
                 "баллада": {
@@ -213,7 +220,7 @@ class GenreWeightsEngine:
 
     # ---------- Внутренняя логика ----------
 
-    def _domain_for_genre(self, genre: str) -> str | None:
+    def _domain_for_genre(self, genre: str) -> Optional[str]:
         for domain, genres in self.registry.domains.items():
             if genre in genres:
                 return domain
@@ -228,23 +235,53 @@ class GenreWeightsEngine:
         u = self.universe
         if domain == "electronic":
             base = u.edm_genres + [
-                g for g in u.music_genres
-                if any(k in g for k in (
-                    "edm", "techno", "trance", "dnb", "drum_and_bass",
-                    "dubstep", "house", "bass", "synth", "wave", "electro",
-                    "idm", "break", "rave",
-                ))
+                g
+                for g in u.music_genres
+                if any(
+                    k in g
+                    for k in (
+                        "edm",
+                        "techno",
+                        "trance",
+                        "dnb",
+                        "drum_and_bass",
+                        "dubstep",
+                        "house",
+                        "bass",
+                        "synth",
+                        "wave",
+                        "electro",
+                        "idm",
+                        "break",
+                        "rave",
+                    )
+                )
             ]
         elif domain == "hard":
             base = [
-                g for g in u.music_genres
-                if any(k in g for k in (
-                    "rock", "metal", "punk", "core", "rap", "hip_hop",
-                    "drill", "trap", "hard",
-                ))
+                g
+                for g in u.music_genres
+                if any(
+                    k in g
+                    for k in (
+                        "rock",
+                        "metal",
+                        "punk",
+                        "core",
+                        "rap",
+                        "hip_hop",
+                        "drill",
+                        "trap",
+                        "hard",
+                    )
+                )
             ]
         elif domain == "jazz":
-            base = [g for g in u.music_genres if any(k in g for k in ("jazz", "swing", "bop"))]
+            base = [
+                g
+                for g in u.music_genres
+                if any(k in g for k in ("jazz", "swing", "bop"))
+            ]
         elif domain == "lyrical":
             base = u.lyric_forms + u.literature_styles
         elif domain == "comedy":
@@ -254,16 +291,28 @@ class GenreWeightsEngine:
             base += [g for g in u.music_genres if "cinematic" in g or "score" in g]
         elif domain == "soft":
             base = [
-                g for g in u.music_genres
-                if any(k in g for k in (
-                    "folk", "ambient", "lofi", "chill", "dream", "soft", "ballad"
-                ))
+                g
+                for g in u.music_genres
+                if any(
+                    k in g
+                    for k in (
+                        "folk",
+                        "ambient",
+                        "lofi",
+                        "chill",
+                        "dream",
+                        "soft",
+                        "ballad",
+                    )
+                )
             ]
         else:
             base = []
 
         normalized = list(dict.fromkeys(base))  # сохраняем порядок
-        self._universe_domain_cache[domain] = normalized or self.registry.domains.get(domain, [])
+        self._universe_domain_cache[domain] = normalized or self.registry.domains.get(
+            domain, []
+        )
         return self._universe_domain_cache[domain]
 
     def score_domains(self, features: Dict[str, float]) -> Dict[str, float]:
@@ -274,7 +323,8 @@ class GenreWeightsEngine:
             for feat, w in weights.items():
                 # Зажимаем значение признака в [0.0, 1.0] для безопасности
                 value = max(0.0, min(1.0, float(features.get(feat, 0.0))))
-                # Веса уже нормализованы в __init__, но дополнительная проверка не помешает
+                # Веса уже нормализованы в __init__, но дополнительная проверка
+                # не помешает
                 safe_weight = max(-0.5, min(0.5, w)) if w < 0 else max(0.0, min(1.0, w))
                 s += value * safe_weight
             scores[domain] = s
@@ -283,13 +333,13 @@ class GenreWeightsEngine:
         gothic = features.get("gothic_factor", 0.0)
         dramatic = features.get("dramatic_weight", 0.0)
         lyric = features.get("lyric_form_weight", poetic)
-        
+
         # === ЦВЕТОВАЯ КОРРЕКЦИЯ НА ОСНОВЕ ЭМОЦИЙ ===
         # Получаем цветовую информацию из feature_map (если доступна)
         color_info = features.get("color_profile", {}) or {}
         primary_color = color_info.get("primary_color") or ""
         dominant_emotion = features.get("dominant_emotion", "")
-        
+
         # Маппинг цветов эмоций к доменам (на основе GENRE_DATABASE.json)
         color_to_domain_boost = {
             # LOVE цвета → lyrical
@@ -299,9 +349,8 @@ class GenreWeightsEngine:
             "#FFE4E1": ("lyrical", 0.12),  # love_soft
             "#C2185B": ("lyrical", 0.18),  # love_deep
             "#880E4F": ("lyrical", 0.18),  # love_deep
-            
-            # PAIN/GOTHIC цвета → hard
-            "#DC143C": ("hard", 0.12),  # pain/crimson
+            # PAIN / GOTHIC цвета → hard
+            "#DC143C": ("hard", 0.12),  # pain / crimson
             "#2F1B25": ("hard", 0.15),  # pain
             "#0A1F44": ("hard", 0.15),  # pain
             "#2C1A2E": ("hard", 0.18),  # gothic_dark
@@ -309,51 +358,44 @@ class GenreWeightsEngine:
             "#000000": ("hard", 0.20),  # gothic_dark
             "#111111": ("hard", 0.16),  # dark
             "#8B0000": ("hard", 0.18),  # rage_extreme
-            
-            # TRUTH цвета → lyrical/cinematic
-            "#4B0082": ("lyrical", 0.15),  # truth
+            # TRUTH цвета → lyrical / cinematic
+            "#4B0082_lyrical": ("lyrical", 0.15),  # truth
             "#6C1BB1": ("lyrical", 0.15),  # truth
             "#5B3FA8": ("lyrical", 0.15),  # truth
             "#AEE3FF": ("cinematic", 0.12),  # clear_truth
             "#6DA8C8": ("cinematic", 0.12),  # cold_truth
-            
-            # JOY цвета → electronic/pop
+            # JOY цвета → electronic / pop
             "#FFD93D": ("electronic", 0.15),  # joy
             "#FFD700": ("electronic", 0.18),  # joy_bright
             "#FFFF00": ("electronic", 0.18),  # joy_bright
             "#FFF59D": ("electronic", 0.15),  # joy_bright
-            
             # PEACE цвета → soft
             "#40E0D0": ("soft", 0.15),  # peace
             "#E0F7FA": ("soft", 0.12),  # peace
             "#9FD3FF": ("soft", 0.12),  # calm_flow
             "#8FC1E3": ("soft", 0.10),  # calm
-            
             # EPIC цвета → cinematic
             "#8A2BE2": ("cinematic", 0.20),  # epic
-            "#4B0082": ("cinematic", 0.18),  # epic (также truth)
+            "#4B0082_cinematic": ("cinematic", 0.18),  # epic (также truth)
             "#FF00FF": ("cinematic", 0.18),  # epic
-            
             # NOSTALGIA цвета → lyrical
             "#D8BFD8": ("lyrical", 0.12),  # nostalgia
             "#E6E6FA": ("lyrical", 0.12),  # nostalgia
             "#C3B1E1": ("lyrical", 0.12),  # nostalgia
-            
             # SORROW цвета → lyrical
             "#3E5C82": ("lyrical", 0.15),  # sorrow
             "#4A6FA5": ("lyrical", 0.12),  # sadness
             "#596E94": ("lyrical", 0.12),  # melancholy
-            
-            # WARM цвета → soft/jazz
+            # WARM цвета → soft / jazz
             "#F5B56B": ("soft", 0.12),  # warm_pulse
             "#F7B267": ("soft", 0.10),  # warmth
         }
-        
+
         # Применяем цветовую коррекцию
         if primary_color and primary_color in color_to_domain_boost:
             domain, boost = color_to_domain_boost[primary_color]
             scores[domain] = scores.get(domain, 0.0) + boost
-        
+
         # Также учитываем доминирующую эмоцию по имени
         emotion_to_domain_boost = {
             "love": ("lyrical", 0.20),
@@ -376,18 +418,26 @@ class GenreWeightsEngine:
             "rage_extreme": ("hard", 0.20),
             "anger": ("hard", 0.16),
         }
-        
+
         if dominant_emotion and dominant_emotion in emotion_to_domain_boost:
             domain, boost = emotion_to_domain_boost[dominant_emotion]
             scores[domain] = scores.get(domain, 0.0) + boost
 
         # Выровненные веса на основе базы данных:
         # - LYRICAL: преимущественно major, медленный BPM - усилен poetic и lyric
-        scores["lyrical"] = scores.get("lyrical", 0.0) + (poetic * 0.22) + (lyric * 0.28)
+        scores["lyrical"] = (
+            scores.get("lyrical", 0.0) + (poetic * 0.22) + (lyric * 0.28)
+        )
         # - CINEMATIC: преимущественно minor, медленный BPM - усилен dramatic
-        scores["cinematic"] = scores.get("cinematic", 0.0) + (dramatic * 0.18) + (gothic * 0.12)
+        scores["cinematic"] = (
+            scores.get("cinematic", 0.0) + (dramatic * 0.18) + (gothic * 0.12)
+        )
         # - ELECTRONIC: очень быстрый BPM, не должен быть лирическим - усилено вычитание
-        scores["electronic"] = max(0.0, scores.get("electronic", 0.0) - (poetic * 0.28 + gothic * 0.22 + dramatic * 0.12))
+        scores["electronic"] = max(
+            0.0,
+            scores.get("electronic", 0.0)
+            - (poetic * 0.28 + gothic * 0.22 + dramatic * 0.12),
+        )
         return scores
 
     def infer_domain(self, features: Dict[str, float]) -> str:
@@ -396,7 +446,8 @@ class GenreWeightsEngine:
 
         # отфильтровать по порогу
         candidates = {
-            d: s for d, s in domain_scores.items()
+            d: s
+            for d, s in domain_scores.items()
             if s >= self.domain_thresholds.get(d, 0.0)
         }
         if candidates:
@@ -413,7 +464,9 @@ class GenreWeightsEngine:
         - если ничего не набрало порога — fallback
         """
         domain = self.infer_domain(features)
-        domain_genres = self._genres_for_domain(domain) or self.registry.domains.get(domain, [])
+        domain_genres = self._genres_for_domain(domain) or self.registry.domains.get(
+            domain, []
+        )
 
         # Если домен пустой — fallback
         if not domain_genres:
@@ -435,10 +488,12 @@ class GenreWeightsEngine:
         selected = domain_genres[0]
 
         poetic = features.get("poetic_density", 0.0)
-        lyric = features.get("lyric_form_weight", poetic)
-        gothic = features.get("gothic_factor", 0.0)
+        features.get("lyric_form_weight", poetic)  # Reserved for future use
+        features.get("gothic_factor", 0.0)  # Reserved for future use
 
-        if False:  # domain == "electronic" and (poetic > 0.35 or lyric > 0.35 or gothic > 0.25):
+        # domain == "electronic" and (poetic > 0.35 or lyric > 0.35 or gothic >
+        # 0.25):
+        if False:
             # GLOBAL PATCH: отключен fallback на lyrical_song
             # return "lyrical_song"
             pass
@@ -446,7 +501,8 @@ class GenreWeightsEngine:
         # NEW: нормальное разрешение жанров
         return selected
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

@@ -1,5 +1,3 @@
-import pytest
-
 from studiocore.monolith_v4_3_1 import StudioCore
 
 

@@ -1,12 +1,12 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 StudioCore v5 — Frequency & RNS Safety
@@ -20,11 +20,14 @@ from typing import Dict, Any, List
 # =====================================================
 # 🛡 RNS Safety Filter
 # =====================================================
+
+
 class RNSSafety:
     """
     Resonance–Nervous–Safety filter
     Ограничивает диапазоны частот и октав для защиты слуха и психоакустической стабильности.
     """
+
     def __init__(self, cfg: Dict[str, Any]):
         s = cfg.get("safety", {})
         self.max_peak_db = s.get("max_peak_db", -1.0)
@@ -47,6 +50,8 @@ class RNSSafety:
 # =====================================================
 # 🎵 Universal Frequency Engine
 # =====================================================
+
+
 class UniversalFrequencyEngine:
     """
     Переводит Truth–Love–Pain в частотную модель резонанса.
@@ -55,20 +60,20 @@ class UniversalFrequencyEngine:
       - harmonic_shift: смещение октавы
       - consciousness_level: согласованность трёх осей
       - recommended_octaves: безопасные диапазоны
-      - rns_index: индекс нейро-резонансной безопасности (0–1)
+      - rns_index: индекс нейро - резонансной безопасности (0–1)
       - safe_band_hz: безопасная частота после фильтрации RNS
     """
 
     BASE_HZ = 432.1  # уточнённая гармоника Земли (Cousto Earth frequency)
     MAX_MULT = 2.5
 
-    def _mix(self, t: float, l: float, p: float) -> float:
+    def _mix(self, t: float, l: float, p: float) -> float:  # noqa: E741
         """
         Смешивает три оси (Truth, Love, Pain) в одно гармоническое значение.
         Любовь стабилизирует, боль модулирует, истина — фазовый баланс.
         """
         # базовая гармоника
-        base = (0.6 * t + 0.9 * l + 0.4 * p)
+        base = 0.6 * t + 0.9 * l + 0.4 * p
         # добавим фазовую стабильность (смягчённый синус)
         phase = 0.5 * math.sin(math.pi * (t - p)) + 0.5 * math.cos(math.pi * (l - 0.5))
         harmonics = 1 + 0.4 * phase
@@ -77,8 +82,8 @@ class UniversalFrequencyEngine:
 
     def resonance_profile(self, tlp: Dict[str, float]) -> Dict[str, Any]:
         """Вычисляет частотный профиль, безопасные диапазоны и индекс RNS."""
-        t, l, p = tlp.get("truth", 0.0), tlp.get("love", 0.0), tlp.get("pain", 0.0)
-        mix = self._mix(t, l, p)
+        t, l, p = tlp.get("truth", 0.0), tlp.get("love", 0.0), tlp.get("pain", 0.0)  # noqa: E741
+        mix = self._mix(t, l, p)  # noqa: E741
 
         base_hz = self.BASE_HZ * mix
         harmonic_shift = round(12 * (mix - 1), 2)
@@ -92,7 +97,7 @@ class UniversalFrequencyEngine:
         else:
             octaves = [3, 4]
 
-        # индекс нейро-безопасности (высокий при гармонии)
+        # индекс нейро - безопасности (высокий при гармонии)
         rns_index = round(1.0 - abs(t - p) * 0.5 - abs(l - p) * 0.3, 3)
         rns_index = max(0.0, min(1.0, rns_index))
 
@@ -106,10 +111,11 @@ class UniversalFrequencyEngine:
             "consciousness_level": round(consciousness_level, 3),
             "recommended_octaves": octaves,
             "rns_index": rns_index,
-            "safe_band_hz": safe_center
+            "safe_band_hz": safe_center,
         }
+
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

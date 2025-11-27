@@ -1,24 +1,24 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 LyricalEmotionEngine v1.0
 
 Объединяет:
-- RDE (Raw Dramatic Emotion: joy/sadness/anger/fear/epic/peace/hope/etc.)
-- TLP (Truth/Love/Pain)
+- RDE (Raw Dramatic Emotion: joy / sadness / anger / fear / epic / peace / hope / etc.)
+- TLP (Truth / Love / Pain)
 - PoeticDensity (плотность образов)
-- EmotionalGradient (как растёт/спадает эмоция по тексту)
+- EmotionalGradient (как растёт / спадает эмоция по тексту)
 
 Отдаёт сводный эмоциональный профиль для лирики
-и используется доменом LYRICAL/COMEDY в жанровом анализе.
+и используется доменом LYRICAL / COMEDY в жанровом анализе.
 """
 
 from __future__ import annotations
@@ -43,8 +43,8 @@ class LyricalEmotionEngine:
         {
           "rde": {"joy": ..., "sadness": ..., ...},
           "tlp": {"truth": ..., "love": ..., "pain": ...},
-          "poetic_density": 0.0-1.0,
-          "emotional_gradient": 0.0-1.0,
+          "poetic_density": 0.0 - 1.0,
+          "emotional_gradient": 0.0 - 1.0,
         }
         """
         rde = analysis.get("rde", {})
@@ -53,17 +53,27 @@ class LyricalEmotionEngine:
         grad = float(analysis.get("emotional_gradient", 0.0))
 
         # Примитивный агрегат — можно усложнить позже
-        rde_scalar = float(rde.get("epic", 0.0) + rde.get("hope", 0.0) +
-                           rde.get("pain", 0.0) + rde.get("sadness", 0.0)) / 4.0 or 0.0
-        tlp_scalar = float(tlp.get("truth", 0.0) * 0.4 +
-                           tlp.get("love", 0.0) * 0.3 +
-                           tlp.get("pain", 0.0) * 0.3)
+        rde_scalar = (
+            float(
+                rde.get("epic", 0.0)
+                + rde.get("hope", 0.0)
+                + rde.get("pain", 0.0)
+                + rde.get("sadness", 0.0)
+            )
+            / 4.0
+            or 0.0
+        )
+        tlp_scalar = float(
+            tlp.get("truth", 0.0) * 0.4
+            + tlp.get("love", 0.0) * 0.3
+            + tlp.get("pain", 0.0) * 0.3
+        )
 
         final_score = (
-            rde_scalar * self.weights["rde"] +
-            tlp_scalar * self.weights["tlp"] +
-            pd * self.weights["poetic_density"] +
-            grad * self.weights["emotional_gradient"]
+            rde_scalar * self.weights["rde"]
+            + tlp_scalar * self.weights["tlp"]
+            + pd * self.weights["poetic_density"]
+            + grad * self.weights["emotional_gradient"]
         )
 
         prefer_strict_boundary = pd > 0.85 or rde_scalar > 0.6
@@ -77,7 +87,8 @@ class LyricalEmotionEngine:
             "prefer_strict_boundary": prefer_strict_boundary,
         }
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e

@@ -26,6 +26,7 @@ def test_loader_diagnostics_shape():
     assert diag.active in {None, "v6", "v5", "monolith", "fallback"}
     assert STUDIOCORE_VERSION.startswith("v6")
 
+
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore-FP-2025-SB-9fd72e27

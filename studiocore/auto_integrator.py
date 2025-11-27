@@ -1,32 +1,29 @@
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
-# -*- coding: utf-8 -*-
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
+# -*- coding: utf - 8 -*-
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
 
 """
 AutoIntegrator v1.0 — системный модуль автоматической синхронизации StudioCore.
 
 Функции:
-- авто-обновление main после каждого патча
-- авто-слияние изменений между ветками
-- авто-обновление архитектуры (ядра, движки, секции, модули)
-- авто-исправление лёгких конфликтов
-- авто-расширение каталогов при появлении новых файлов
-- авто-линтинг + авто-форматирование
-- авто-проверка целостности связей между ядрами V4 / V5 / V6
+- авто - обновление main после каждого патча
+- авто - слияние изменений между ветками
+- авто - обновление архитектуры (ядра, движки, секции, модули)
+- авто - исправление лёгких конфликтов
+- авто - расширение каталогов при появлении новых файлов
+- авто - линтинг + авто - форматирование
+- авто - проверка целостности связей между ядрами V4 / V5 / V6
 """
 
 import subprocess
 import os
-import sys
-import shlex
 from pathlib import Path
-import shutil
 
 
 class AutoIntegrator:
@@ -36,6 +33,7 @@ class AutoIntegrator:
     # ==============================
     #       GIT HELPERS
     # ==============================
+
     def _run(self, cmd: str):
         """
         Безопасное выполнение команды без shell=True.
@@ -43,21 +41,23 @@ class AutoIntegrator:
         """
         try:
             # Безопасное разбиение команды на аргументы
-            # Используем shlex.split для правильной обработки кавычек и пробелов
+            # Используем shlex.split для правильной обработки кавычек и
+            # пробелов
             import shlex
+
             cmd_parts = shlex.split(cmd) if isinstance(cmd, str) else cmd
-            
+
             # Если cmd уже список, используем его напрямую
             if not isinstance(cmd_parts, list):
                 cmd_parts = [str(cmd)]
-            
+
             # Выполняем без shell=True для безопасности
             result = subprocess.run(
                 cmd_parts,
                 shell=False,  # Безопасно: без shell
                 capture_output=True,
                 text=True,
-                timeout=30  # Таймаут для предотвращения зависаний
+                timeout=30,  # Таймаут для предотвращения зависаний
             )
             return result.stdout, result.stderr
         except subprocess.TimeoutExpired:
@@ -68,7 +68,9 @@ class AutoIntegrator:
             return "", str(e)
 
     def auto_pull(self):
-        return self._run(f"git pull origin {self.base_branch} --allow-unrelated-histories")
+        return self._run(
+            f"git pull origin {self.base_branch} --allow - unrelated - histories"
+        )
 
     def auto_add(self):
         return self._run("git add -A")
@@ -80,11 +82,12 @@ class AutoIntegrator:
         return self._run(f"git push origin {self.base_branch}")
 
     def auto_merge(self, branch: str):
-        return self._run(f"git merge {branch} --strategy-option=ours --no-edit")
+        return self._run(f"git merge {branch} --strategy - option=ours --no - edit")
 
     # ==============================
     #       ARCHITECTURE FIXES
     # ==============================
+
     def ensure_directories(self):
         required_dirs = [
             "studiocore",
@@ -99,7 +102,7 @@ class AutoIntegrator:
                 open(os.path.join(root, "__init__.py"), "a").close()
 
     def auto_lint(self):
-        """Авто-форматирование + базовая очистка."""
+        """Авто - форматирование + базовая очистка."""
         self._run("python3 -m black studiocore")
         self._run("python3 -m isort studiocore")
 
@@ -114,6 +117,7 @@ class AutoIntegrator:
     # ==============================
     #       MASTER EXECUTION
     # ==============================
+
     def execute(self):
         self.ensure_directories()
         self.ensure_init_files()
@@ -121,7 +125,7 @@ class AutoIntegrator:
         self.auto_lint()
 
         self.auto_add()
-        self.auto_commit("AUTO-INTEGRATOR: sync architecture")
+        self.auto_commit("AUTO - INTEGRATOR: sync architecture")
         self.auto_push()
 
 
@@ -130,5 +134,5 @@ if __name__ == "__main__":
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
-# Fingerprint: StudioCore-FP-2025-SB-9fd72e27
-# Hash: 22ae-df91-bc11-6c7e
+# Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
+# Hash: 22ae - df91 - bc11 - 6c7e
