@@ -57,12 +57,39 @@ class StudioCoreV6:
         Analyze text and return comprehensive results.
         Compatible with StudioCore monolith analyze() signature.
         """
-        return self._core.analyze(
+        result = self._core.analyze(
             text=text,
             preferred_gender=preferred_gender,
             version=version,
             semantic_hints=semantic_hints,
         )
+        
+        # Дополнительно: Используем HybridGenreEngine для уточнения жанра
+        if self._hge is not None and result.get("style"):
+            style = result.get("style", {})
+            genre = style.get("genre")
+            if genre:
+                try:
+                    # Используем HybridGenreEngine для уточнения жанра
+                    context = {
+                        "emotions": result.get("emotions", {}),
+                        "tlp": result.get("tlp", {}),
+                        "bpm": result.get("bpm"),
+                        "key": result.get("key"),
+                    }
+                    resolved_genre = self._hge.resolve(genre=genre, context=context)
+                    if resolved_genre and isinstance(resolved_genre, str):
+                        # Обновляем жанр в style, если он был уточнен
+                        style["genre"] = resolved_genre
+                        style["genre_source"] = "hybrid_genre_engine"
+                        result["style"] = style
+                except Exception as e:
+                    # Логируем ошибку, но не прерываем выполнение
+                    import logging
+                    log = logging.getLogger(__name__)
+                    log.warning(f"HybridGenreEngine.resolve() failed: {e}")
+        
+        return result
 
 
 def main():

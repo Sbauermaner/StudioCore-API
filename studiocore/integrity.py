@@ -15,7 +15,7 @@ StudioCore v5 — Integrity Scan Engine
 
 import re
 from statistics import mean
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from .emotion import AutoEmotionalAnalyzer, TruthLovePainEngine
 
 
@@ -41,7 +41,13 @@ class IntegrityScanEngine:
         diff = abs(t - l) + abs(l - p) + abs(t - p)  # noqa: E741
         return round(1.0 - min(1.0, diff * 0.6), 3)
 
-    def analyze(self, text: str) -> Dict[str, Any]:
+    def analyze(
+        self, 
+        text: str,
+        # Task 2.2: Добавлены опциональные параметры для устранения повторных анализов
+        emotions: Optional[Dict[str, float]] = None,
+        tlp: Optional[Dict[str, float]] = None,
+    ) -> Dict[str, Any]:
         lines = [line for line in text.split("\n") if line.strip()]
         words = re.findall(r"[^\s]+", text)
         sents = re.split(r"[.!?]+", text)
@@ -54,10 +60,18 @@ class IntegrityScanEngine:
             "symmetry_index": self._symmetry_index(lines),
         }
 
-        # эмоции и оси TLP
-        emo = AutoEmotionalAnalyzer().analyze(text)
-        tlp = TruthLovePainEngine().analyze(text)
-        harmonic_coherence = self._harmonic_coherence(tlp)
+        # Task 2.2: Используем переданные emotions и tlp вместо создания новых экземпляров
+        if emotions is None:
+            emo = AutoEmotionalAnalyzer().analyze(text)
+        else:
+            emo = emotions
+        
+        if tlp is None:
+            tlp_local = TruthLovePainEngine().analyze(text)
+        else:
+            tlp_local = tlp
+        
+        harmonic_coherence = self._harmonic_coherence(tlp_local)
 
         # рефлексия — присутствие «я», «мы», «они»
         ref_words = set(
@@ -84,7 +98,7 @@ class IntegrityScanEngine:
             "form": form,
             "essence": {
                 "emotions": emo,
-                "tlp": tlp,
+                "tlp": tlp_local,
                 "harmonic_coherence": harmonic_coherence,
             },
             "reflection": {
