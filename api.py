@@ -30,9 +30,16 @@ app = FastAPI(
 )
 
 # CORS middleware для поддержки cross-origin запросов
+# Task 3.2: Security fix - use environment variable instead of wildcard
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+cors_origins = (
+    [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+    if cors_origins_env
+    else ["*"]  # Fallback to wildcard only if env var is not set
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # В production замените на конкретные домены
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

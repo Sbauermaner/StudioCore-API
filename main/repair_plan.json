@@ -1,0 +1,143 @@
+{
+    "cursor_action_plan": {
+      "project_name": "StudioCore-API Repair",
+      "objective": "Eliminate critical logic gaps, redundant calculations, security risks, and hardcodes identified in the analysis documentation.",
+      "phases": [
+        {
+          "phase_id": 1,
+          "name": "Restore Broken Analysis Pipeline",
+          "description": "Fix 'monolith_v4_3_1.py' where 10 out of 15 processes are currently skipped or hardcoded.",
+          "priority": "CRITICAL",
+          "target_files": ["studiocore/monolith_v4_3_1.py", "studiocore/config.py"],
+          "tasks": [
+            {
+              "id": "1.1",
+              "location": "monolith_v4_3_1.py:536",
+              "issue": "TLP Analysis is passed as None to rhythm.analyze, causing incomplete rhythm calculation.",
+              "action": "Insert `tlp = self.tlp.analyze(raw)` and `cf = tlp.get('conscious_frequency')` immediately after emotion analysis."
+            },
+            {
+              "id": "1.2",
+              "location": "monolith_v4_3_1.py:532",
+              "issue": "Section Analysis is instantiated but never called.",
+              "action": "Call `section_result = self._analyze_sections(text_blocks, preferred_gender)` after text block extraction."
+            },
+            {
+              "id": "1.3",
+              "location": "monolith_v4_3_1.py:556-565",
+              "issue": "Style.build() is skipped; code uses static FALLBACK values.",
+              "action": "Remove fallback hardcodes. Call `style_result = self.style.build(emotions, tlp, raw, bpm, semantic_hints, voice_hint)`."
+            },
+            {
+              "id": "1.4",
+              "location": "monolith_v4_3_1.py:314-396",
+              "issue": "Semantic Layers logic exists but is never invoked.",
+              "action": "Call `semantic_layers = self._build_semantic_layers(emotions, tlp, bpm, key)`."
+            },
+            {
+              "id": "1.5",
+              "location": "monolith_v4_3_1.py:402-514",
+              "issue": "Text Annotation (UI/Suno strings) is never generated.",
+              "action": "Call `annotated_ui, annotated_suno = self.annotate_text(text_blocks, section_profiles, semantic_layers)` before the return statement."
+            },
+            {
+              "id": "1.6",
+              "location": "monolith_v4_3_1.py:569-575",
+              "issue": "Return dictionary is missing calculated data.",
+              "action": "Update the return dictionary to include `tlp`, `vocal`, `semantic_layers`, `annotated_text_ui`, and `annotated_text_suno`."
+            }
+          ]
+        },
+        {
+          "phase_id": 2,
+          "name": "Eliminate Process Redundancy",
+          "description": "Stop engines from re-analyzing text (TLP is analyzed 11 times, Emotion 9 times). Pass results down instead.",
+          "priority": "HIGH",
+          "target_files": ["studiocore/vocals.py", "studiocore/integrity.py", "studiocore/monolith_v4_3_1.py"],
+          "tasks": [
+            {
+              "id": "2.1",
+              "location": "studiocore/vocals.py:387-388",
+              "issue": "Vocals engine re-analyzes Emotion and TLP internally.",
+              "action": "Refactor `VocalProfileRegistry.analyze` (or `get`) to accept `emotions` and `tlp` dictionaries as arguments. Remove internal `self.emo_analyzer.analyze(text)` calls."
+            },
+            {
+              "id": "2.2",
+              "location": "studiocore/integrity.py:58-59",
+              "issue": "Integrity engine instantiates NEW analyzers and re-runs analysis.",
+              "action": "Refactor `IntegrityScanEngine.analyze` to accept `emotions` and `tlp`. Remove instantiation of `AutoEmotionalAnalyzer` and `TruthLovePainEngine` inside the method."
+            },
+            {
+              "id": "2.3",
+              "location": "studiocore/monolith_v4_3_1.py:549",
+              "issue": "Update calls to sub-engines to match new signatures.",
+              "action": "Update calls to `self.vocal_allocator.analyze(...)` and `self.integrity.analyze(...)` to pass the already calculated `emotions` and `tlp` variables."
+            }
+          ]
+        },
+        {
+          "phase_id": 3,
+          "name": "Security and Validation Fixes",
+          "description": "Address critical security gaps and missing input validation.",
+          "priority": "HIGH",
+          "target_files": ["api.py", "studiocore/config.py", "studiocore/monolith_v4_3_1.py"],
+          "tasks": [
+            {
+              "id": "3.1",
+              "location": "studiocore/monolith_v4_3_1.py:530",
+              "issue": "No input validation in Monolith (MAX_INPUT_LENGTH check missing).",
+              "action": "Add check: `if len(text) > config.MAX_INPUT_LENGTH: raise ValueError(...)`. Also check for empty string."
+            },
+            {
+              "id": "3.2",
+              "location": "api.py:35",
+              "issue": "CORS allows all origins ('*').",
+              "action": "Change `allow_origins=['*']` to use an environment variable `os.getenv('CORS_ORIGINS').split(',')` or a restricted list."
+            },
+            {
+              "id": "3.3",
+              "location": "studiocore/config.py:50-60",
+              "issue": "Aggression filter keywords exist but are unused.",
+              "action": "Implement a `check_safety(text)` method in `text_utils.py` using `AGGRESSION_KEYWORDS` and call it at the start of `monolith_v4_3_1.py`."
+            }
+          ]
+        },
+        {
+          "phase_id": 4,
+          "name": "Refactor Hardcodes",
+          "description": "Move hardcoded values from logic files to configuration.",
+          "priority": "MEDIUM",
+          "target_files": ["studiocore/rhythm.py", "studiocore/config.py"],
+          "tasks": [
+            {
+              "id": "4.1",
+              "location": "studiocore/rhythm.py",
+              "issue": "Over 35 hardcoded values (weights, thresholds, multipliers) found in code.",
+              "action": "Move values like `120.0` (default BPM), `0.7` (header weight), `50` (Pain boost) to `studiocore/config.py` under `DEFAULT_CONFIG`."
+            },
+            {
+              "id": "4.2",
+              "location": "studiocore/rhythm.py:33-40",
+              "issue": "Punctuation weights are hardcoded.",
+              "action": "Reference `DEFAULT_CONFIG.PUNCT_WEIGHTS` instead of local dictionary."
+            }
+          ]
+        },
+        {
+          "phase_id": 5,
+          "name": "State Management Fix",
+          "description": "Fix global state leaks that violate stateless architecture.",
+          "priority": "MEDIUM",
+          "target_files": ["studiocore/emotion.py"],
+          "tasks": [
+            {
+              "id": "5.1",
+              "location": "studiocore/emotion.py:722",
+              "issue": "`_EMOTION_MODEL_CACHE` is a global variable causing potential thread-safety issues.",
+              "action": "Encapsulate the cache within the `AutoEmotionalAnalyzer` instance or implement a proper thread-safe singleton pattern."
+            }
+          ]
+        }
+      ]
+    }
+  }

@@ -28,17 +28,10 @@ from typing import Dict, List, Optional, Tuple, TypedDict
 # without explicit written permission from the Author is prohibited.
 
 from .text_utils import extract_sections
+from .config import DEFAULT_CONFIG
 
-PUNCT_WEIGHTS = {
-    "!": 0.6,
-    "?": 0.4,
-    ".": 0.1,
-    ", ": 0.05,
-    "…": 0.5,
-    "—": 0.2,
-    ":": 0.15,
-    ";": 0.1,
-}
+# Task 4.2: Используем PUNCT_WEIGHTS из config.py вместо локального словаря
+PUNCT_WEIGHTS = DEFAULT_CONFIG.PUNCT_WEIGHTS
 
 HEADER_BPM_RE = re.compile(
     r"\[\s*BPM\s*:?\s*(?P<bpm>[0-9]{2,3}(?:\.[0-9]+)?)\s*\]", re.I
@@ -54,10 +47,11 @@ SECTION_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "OUTRO": ("outro", "финал", "ending", "концовка"),
 }
 
-MIN_BPM = 60.0
-MAX_BPM = 180.0
-MICRO_MIN = 40.0
-MICRO_MAX = 200.0
+# Task 4.1: Используем значения из config.py вместо хардкодов
+MIN_BPM = DEFAULT_CONFIG.rhythm["MIN_BPM"]
+MAX_BPM = DEFAULT_CONFIG.rhythm["MAX_BPM"]
+MICRO_MIN = DEFAULT_CONFIG.rhythm["MICRO_MIN"]
+MICRO_MAX = DEFAULT_CONFIG.rhythm["MICRO_MAX"]
 
 
 class RhythmSection(TypedDict, total=False):
@@ -103,15 +97,20 @@ def resolve_global_bpm(
         if estimated_bpm is None:
             return header_bpm
         diff = abs(header_bpm - estimated_bpm)
-        if diff > 30:
+        # Task 4.1: Используем значения из config.py
+        if diff > DEFAULT_CONFIG.rhythm["BPM_CONFLICT_THRESHOLD"]:
             # strong disagreement — keep the author's intent fully
             return header_bpm
-        return header_bpm * 0.7 + estimated_bpm * 0.3
+        return (
+            header_bpm * DEFAULT_CONFIG.rhythm["HEADER_BPM_WEIGHT"]
+            + estimated_bpm * DEFAULT_CONFIG.rhythm["ESTIMATED_BPM_WEIGHT"]
+        )
 
     if estimated_bpm is not None:
         return estimated_bpm
 
-    return 120.0
+    # Task 4.1: Используем DEFAULT_BPM из config.py
+    return DEFAULT_CONFIG.rhythm["DEFAULT_BPM"]
 
 
 def calc_tension(curve: List[float]) -> float:
@@ -208,8 +207,12 @@ class LyricMeter:
         emotions: Optional[Dict[str, float]] = None,
         cf: Optional[float] = None,
         tlp: Optional[Dict[str, float]] = None,
-        emotion_weight: float = 0.3,
+        emotion_weight: Optional[float] = None,
     ) -> float:
+        # Task 4.1: Используем значение из config.py если не передано
+        if emotion_weight is None:
+            emotion_weight = DEFAULT_CONFIG.rhythm["EMOTION_WEIGHT"]
+        
         emotions = emotions or {}
         tlp = tlp or {}
         lines = [line.strip() for line in text.split("\n") if line.strip()]
@@ -219,10 +222,18 @@ class LyricMeter:
         syllables = [self._syllables(line) for line in lines]
         avg_syll = sum(syllables) / len(lines)
 
-        base = 60 + 120 / (1 + math.exp((avg_syll - 8) / 2.5 * 0.8))
+        # Task 4.1: Используем значения из config.py
+        r = DEFAULT_CONFIG.rhythm
+        base = MIN_BPM + DEFAULT_CONFIG.rhythm["DEFAULT_BPM"] / (
+            1 + math.exp(
+                (avg_syll - r["AVG_SYLLABLES_THRESHOLD"]) 
+                / r["SYLLABLE_DIVISOR"] 
+                * r["SYLLABLE_MULTIPLIER"]
+            )
+        )
 
         p_energy = self._punct_energy(text)
-        base += min(18.0, p_energy * 3.5)
+        base += min(r["PUNCT_ENERGY_MAX"], p_energy * r["PUNCT_ENERGY_MULTIPLIER"])
 
         anger = emotions.get("anger", 0.0)
         epic = emotions.get("epic", 0.0)
@@ -231,25 +242,43 @@ class LyricMeter:
         fear = emotions.get("fear", 0.0)
         peace = emotions.get("peace", 0.0)
 
-        energy_factor = clamp(1 + (anger + epic + joy - sadness - fear) * 0.6, 0.8, 1.4)
-        accel = 10.0 * (0.7 * anger + 0.6 * epic + 0.3 * joy)
-        brake = 10.0 * (0.6 * sadness + 0.5 * fear + 0.2 * peace)
+        # Task 4.1: Используем значения из config.py
+        energy_factor = clamp(
+            1 + (anger + epic + joy - sadness - fear) * r["ENERGY_FACTOR_MULTIPLIER"],
+            r["ENERGY_FACTOR_CLAMP_MIN"],
+            r["ENERGY_FACTOR_CLAMP_MAX"]
+        )
+        accel_weights = r["ACCEL_EMOTION_WEIGHTS"]
+        brake_weights = r["BRAKE_EMOTION_WEIGHTS"]
+        accel = r["ACCEL_BRAKE_MULTIPLIER"] * (
+            accel_weights["anger"] * anger 
+            + accel_weights["epic"] * epic 
+            + accel_weights["joy"] * joy
+        )
+        brake = r["ACCEL_BRAKE_MULTIPLIER"] * (
+            brake_weights["sadness"] * sadness 
+            + brake_weights["fear"] * fear 
+            + brake_weights["peace"] * peace
+        )
         bpm = (base + accel - brake) * energy_factor
 
         if cf is not None:
-            bpm += (cf - 0.8) * 100 * emotion_weight
+            # Task 4.1: Используем значения из config.py
+            bpm += (cf - r["CF_THRESHOLD"]) * r["CF_BOOST_MULTIPLIER"] * emotion_weight
 
         if tlp:
-            pain_boost = tlp.get("Pain", 0.0) * 50 * emotion_weight
-            love_smooth = tlp.get("Love", 0.0) * 25 * emotion_weight
-            truth_drive = tlp.get("Truth", 0.0) * 20 * emotion_weight
+            # Task 4.1: Используем значения из config.py
+            pain_boost = tlp.get("Pain", 0.0) * r["PAIN_BOOST_MULTIPLIER"] * emotion_weight
+            love_smooth = tlp.get("Love", 0.0) * r["LOVE_SMOOTH_MULTIPLIER"] * emotion_weight
+            truth_drive = tlp.get("Truth", 0.0) * r["TRUTH_DRIVE_MULTIPLIER"] * emotion_weight
             bpm += pain_boost + truth_drive - love_smooth
 
         n_lines = len(lines)
-        if n_lines <= 4:
-            bpm += 4
-        elif n_lines > 16:
-            bpm -= 3
+        # Task 4.1: Используем значения из config.py
+        if n_lines <= r["SHORT_SECTION_LINE_COUNT"]:
+            bpm += r["SHORT_SECTION_BPM_BOOST"]
+        elif n_lines > r["LONG_SECTION_LINE_COUNT"]:
+            bpm -= r["LONG_SECTION_BPM_PENALTY"]
 
         return clamp(bpm, MIN_BPM, MAX_BPM)
 
@@ -276,21 +305,27 @@ class LyricMeter:
             statistics.pstdev(phrase_lengths) if len(phrase_lengths) > 1 else 0.0
         )
 
-        base = 58.0 + avg_words * 3.2
-        base += variation * 1.5
-        base += punctuation_hits * 1.2
-        base += accent_hits * 4.0
-        base += dash_hits * 0.8
-        base += breath_pauses * 2.0
-        base -= ellipsis_hits * 3.5
-        base -= max(0.0, (avg_word_len - 5.5) * 1.7)
+        # Task 4.1: Используем значения из config.py
+        r = DEFAULT_CONFIG.rhythm
+        base = r["BASE_BPM_HEURISTIC"] + avg_words * r["AVG_WORDS_MULTIPLIER"]
+        base += variation * r["VARIATION_MULTIPLIER"]
+        base += punctuation_hits * r["PUNCTUATION_HITS_MULTIPLIER"]
+        base += accent_hits * r["ACCENT_HITS_MULTIPLIER"]
+        base += dash_hits * r["DASH_HITS_MULTIPLIER"]
+        base += breath_pauses * r["BREATH_PAUSES_MULTIPLIER"]
+        base -= ellipsis_hits * r["ELLIPSIS_HITS_MULTIPLIER"]
+        base -= max(0.0, (avg_word_len - r["AVG_WORD_LENGTH_THRESHOLD"]) * r["WORD_LENGTH_MULTIPLIER"])
 
-        short_lines = sum(1 for w in phrase_lengths if w <= 4)
-        long_lines = sum(1 for w in phrase_lengths if w >= 11)
-        base += short_lines * 2.0
-        base -= long_lines * 1.6
+        short_lines = sum(1 for w in phrase_lengths if w <= r["SHORT_LINES_THRESHOLD"])
+        long_lines = sum(1 for w in phrase_lengths if w >= r["LONG_LINES_THRESHOLD"])
+        base += short_lines * r["SHORT_LINES_MULTIPLIER"]
+        base -= long_lines * r["LONG_LINES_PENALTY"]
 
-        return clamp(base, MIN_BPM - 15.0, MAX_BPM + 25.0)
+        return clamp(
+            base, 
+            MIN_BPM - r["BPM_CLAMP_OFFSET_MIN"], 
+            MAX_BPM + r["BPM_CLAMP_OFFSET_MAX"]
+        )
 
     def _blend_section_bpm(
         self,
@@ -298,13 +333,18 @@ class LyricMeter:
         heuristic_bpm: float,
         global_density: float,
     ) -> float:
+        # Task 4.1: Используем значения из config.py
+        r = DEFAULT_CONFIG.rhythm
         values: List[Tuple[float, float]] = []
         if density_bpm > 0:
-            values.append((density_bpm, 0.45))
+            values.append((density_bpm, r["DENSITY_BPM_WEIGHT"]))
         if heuristic_bpm > 0:
-            values.append((heuristic_bpm, 0.45 if density_bpm > 0 else 0.65))
+            values.append((
+                heuristic_bpm, 
+                r["HEURISTIC_BPM_WEIGHT"] if density_bpm > 0 else r["HEURISTIC_BPM_WEIGHT_FALLBACK"]
+            ))
         if global_density > 0:
-            values.append((global_density, 0.10 if values else 1.0))
+            values.append((global_density, r["GLOBAL_DENSITY_WEIGHT"] if values else 1.0))
 
         if not values:
             return global_density or 0.0
@@ -341,7 +381,8 @@ class LyricMeter:
             shift += accent * 4.5
             shift -= ellipsis * 4.0
             shift += dash * 1.2
-            shift += comma_breaks * 0.8
+            # Task 4.1: Используем значение из config.py
+            shift += comma_breaks * DEFAULT_CONFIG.rhythm["COMMA_BREAKS_MULTIPLIER"]
 
             if idx > 0:
                 prev_len = phrase_lengths[idx - 1]
@@ -368,8 +409,11 @@ class LyricMeter:
         emotions: Optional[Dict[str, float]] = None,
         cf: Optional[float] = None,
         tlp: Optional[Dict[str, float]] = None,
-        emotion_weight: float = 0.3,
+        emotion_weight: Optional[float] = None,
     ) -> RhythmAnalysis:
+        # Task 4.1: Используем значение из config.py если не передано
+        if emotion_weight is None:
+            emotion_weight = DEFAULT_CONFIG.rhythm["EMOTION_WEIGHT"]
         emotions = emotions or {}
         tlp = tlp or {}
 
@@ -414,7 +458,12 @@ class LyricMeter:
         )
 
         if estimated_from_sections is not None and density_global > 0:
-            estimated_global = 0.65 * estimated_from_sections + 0.35 * density_global
+            # Task 4.1: Используем значения из config.py
+            r = DEFAULT_CONFIG.rhythm
+            estimated_global = (
+                r["ESTIMATED_SECTIONS_WEIGHT"] * estimated_from_sections 
+                + r["DENSITY_GLOBAL_WEIGHT"] * density_global
+            )
         else:
             estimated_global = estimated_from_sections or (
                 density_global if density_global > 0 else None
@@ -449,8 +498,11 @@ class LyricMeter:
         emotions: Optional[Dict[str, float]] = None,
         cf: Optional[float] = None,
         tlp: Optional[Dict[str, float]] = None,
-        emotion_weight: float = 0.3,
+        emotion_weight: Optional[float] = None,
     ) -> int:
+        # Task 4.1: Используем значение из config.py если не передано
+        if emotion_weight is None:
+            emotion_weight = DEFAULT_CONFIG.rhythm["EMOTION_WEIGHT"]
         analysis = self.analyze(
             text,
             emotions=emotions,

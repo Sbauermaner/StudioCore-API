@@ -719,24 +719,19 @@ class EmotionEngineV2:
 # =====================================================
 # 🎼 EmotionModel v1 (66 → 12 → GENRE / BPM / KEY)
 # =====================================================
-_EMOTION_MODEL_CACHE: Optional[Dict[str, Any]] = None
+# Task 5.1: Удален глобальный кэш для stateless архитектуры
+# Кэш теперь инкапсулирован в EmotionEngine.__init__()
 
 
 def load_emotion_model() -> Dict[str, Any]:
-    """Load and cache emotion_model_v1.json."""
-
-    global _EMOTION_MODEL_CACHE
-    if _EMOTION_MODEL_CACHE is not None:
-        return _EMOTION_MODEL_CACHE
-
+    """Load emotion_model_v1.json (stateless version, no global cache)."""
     model_path = os.path.join(os.path.dirname(__file__), "emotion_model_v1.json")
     try:
         with open(model_path, "r", encoding="utf - 8") as fp:
-            _EMOTION_MODEL_CACHE = json.load(fp)
+            return json.load(fp)
     except FileNotFoundError:
         log.warning("emotion_model_v1.json not found; using empty model")
-        _EMOTION_MODEL_CACHE = {"version": "0.0", "clusters": {}}
-    return _EMOTION_MODEL_CACHE
+        return {"version": "0.0", "clusters": {}}
 
 
 class EmotionEngine:

@@ -39,6 +39,8 @@ from .rhythm import LyricMeter
 
 # v11: 'PatchedStyleMatrix' - это наш 'StyleMatrix'
 from .style import PatchedStyleMatrix
+from .color_engine_adapter import ColorEngineAdapter
+from .rde_engine import RhythmDynamicsEmotionEngine
 
 # === 2. Настройка логгера ===
 log = logging.getLogger(__name__)
@@ -175,9 +177,15 @@ class PatchedIntegrityScanEngine:
     def __init__(self):
         self._engine = FullIntegrityScanEngine()
 
-    def analyze(self, text: str) -> Dict[str, Any]:
+    def analyze(
+        self, 
+        text: str,
+        # Task 2.3: Добавлены параметры для устранения повторных анализов
+        emotions: Optional[Dict[str, float]] = None,
+        tlp: Optional[Dict[str, float]] = None,
+    ) -> Dict[str, Any]:
         """Заменяет заглушку на полноценный анализ целостности (V6 Logic)."""
-        return self._engine.analyze(text)
+        return self._engine.analyze(text, emotions=emotions, tlp=tlp)
 
 
 class AdaptiveVocalAllocator:
@@ -188,8 +196,9 @@ class AdaptiveVocalAllocator:
         self, emo: Dict[str, float], tlp: Dict[str, float], bpm: int, text: str
     ) -> Dict[str, Any]:
         """Заменяет заглушку на полноценный аллокатор вокала (V6 Logic)."""
+        # Task 2.3: Передаем emotions и tlp в get() для устранения повторных анализов
         # Используем V6 логику для определения формы на основе эмоций / TLP
-        vox, _, vocal_form = self._vocal_registry.get("default", "auto", text, [], [])
+        vox, _, vocal_form = self._vocal_registry.get("default", "auto", text, [], [], emotions=emo, tlp=tlp)
         vocal_count = len(
             [
                 v
@@ -246,6 +255,12 @@ class StudioCore:
         self.tone = ToneSyncEngine()
         log.debug("Загрузка: AdaptiveVocalAllocator")
         self.vocal_allocator = AdaptiveVocalAllocator()
+        
+        log.debug("Загрузка: ColorEngineAdapter")
+        self.color_engine = ColorEngineAdapter()
+        
+        log.debug("Загрузка: RhythmDynamicsEmotionEngine")
+        self.rde_engine = RhythmDynamicsEmotionEngine()
 
         log.info(
             f"🔹 [StudioCore {STUDIOCORE_VERSION}] Monolith loaded (Section - Aware Duet Mode v2)."
@@ -527,13 +542,41 @@ class StudioCore:
         log.debug(f"--- ЗАПУСК АНАЛИЗА (v{STUDIOCORE_VERSION}) ---")
         log.debug(f"Preferred Gender: {preferred_gender}, Text: {text[:40]}...")
 
+        # Task 3.1: Input Validation
+        if not text or not isinstance(text, str):
+            raise ValueError("Text input is required and must be a string")
+        if len(text) > DEFAULT_CONFIG.MAX_INPUT_LENGTH:
+            raise ValueError(
+                f"Text length ({len(text)}) exceeds maximum allowed length ({DEFAULT_CONFIG.MAX_INPUT_LENGTH})"
+            )
+
+        # Task 3.3: Aggression Filter
+        aggression_keywords = DEFAULT_CONFIG.AGGRESSION_KEYWORDS
+        text_lower = text.lower()
+        found_keywords = [kw for kw in aggression_keywords if kw.lower() in text_lower]
+        if found_keywords:
+            log.warning(
+                f"Aggression keywords detected: {found_keywords}. Replacing with neutral text."
+            )
+            text = DEFAULT_CONFIG.FALLBACK_NEUTRAL_TEXT
+
         raw = normalize_text_preserve_symbols(text)
         text_blocks = extract_raw_blocks(raw)
+
+        # Task 1.2: Section Analysis
+        section_result = self._analyze_sections(text_blocks, preferred_gender)
+        section_profiles = section_result.get("section_profiles", [])
+        voice_hint = section_result.get("user_voice_hint")
 
         emotions = self.emotion.analyze(raw)
         log.debug(f"Результат EMO: {emotions}")
 
-        rhythm_analysis = self.rhythm.analyze(raw, emotions=emotions, tlp=None, cf=None)
+        # Task 1.1: TLP Analysis
+        tlp = self.tlp.analyze(raw)
+        cf = tlp.get("conscious_frequency")
+        log.debug(f"Результат TLP: {tlp}, CF: {cf}")
+
+        rhythm_analysis = self.rhythm.analyze(raw, emotions=emotions, tlp=tlp, cf=cf)
         bpm = int(round(rhythm_analysis.get("global_bpm", DEFAULT_CONFIG.FALLBACK_BPM)))
         log.debug(
             "Базовый BPM: %s (header=%s, estimated=%s)",
@@ -547,31 +590,100 @@ class StudioCore:
         if not key or key == "auto":
             key = DEFAULT_CONFIG.FALLBACK_KEY
 
+        # Task 1.3: Style.build() вместо FALLBACK значений
+        if self.style:
+            style_result = self.style.build(
+                emotions, tlp, raw, bpm, semantic_hints, voice_hint
+            )
+            style = style_result
+        else:
+            # Fallback если style engine недоступен
+            style = {
+                "genre": DEFAULT_CONFIG.FALLBACK_STYLE,
+                "style": DEFAULT_CONFIG.FALLBACK_STYLE,
+                "bpm": bpm,
+                "key": key,
+                "visual": DEFAULT_CONFIG.FALLBACK_VISUAL,
+                "narrative": DEFAULT_CONFIG.FALLBACK_NARRATIVE,
+                "structure": DEFAULT_CONFIG.FALLBACK_STRUCTURE,
+                "emotion": emotions.get("dominant") or DEFAULT_CONFIG.FALLBACK_EMOTION,
+            }
+            log.warning("Style engine недоступен, используются FALLBACK значения")
+
+        # Task 1.4: Semantic Layers
+        semantic_layers = self._build_semantic_layers(emotions, tlp, bpm, key)
+        semantic_sections = semantic_layers.get("layers", {}).get("sections", [])
+
+        # Определяем layout из semantic_sections или используем fallback
+        layout = DEFAULT_CONFIG.FALLBACK_STRUCTURE
+        if semantic_sections and len(semantic_sections) > 0:
+            layout = semantic_sections[0].get("tag", DEFAULT_CONFIG.FALLBACK_STRUCTURE)
+
         structure = {
             "sections": text_blocks,
             "section_count": len(text_blocks),
-            "layout": DEFAULT_CONFIG.FALLBACK_STRUCTURE,
+            "layout": layout,
         }
 
-        style = {
-            "genre": DEFAULT_CONFIG.FALLBACK_STYLE,
-            "style": DEFAULT_CONFIG.FALLBACK_STYLE,
-            "bpm": bpm,
-            "key": key,
-            "visual": DEFAULT_CONFIG.FALLBACK_VISUAL,
-            "narrative": DEFAULT_CONFIG.FALLBACK_NARRATIVE,
-            "structure": DEFAULT_CONFIG.FALLBACK_STRUCTURE,
-            "emotion": emotions.get("dominant") or DEFAULT_CONFIG.FALLBACK_EMOTION,
+        # Task 1.6: Vocal Allocator
+        vocal_result = self.vocal_allocator.analyze(emotions, tlp, bpm, raw)
+        log.debug(f"Результат Vocal: {vocal_result}")
+
+        # Task 1.6: Integrity Scan
+        # Task 2.3: Передаем emotions и tlp для устранения повторных анализов
+        integrity_result = self.integrity.analyze(raw, emotions=emotions, tlp=tlp)
+        log.debug(f"Результат Integrity: {integrity_result}")
+
+        # Task 1.5: Text Annotation
+        annotated_text_ui, annotated_text_suno = self.annotate_text(
+            text_blocks, section_profiles, semantic_sections
+        )
+
+        # Дополнительно: Color Resolution
+        # Собираем промежуточный результат для Color Engine
+        intermediate_result = {
+            "emotions": emotions,
+            "tlp": tlp,
+            "style": style,
         }
+        color_resolution = self.color_engine.resolve_color_wave(intermediate_result)
+        color_wave = color_resolution.colors if color_resolution else []
+
+        # Дополнительно: RDE Analysis
+        # RDE требует bpm_payload, breathing_profile, emotion_profile, instrumentation_payload
+        rde_result = {
+            "resonance": self.rde_engine.calc_resonance(raw),
+            "fracture": self.rde_engine.calc_fracture(raw),
+            "entropy": self.rde_engine.calc_entropy(raw),
+        }
+        # Если есть TLP, используем его для экспорта emotion vector
+        if tlp:
+            try:
+                rde_emotion_vector = self.rde_engine.export_emotion_vector(raw)
+                rde_result["emotion_vector"] = {
+                    "valence": rde_emotion_vector.valence,
+                    "arousal": rde_emotion_vector.arousal,
+                }
+            except Exception as e:
+                log.warning(f"Не удалось экспортировать RDE emotion vector: {e}")
 
         log.debug("--- АНАЛИЗ УСПЕШНО ЗАВЕРШЕН ---")
 
+        # Task 1.7: Обновленный return словарь с всеми рассчитанными данными
         return {
             "emotions": emotions,
+            "tlp": tlp,
             "bpm": bpm,
             "key": key,
             "structure": structure,
             "style": style,
+            "vocal": vocal_result,
+            "semantic_layers": semantic_layers,
+            "integrity": integrity_result,
+            "annotated_text_ui": annotated_text_ui,
+            "annotated_text_suno": annotated_text_suno,
+            "color_wave": color_wave,
+            "rde": rde_result,
         }
 
 

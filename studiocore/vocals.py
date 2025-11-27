@@ -292,6 +292,9 @@ class VocalProfileRegistry:
         sections: List[Dict[str, Any]],  # (Устарело, но оставлено для API)
         # v4.3: Приходит из monolith (СПИСОК)
         vocal_profile_tags: List[Dict[str, Any]],
+        # Task 2.1: Добавлены опциональные параметры для устранения повторных анализов
+        emotions: Optional[Dict[str, float]] = None,
+        tlp: Optional[Dict[str, float]] = None,
     ) -> Tuple[List[str], List[str], str]:
         log.debug(
             f"Вызов функции: VocalProfileRegistry.get (Genre={genre_full}, PrefGender={preferred_gender})"
@@ -380,13 +383,16 @@ class VocalProfileRegistry:
         log.debug(f"Форма после хинтов: {form}")
 
         # Если все еще solo, используем старый метод auto_form
+        # Task 2.1: Используем переданные emotions и tlp вместо повторного анализа
         if form == "solo" and not (
             summed_tags.get("male") or summed_tags.get("female")
         ):
-            if self.emo_analyzer and self.tlp_analyzer:
+            if emotions is not None and tlp is not None:
+                form = self._auto_form(emotions, tlp, text)
+            elif self.emo_analyzer and self.tlp_analyzer:
                 emo = self.emo_analyzer.analyze(text)
-                tlp = self.tlp_analyzer.analyze(text)
-                form = self._auto_form(emo, tlp, text)
+                tlp_local = self.tlp_analyzer.analyze(text)
+                form = self._auto_form(emo, tlp_local, text)
             else:
                 log.warning("Emo / TLP анализаторы не загружены, _auto_form пропущен.")
         log.debug(f"Финальная форма: {form}")
@@ -425,7 +431,8 @@ class VocalProfileRegistry:
             if "mf" in vocal_form:  # duet_mf
                 vox = male_vox + female_vox
             else:
-                emo = self.emo_analyzer.analyze(text) if self.emo_analyzer else {}
+                # Task 2.1: Используем переданные emotions вместо повторного анализа
+                emo = emotions if emotions is not None else (self.emo_analyzer.analyze(text) if self.emo_analyzer else {})
                 joy_peace = emo.get("joy", 0) + emo.get("peace", 0)
                 anger_epic = emo.get("anger", 0) + emo.get("epic", 0)
                 vox = female_vox if joy_peace > anger_epic else male_vox
