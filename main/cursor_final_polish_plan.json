@@ -1,0 +1,41 @@
+{
+    "project_final_polish_plan": {
+      "meta": {
+        "status_reference": "AKTUELLER_STATUS_ANALYSE_2025_FINAL.md",
+        "objective": "Eliminate final 'pass' placeholders to reach 100% code completeness."
+      },
+      "phases": [
+        {
+          "id": "PHASE_16_FINAL_CODE_COMPLETION",
+          "name": "Eliminate Logic Gaps",
+          "priority": "LOW (Cleanup)",
+          "description": "Fix remaining placeholders identified in the final audit.",
+          "target_files": [
+            "studiocore/hybrid_genre_engine.py",
+            "studiocore/genre_weights.py",
+            "studiocore/emotion_map.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "16.1",
+              "issue": "`HybridGenreEngine.__init__` contains `pass`.",
+              "location": "studiocore/hybrid_genre_engine.py:25",
+              "action": "Initialize necessary attributes (e.g., `self.config = config`, `self.weights = GENRE_WEIGHTS`) instead of `pass`."
+            },
+            {
+              "task_id": "16.2",
+              "issue": "`GenreWeightsEngine.infer_genre` contains `pass` in logic branches.",
+              "location": "studiocore/genre_weights.py:499",
+              "action": "Replace `pass` with a safe default return (e.g., `return 'neutral'`) and a debug log message."
+            },
+            {
+              "task_id": "16.3",
+              "issue": "`EmotionMap` methods contain `pass`.",
+              "location": "studiocore/emotion_map.py:19",
+              "action": "Implement basic mapping return values (e.g., return empty dict `{}`) to prevent NoneType errors downstream."
+            }
+          ]
+        }
+      ]
+    }
+  }

@@ -1,0 +1,92 @@
+{
+    "project_master_repair_plan": {
+      "meta": {
+        "status_reference": "PROJEKTSTATUS_BERICHT.md",
+        "objective": "Execute the 3-Phase roadmap to reach 90%+ functionality.",
+        "estimated_effort": "57 hours (compressed into automated steps)"
+      },
+      "phases": [
+        {
+          "id": "PHASE_1_CRITICAL_FIXES",
+          "name": "Safety Integration (Priority P0)",
+          "priority": "CRITICAL",
+          "description": "Integrate safety checks into Monolith. Defined as the single most critical missing piece.",
+          "target_files": [
+            "studiocore/monolith_v4_3_1.py",
+            "studiocore/config.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "1.1",
+              "issue": "Safety logic exists in config but is not called in `analyze`.",
+              "location": "studiocore/monolith_v4_3_1.py:530",
+              "action": "Insert `self._check_safety(text)` at the start of `analyze`. Implement `_check_safety` to validate length (MAX_INPUT_LENGTH) and check `AGGRESSION_KEYWORDS`."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_2_IMPORTANT_IMPROVEMENTS",
+          "name": "Performance & Stability (Priority P1)",
+          "priority": "HIGH",
+          "description": "Fix performance bottlenecks and threading issues.",
+          "target_files": [
+            "studiocore/logical_engines.py",
+            "api.py",
+            "studiocore/emotion.py",
+            "studiocore/rhythm.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "2.1",
+              "issue": "Emotion analysis repeats 4 times per request in `logical_engines`.",
+              "location": "studiocore/logical_engines.py",
+              "action": "Implement caching in `EmotionEngine.analyze(text)`. Store result in `self._cache` keyed by text hash."
+            },
+            {
+              "task_id": "2.2",
+              "issue": "API lacks Rate Limiting, risking DDoS.",
+              "location": "api.py",
+              "action": "Implement a basic `SlowAPI` limiter or custom middleware to limit requests per IP (e.g., 60/min)."
+            },
+            {
+              "task_id": "2.3",
+              "issue": "Global state `_EMOTION_MODEL_CACHE` is not thread-safe.",
+              "location": "studiocore/emotion.py:722",
+              "action": "Wrap the global cache access with a `threading.Lock()`."
+            },
+            {
+              "task_id": "2.4",
+              "issue": "Silent failures swallow errors without logging.",
+              "location": "studiocore/rhythm.py & studiocore/monolith_v4_3_1.py",
+              "action": "Search for `except: pass` or `except Exception:` blocks and add `logger.error(...)`."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_3_OPTIMIZATION_AND_CLEANUP",
+          "name": "Code Quality & Stubs (Priority P2)",
+          "priority": "MEDIUM",
+          "description": "Clean up hardcodes and implement missing stubs.",
+          "target_files": [
+            "studiocore/fallback.py",
+            "studiocore/auto_sync_openapi.py",
+            "studiocore/config.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "3.1",
+              "issue": "Version strings are hardcoded across multiple files.",
+              "location": "Multiple Files",
+              "action": "Move all version strings ('v6.4', 'v4.3.11') to `studiocore/config.py` and reference them."
+            },
+            {
+              "task_id": "3.2",
+              "issue": "Stub functions (`StudioCoreFallback`, `auto_sync_openapi`) crash.",
+              "location": "studiocore/fallback.py",
+              "action": "Implement a minimal working `analyze` method in Fallback engine that returns a valid JSON structure."
+            }
+          ]
+        }
+      ]
+    }
+  }

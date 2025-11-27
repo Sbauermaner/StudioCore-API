@@ -25,20 +25,26 @@ def _safe_get(d, path, default=None):
 
 
 def extract_main_outputs(result):
+    """Task 11.1: Safely extract main outputs with defaults for missing optional fields."""
+    if not isinstance(result, dict):
+        return "", "", "", "", "{}"
+    
+    # Task 11.1: Safe extraction with defaults
     fanf = result.get("fanf", {}) if isinstance(result.get("fanf"), dict) else {}
     style_prompt = fanf.get("style_prompt") or result.get("style_prompt") or ""
     lyrics_prompt = fanf.get("lyrics_prompt") or result.get("lyrics_prompt") or ""
-    ui_text = fanf.get("ui_text") or result.get("annotated_text") or ""
+    ui_text = fanf.get("ui_text") or result.get("annotated_text") or result.get("annotated_text_ui") or ""
     fanf_text = (
         fanf.get("full")
         or fanf.get("summary")
         or fanf.get("annotated_text_fanf")
         or ui_text
+        or ""
     )
     try:
         summary_json = json.dumps(result, ensure_ascii=False, indent=2)
     except Exception:
-        summary_json = str(result)
+        summary_json = str(result) if result else "{}"
     return style_prompt, lyrics_prompt, ui_text, fanf_text, summary_json
 
 
@@ -82,10 +88,12 @@ def build_core_pulse_timeline(result):
     ]
     for label, key in stages:
         status = None
-        if isinstance(engines.get(key), dict):
-            status = engines[key].get("status")
-        elif isinstance(engines.get(key), str):
-            status = engines[key]
+        # Task 15.1: Use .get() with defaults to prevent KeyErrors
+        engine_data = engines.get(key)
+        if isinstance(engine_data, dict):
+            status = engine_data.get("status")
+        elif isinstance(engine_data, str):
+            status = engine_data
         color = status_to_color(status)
         html.append(
             f"""
@@ -102,6 +110,10 @@ def build_core_pulse_timeline(result):
 
 
 def build_tlp_pulse_text(result):
+    """Task 11.1: Safely build TLP pulse text with defaults for missing fields."""
+    if not isinstance(result, dict):
+        return "TLP Pulse: No data available"
+    
     tlp = result.get("tlp", {}) if isinstance(result.get("tlp"), dict) else {}
     truth = tlp.get("truth", 0.0)
     love = tlp.get("love", 0.0)
@@ -125,17 +137,21 @@ def build_tlp_pulse_text(result):
 
 
 def build_rde_section_text(result):
+    """Task 11.1: Safely build RDE section text with defaults for missing fields."""
+    if not isinstance(result, dict):
+        return "RDE / Sections: No data available"
+    
     rde = result.get("rde", {}) if isinstance(result.get("rde"), dict) else {}
-    rhythm = rde.get("rhythm", "—")
-    dynamics = rde.get("dynamics", "—")
-    emotion = rde.get("emotion", "—")
+    rhythm = rde.get("rhythm", rde.get("resonance", "—"))
+    dynamics = rde.get("dynamics", rde.get("fracture", "—"))
+    emotion = rde.get("emotion", rde.get("entropy", "—"))
     structure = (
         result.get("structure", {}) if isinstance(result.get("structure"), dict) else {}
     )
     section_list = structure.get("sections") or []
     headers = structure.get("headers") or []
 
-    # Получаем информацию о вокальных техниках и эмоциях секций
+    # Task 11.1: Safe extraction of fanf and lyrics_sections with defaults
     fanf = result.get("fanf", {}) if isinstance(result.get("fanf"), dict) else {}
     lyrics_sections = fanf.get("lyrics_sections") or []
     if not lyrics_sections:
@@ -197,15 +213,19 @@ def build_rde_section_text(result):
 
 
 def build_tone_bpm_text(result):
+    """Task 11.1: Safely build tone/bpm text with defaults for missing fields."""
+    if not isinstance(result, dict):
+        return "Tone / Key / BPM: No data available"
+    
     tone = result.get("tone", {}) if isinstance(result.get("tone"), dict) else {}
     style = result.get("style", {}) if isinstance(result.get("style"), dict) else {}
     bpm_val = result.get("bpm", "—")
-    key_root = tone.get("key_root") or style.get("key_root")
-    key_mode = tone.get("key_mode") or style.get("mode")
-    key_full = tone.get("key_full") or style.get("key")
-    color_sig = tone.get("color_signature") or style.get("color")
+    key_root = tone.get("key_root") or style.get("key_root") or None
+    key_mode = tone.get("key_mode") or style.get("mode") or None
+    key_full = tone.get("key_full") or style.get("key") or None
+    color_sig = tone.get("color_signature") or style.get("color") or None
     resonance = tone.get("resonance_hz", "—")
-    safe_octaves = tone.get("safe_octaves", [])
+    safe_octaves = tone.get("safe_octaves", []) if isinstance(tone.get("safe_octaves"), list) else []
     return "\n".join(
         [
             "Tone / Key / BPM:",
@@ -222,17 +242,21 @@ def build_tone_bpm_text(result):
 
 
 def build_genre_vocal_text(result):
+    """Task 11.1: Safely build genre/vocal text with defaults for missing fields."""
+    if not isinstance(result, dict):
+        return "Genre Fusion / Vocal Profile: No data available"
+    
     genre = result.get("genre", {}) if isinstance(result.get("genre"), dict) else {}
     style = result.get("style", {}) if isinstance(result.get("style"), dict) else {}
     vocal = result.get("vocal", {}) if isinstance(result.get("vocal"), dict) else {}
-    primary = genre.get("primary") or style.get("genre")
-    secondary = genre.get("secondary")
-    hybrid = genre.get("hybrid")
-    gender = vocal.get("gender") or result.get("final_gender_preference")
-    form = vocal.get("form") or style.get("vocal_form")
-    texture = vocal.get("texture")
-    # Добавляем информацию о вокальных техниках для секций
-    section_techniques = vocal.get("section_techniques", [])
+    primary = genre.get("primary") or style.get("genre") or None
+    secondary = genre.get("secondary") or None
+    hybrid = genre.get("hybrid") or None
+    gender = vocal.get("gender") or result.get("final_gender_preference") or None
+    form = vocal.get("form") or style.get("vocal_form") or None
+    texture = vocal.get("texture") or None
+    # Task 11.1: Safe extraction of section_techniques with default
+    section_techniques = vocal.get("section_techniques", []) if isinstance(vocal.get("section_techniques"), list) else []
     techniques_info = ""
     if section_techniques:
         techniques_info = "\n\nVocal Techniques by Section:"
@@ -257,13 +281,20 @@ def build_genre_vocal_text(result):
 
 
 def build_breath_map_text(result):
+    """Task 11.1: Safely build breath map text with defaults for missing fields."""
+    if not isinstance(result, dict):
+        return "Breathing / ZeroPulse map: No data available"
+    
     diagnostics = result.get("diagnostics", {}) or {}
     breath = diagnostics.get("breathing") or diagnostics.get("zero_pulse") or {}
     if not breath:
         return "Breathing / ZeroPulse map не предоставлен ядром."
     lines = ["Breathing / ZeroPulse map:"]
-    for k, v in breath.items():
-        lines.append(f"  {k}: {v}")
+    try:
+        for k, v in breath.items():
+            lines.append(f"  {k}: {v}")
+    except (AttributeError, TypeError):
+        return "Breathing / ZeroPulse map: Invalid data format"
     return "\n".join(lines)
 
 

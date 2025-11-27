@@ -1,0 +1,48 @@
+{
+    "project_release_plan": {
+      "meta": {
+        "status_reference": "PROJEKT_SIGNOFF_2025.md",
+        "project_status": "READY FOR PRODUCTION",
+        "objective": "Prepare the codebase for deployment (Documentation, Requirements, Docker)."
+      },
+      "phases": [
+        {
+          "id": "PHASE_22_RELEASE_PREP",
+          "name": "Release Packaging",
+          "priority": "LOW (Deployment)",
+          "description": "Finalize artifacts for production deployment.",
+          "target_files": [
+            "requirements.txt",
+            "studiocore/config.py",
+            "Dockerfile"
+          ],
+          "tasks": [
+            {
+              "task_id": "22.1",
+              "issue": "Dependencies might be loose.",
+              "location": "requirements.txt",
+              "action": "Review `requirements.txt`. Ensure all critical packages have version pins (e.g., `fastapi>=0.68.0`) to prevent future breaking changes."
+            },
+            {
+              "task_id": "22.2",
+              "issue": "Production Config Check.",
+              "location": "studiocore/config.py",
+              "action": "Ensure `debug` flags are set to `False` by default or controlled via Environment Variables."
+            },
+            {
+              "task_id": "22.3",
+              "issue": "Docker Build Verification.",
+              "location": "Terminal",
+              "action": "Run `docker build -t studiocore-api:latest .` to verify the container builds successfully with the patched code."
+            },
+            {
+              "task_id": "22.4",
+              "issue": "Release Notes.",
+              "location": "RELEASE_NOTES.md",
+              "action": "Create a `RELEASE_NOTES.md` file summarizing the transition from v6.4-beta to v6.4-stable, listing the fixed conflicts and safety features."
+            }
+          ]
+        }
+      ]
+    }
+  }

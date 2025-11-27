@@ -1,0 +1,40 @@
+{
+    "project_conflict_resolution_plan": {
+      "meta": {
+        "status_reference": "UMFASSENDE_ANALYSE_KONFLIKTE_2025.md",
+        "objective": "Implement automated conflict resolution strategies for higher coherence."
+      },
+      "phases": [
+        {
+          "id": "PHASE_17_AUTO_RESOLUTION",
+          "name": "Intelligent Conflict Resolution",
+          "priority": "OPTIONAL (Enhancement)",
+          "description": "Automate resolution of logical conflicts defined in KONFLIKTE_UND_PROZESSE.md.",
+          "target_files": [
+            "studiocore/consistency_v8.py",
+            "studiocore/genre_conflict_resolver.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "17.1",
+              "issue": "BPM vs TLP conflicts (e.g. high BPM with low TLP) are detected but not auto-fixed.",
+              "location": "studiocore/consistency_v8.py",
+              "action": "Implement `resolve_bpm_tlp_conflict(bpm, tlp)`: if `bpm > 130` and `tlp_intensity < 0.3`, return a suggested BPM scale-down (e.g., 0.8x)."
+            },
+            {
+              "task_id": "17.2",
+              "issue": "Genre vs RDE conflicts (e.g. Gothic with high dynamic) affect style coherence.",
+              "location": "studiocore/consistency_v8.py",
+              "action": "Implement `resolve_genre_rde_conflict(genre, rde)`: if `genre == 'gothic'` and `rde.dynamic > 0.8`, cap `rde.dynamic` to 0.7."
+            },
+            {
+              "task_id": "17.3",
+              "issue": "Color vs Key conflicts are manual.",
+              "location": "studiocore/genre_conflict_resolver.py",
+              "action": "Add logic to prioritize Color-implied keys if the detected Key contradicts the dominant emotional color (reference `EMOTION_COLOR_TO_KEY` table)."
+            }
+          ]
+        }
+      ]
+    }
+  }

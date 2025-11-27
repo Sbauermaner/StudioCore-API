@@ -1,0 +1,1108 @@
+[
+  {
+    "file": "studiocore/adapter.py",
+    "line": 21,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: log, noise_pattern, text, text, text...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/app.py",
+    "line": 37,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: input_data, core, result, out_path, text...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/auto_integrator.py",
+    "line": 92,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: required_dirs, cmd_parts, result, text, text...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/bpm_engine.py",
+    "line": 82,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: __all__, text_lines, total_syllables, total_words, avg_syllables_per_word...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/color_engine_adapter.py",
+    "line": 154,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: key, hex_color, factor, rgb1, rgb2...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/config.py",
+    "line": 21,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: logger, STUDIOCORE_VERSION, VERSION_LIMITS, DEFAULT_CONFIG, NEUTRAL_MOOD...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/consistency_v8.py",
+    "line": 27,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: bpm, tlp, pain, truth, genre...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/core_v6.py",
+    "line": 60,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: result, style, genre, core, test_text...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/diagnostics_v8.py",
+    "line": 21,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: SCHEMA_VERSION, base, base, runtime_ms, engine_name...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/dynamic_emotion_engine.py",
+    "line": 67,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: __all__, AXES, text, emotion_scores, tlp_scores...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 34,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: log, PUNCT_WEIGHTS, EMOJI_WEIGHTS, _EMOTION_MODEL_LOCK, __all__...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/emotion_curve.py",
+    "line": 13,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: SECTION_ORDER, __all__, order_index, ordered, total...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/emotion_dictionary_extended.py",
+    "line": 69,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: lowered, buckets, high_hits, medium_hits, low_hits...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/emotion_engine.py",
+    "line": 302,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: vector, lower_text, total, weights, vector...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/emotion_genre_matrix.py",
+    "line": 12,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: _GENRES, __all__, bias, vector, anger...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/emotion_map.py",
+    "line": 35,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: r, g, b, brightness, r...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/emotion_profile.py",
+    "line": 34,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: total_weight, t, l, p, v_mean...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/fanf_annotation.py",
+    "line": 54,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: CHOIR_KEYWORDS, INTIMATE_KEYWORDS, analysis, emotion, bpm...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/frequency.py",
+    "line": 67,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: BASE_HZ, MAX_MULT, s, base, phase...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/fusion_engine_v64.py",
+    "line": 45,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: profile, legacy_bpm, locks, manual, manual_bpm...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/genre_colors.py",
+    "line": 203,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: genre_lower, genre_lower, hex_color, best_genre, best_distance...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/genre_conflict_resolver.py",
+    "line": 55,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: dominant_color, preferred_keys, detected_key_normalized, preferred_keys_normalized, suggested_key...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/genre_matrix_extended.py",
+    "line": 111,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: lowered, total, normalized, score, local_emotion...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/genre_router.py",
+    "line": 40,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: bpm, key, mode, integrity, rhyme_density...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/genre_routing_engine.py",
+    "line": 40,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: EMOTION_GROUPS, SUNO_STYLE, group, main_genre, sub_genre...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/genre_universe.py",
+    "line": 66,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: canonical, canonical, canonical, canonical, domain...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/genre_universe_adapter.py",
+    "line": 13,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: logger, macro, macro, resolved, sub...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/genre_universe_extended.py",
+    "line": 282,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: __all__, u, music_genres, edm_genres, literature_styles...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/genre_universe_loader.py",
+    "line": 38,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: U, music_genres, edm_subgenres, lyric_forms, literary_genres...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/genre_weights.py",
+    "line": 235,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: u, normalized, poetic, gothic, dramatic...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/hybrid_genre_engine.py",
+    "line": 126,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: genre, signals, road_narrative_min, epic_threshold, swing_weights...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/instrument.py",
+    "line": 81,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: total, library, base, energy, suggestion...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/instrument_dynamics.py",
+    "line": 20,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: palette, bpm, feel, profile, dominant...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/integrity.py",
+    "line": 28,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: lengths, mean_len, variance, punct, diff...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/logger.py",
+    "line": 24,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: LOG_LEVEL, LOG_FORMAT, DATE_FORMAT, _is_configured, root_logger...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/logical_engines.py",
+    "line": 45,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: _SENTENCE_SPLIT_RE, _COMMAND_RE, _VOWEL_RE, sentences, structured...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/lyrical_emotion.py",
+    "line": 50,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: rde, tlp, pd, grad, rde_scalar...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 32,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: MONOLITH_VERSION, STUDIOCORE_VERSION, log, text_low, patterns...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/multimodal_emotion_matrix.py",
+    "line": 42,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: dominant, sections, bpm_rec, key_mode, primary_emotion...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/rde_engine.py",
+    "line": 146,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: __all__, dominant, palette, snapshot, sentences...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/rhythm.py",
+    "line": 36,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: log, PUNCT_WEIGHTS, HEADER_BPM_RE, MIN_BPM, MAX_BPM...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/section_intelligence.py",
+    "line": 22,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: LONGFORM_SECTION_RULES, sections, repeated, sections, candidate...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/section_parser.py",
+    "line": 141,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: __all__, engine, reset_fn, lines, words...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/sections.py",
+    "line": 9,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: ANNOTATION_PATTERN, EMO_MAP, matches, result, emo...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/style.py",
+    "line": 21,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: log, STYLE_VERSION, love, pain, truth...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/suno_annotations.py",
+    "line": 152,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: total_valence, total_arousal, total_pain, table, table...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/text_utils.py",
+    "line": 16,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: log, PUNCTUATION_SAFE, EMOJI_SAFE, SECTION_TAG_RE, COMMAND_BLOCK_RE...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/tlp_engine.py",
+    "line": 211,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: __all__, text_hash, profile, text_hash, dominant...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/tone.py",
+    "line": 34,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: RIFT_MARKERS, BASE_COLOR_MAP, RESONANCE_MAP, KEY_STEPS, parts...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/tone_sync.py",
+    "line": 94,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: key, tlp, emotion_matrix, truth, love...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/user_override_manager.py",
+    "line": 90,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: vocal_profile_clean, manual, meta, hints, target...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/vocal_techniques.py",
+    "line": 29,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: ACADEMIC_VOCALS, POPULAR_VOCALS, JAZZ_VOCALS, ETHNIC_VOCALS, EXTREME_VOCALS...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/vocals.py",
+    "line": 22,
+    "type": "potential_state_leak",
+    "error": "Viele Module-Level Variablen: log, VALID_VOICES, VALID_INSTRUMENTS, DEFAULT_VOCAL_MAP, s...",
+    "solution": "Verschiebe Variablen in Klassen oder verwende lokale Variablen"
+  },
+  {
+    "file": "studiocore/core_v6.py",
+    "line": 0,
+    "type": "stateless_violation",
+    "error": "_build_engine_bundle Methode fehlt",
+    "solution": "Implementiere _build_engine_bundle() für stateless Verhalten"
+  },
+  {
+    "file": "studiocore/genre_routing_engine.py",
+    "line": 99,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: group = self.EMOTION_GROUPS.get(dominant, [\"cinematic_neutra",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_routing_engine.py",
+    "line": 103,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: suno_style = self.SUNO_STYLE.get(main_genre, \"Cinematic Adap",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/fanf_annotation.py",
+    "line": 118,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: choir_active = self._should_add_choir(text, emotion)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/fanf_annotation.py",
+    "line": 122,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: section_descriptors = self._build_sections(sections, bpm, to",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_weights.py",
+    "line": 45,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.registry = GlobalGenreRegistry()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_weights.py",
+    "line": 46,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.universe = load_genre_universe()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_weights.py",
+    "line": 134,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.domain_feature_weights: Dict[str, Dict[str, float]] = {",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_weights.py",
+    "line": 145,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.domain_feature_weights[domain] = normalized_weights",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_weights.py",
+    "line": 169,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.genre_profiles: Dict[str, Dict[str, float]] = getattr(",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_weights.py",
+    "line": 467,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: domain_genres = self._genres_for_domain(domain) or self.regi",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/suno_annotations.py",
+    "line": 30,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.emotion_curve = emotion_curve or {}",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/suno_annotations.py",
+    "line": 37,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: color_palette = self._resolve_color_palette()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/suno_annotations.py",
+    "line": 50,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: cluster = (self.emotion_curve or {}).get(\"dominant_cluster\")",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/suno_annotations.py",
+    "line": 61,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: tlp = (self.emotion_curve or {}).get(\"global_tlp\") or {}",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/suno_annotations.py",
+    "line": 92,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: cluster = (self.emotion_curve or {}).get(\"dominant_cluster\")",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/suno_annotations.py",
+    "line": 103,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: cluster = (self.emotion_curve or {}).get(\"dominant_cluster\")",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe.py",
+    "line": 29,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.music_genres: List[str] = []",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe.py",
+    "line": 33,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.dramatic_genres: List[str] = []",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe.py",
+    "line": 39,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.tags: Dict[str, Set[str]] = {}",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe.py",
+    "line": 42,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.music: List[str] = self.music_genres",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe.py",
+    "line": 46,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.stage: List[str] = self.dramatic_genres",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe.py",
+    "line": 47,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.drama: List[str] = self.dramatic_genres",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe.py",
+    "line": 48,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.comedy_genres: List[str] = self.comedy_forms",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe.py",
+    "line": 49,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.edm_genres: List[str] = self.edm_styles",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe.py",
+    "line": 140,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: canonical = self._add_unique(self.ethnic_music_schools, name",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/section_parser.py",
+    "line": 39,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self._annotation_engine = SectionTagAnalyzer()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/section_parser.py",
+    "line": 91,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: rde_emotion_hint = self._estimate_rde_emotion(text)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/tone.py",
+    "line": 118,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: base_color = self.BASE_COLOR_MAP.get(base, \"#FFFFFF\")",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/tone.py",
+    "line": 159,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: color = self._select_key_color(key, cf)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion_engine.py",
+    "line": 34,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.EMOTIONS = [",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion_engine.py",
+    "line": 302,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: vector = {e: 0.0 for e in self.EMOTIONS}",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion_engine.py",
+    "line": 356,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: weights = {emotion: 1.0 for emotion in self.EMOTIONS}",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion_engine.py",
+    "line": 371,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: vector = self.analyze_emotion(text)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/vocals.py",
+    "line": 169,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.emo_analyzer = AutoEmotionalAnalyzer()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/vocals.py",
+    "line": 391,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: form = self._auto_form(emotions, tlp, text)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion_map.py",
+    "line": 56,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: wave = [self.vector_to_color(v) for v in vectors]",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/fusion_engine_v64.py",
+    "line": 132,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: dominant = self._get_dominant_emotion(emotion)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/fusion_engine_v64.py",
+    "line": 261,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: dominant = self._get_dominant_emotion(emotion)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/fusion_engine_v64.py",
+    "line": 264,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: genre_info = self._resolve_genre(legacy, genre_route)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/fusion_engine_v64.py",
+    "line": 265,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: mood_label = self._resolve_mood(legacy, emotion)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/fusion_engine_v64.py",
+    "line": 268,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: visuals = self._resolve_visuals(legacy, color)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/lyrical_emotion.py",
+    "line": 33,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.weights = {",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/section_intelligence.py",
+    "line": 354,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.engine = engine or EmotionEngine()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/section_intelligence.py",
+    "line": 360,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: text, sections, emotion_curve=None, emotion_engine=self.engi",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/core_v6.py",
+    "line": 45,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self._hge = HybridGenreEngine()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/core_v6.py",
+    "line": 80,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: resolved_genre = self._hge.resolve(genre=genre, context=cont",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/user_override_manager.py",
+    "line": 86,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.genre = genre",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/user_override_manager.py",
+    "line": 87,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.mood = mood",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/user_override_manager.py",
+    "line": 100,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.color_state = color_state",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/user_override_manager.py",
+    "line": 159,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: payload[\"genre\"] = self.overrides.genre",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/user_override_manager.py",
+    "line": 161,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: payload[\"mood\"] = self.overrides.mood",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_router.py",
+    "line": 218,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: adjusted_scores = self.apply_emotion_bias(scores, bias)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 153,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: analysis = self.analyze(text, emotions=emo, cf=cf, tlp=tlp)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 198,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: return self._engine.analyze(text, emotions=emotions, tlp=tlp",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 211,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: vox, _, vocal_form = self._vocal_registry.get(\"default\", \"au",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 238,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.emotion = AutoEmotionalAnalyzer()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 270,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.color_engine = ColorEngineAdapter()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 273,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.rde_engine = RhythmDynamicsEmotionEngine()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 603,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: future_emotion = executor.submit(self.emotion.analyze, raw)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 647,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: rhythm_analysis = self.rhythm.analyze(raw, emotions=emotions",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 689,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: semantic_layers = self._build_semantic_layers(emotions, tlp,",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 704,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: vocal_result = self.vocal_allocator.analyze(emotions, tlp, b",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 710,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: integrity_result = self.integrity.analyze(raw, emotions=emot",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 725,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: color_resolution = self.color_engine.resolve_color_wave(inte",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/monolith_v4_3_1.py",
+    "line": 749,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: rde_emotion_vector = self.rde_engine.export_emotion_vector(r",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/logical_engines.py",
+    "line": 335,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self._analyzer = AutoEmotionalAnalyzer()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/logical_engines.py",
+    "line": 494,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: curve = list(intensity_curve or self.emotion_intensity_curve",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/logical_engines.py",
+    "line": 579,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: wave = self.generate_color_wave(emotions)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/logical_engines.py",
+    "line": 1158,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: emotion_cmd = self._extract_command(commands, [\"emotion\", \"s",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/logical_engines.py",
+    "line": 1159,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: mood_cmd = self._extract_command(commands, [\"mood\", \"set moo",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_registry.py",
+    "line": 34,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.music_genres: List[str] = [",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_registry.py",
+    "line": 322,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.lyrical_genres: List[str] = [",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_registry.py",
+    "line": 385,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.comedic_lyrical_genres: List[str] = [",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_registry.py",
+    "line": 399,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.comedic_music_genres: List[str] = [",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/instrument_dynamics.py",
+    "line": 99,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: emotion_intensity = self.apply_emotion_to_instrumental_inten",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion_profile.py",
+    "line": 53,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: weight=max(self.weight, 0.0),",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/dynamic_emotion_engine.py",
+    "line": 32,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self._emotion_engine = emotion_engine or EmotionEngine()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/dynamic_emotion_engine.py",
+    "line": 43,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: emotion_scores = self._emotion_engine.emotion_detection(text",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/structures.py",
+    "line": 17,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.emotions = emotions",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/structures.py",
+    "line": 18,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.weight = weight",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/structures.py",
+    "line": 40,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.emotional_shape = emotional_shape",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/bpm_engine.py",
+    "line": 64,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: mapping = self.emotion_bpm_mapping({}, base_bpm=int(estimate",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 756,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.lexicon = EmotionLexiconExtended()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 757,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.auto_analyzer = AutoEmotionalAnalyzer()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 759,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self._model = load_emotion_model()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 760,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self._base_emotions = self._collect_base_emotions()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 761,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self._phrase_packets: list[PhraseEmotionPacket] = []",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 795,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: base_vector = {emotion: 0.0 for emotion in self._base_emotio",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 801,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: base_vector = self.build_raw_emotion_vector(normalized)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 848,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: raw_scores: Dict[str, float] = {emotion: 0.0 for emotion in ",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 858,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: lexicon_result = self.lexicon.get_emotion(text)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 974,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: raw = self.build_raw_emotion_vector(text)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion.py",
+    "line": 976,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: genre_scores = self.compute_genre_scores(clusters)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/color_engine_adapter.py",
+    "line": 240,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: colors = self._build_from_emotions(emo_profile)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/color_engine_adapter.py",
+    "line": 262,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: hybrid_colors = self._resolve_hybrid_colors(",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/consistency_v8.py",
+    "line": 44,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: genre = self.d.get(\"genre\") or \"\"",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/rhythm.py",
+    "line": 209,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: key = self._normalize_section_name(tag, counters, idx)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/rhythm.py",
+    "line": 470,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: density_section = self._density_bpm(body, emotion_weight=0.0",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/emotion_dictionary_extended.py",
+    "line": 28,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.emotion_words: Dict[str, List[str]] = {",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe_adapter.py",
+    "line": 36,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.universe = GenreUniverse()",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_universe_adapter.py",
+    "line": 89,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: subgenre, tags = self._fallback_map[macro]",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/genre_meta_matrix.py",
+    "line": 99,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: domains = self._match_domains_for_genre(g)",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/hybrid_genre_engine.py",
+    "line": 27,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.weights = GENRE_WEIGHTS",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  },
+  {
+    "file": "studiocore/hybrid_genre_engine.py",
+    "line": 28,
+    "type": "potential_state_leak",
+    "error": "Möglicher State-Leak: self.thresholds = GENRE_THRESHOLDS",
+    "solution": "Prüfe ob Variable zwischen Requests gespeichert wird"
+  }
+]

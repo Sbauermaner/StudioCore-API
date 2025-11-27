@@ -12,6 +12,7 @@ import json
 import os
 import re
 import math
+import threading
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
 import logging
@@ -723,15 +724,29 @@ class EmotionEngineV2:
 # Кэш теперь инкапсулирован в EmotionEngine.__init__()
 
 
+# Task 4.2: Thread-safe emotion model cache
+_EMOTION_MODEL_CACHE: Optional[Dict[str, Any]] = None
+_EMOTION_MODEL_LOCK = threading.Lock()
+
+
 def load_emotion_model() -> Dict[str, Any]:
-    """Load emotion_model_v1.json (stateless version, no global cache)."""
-    model_path = os.path.join(os.path.dirname(__file__), "emotion_model_v1.json")
-    try:
-        with open(model_path, "r", encoding="utf - 8") as fp:
-            return json.load(fp)
-    except FileNotFoundError:
-        log.warning("emotion_model_v1.json not found; using empty model")
-        return {"version": "0.0", "clusters": {}}
+    """Load emotion_model_v1.json with thread-safe caching."""
+    global _EMOTION_MODEL_CACHE
+    
+    # Task 4.2: Thread-safe cache access
+    with _EMOTION_MODEL_LOCK:
+        if _EMOTION_MODEL_CACHE is not None:
+            return _EMOTION_MODEL_CACHE
+        
+        model_path = os.path.join(os.path.dirname(__file__), "emotion_model_v1.json")
+        try:
+            with open(model_path, "r", encoding="utf-8") as fp:
+                _EMOTION_MODEL_CACHE = json.load(fp)
+                return _EMOTION_MODEL_CACHE
+        except FileNotFoundError:
+            log.warning("emotion_model_v1.json not found; using empty model")
+            _EMOTION_MODEL_CACHE = {"version": "0.0", "clusters": {}}
+            return _EMOTION_MODEL_CACHE
 
 
 class EmotionEngine:

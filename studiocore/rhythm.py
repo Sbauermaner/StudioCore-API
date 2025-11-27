@@ -14,10 +14,12 @@ modules (emotion, meaning, breathing) can consume.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 import statistics
-from typing import Dict, List, Optional, Tuple, TypedDict
+import logging
+from typing import Dict, List, Optional, Tuple, TypedDict, Any
 
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
@@ -29,6 +31,9 @@ from typing import Dict, List, Optional, Tuple, TypedDict
 
 from .text_utils import extract_sections
 from .config import DEFAULT_CONFIG
+
+# Task 5.1: Logger for error reporting
+log = logging.getLogger(__name__)
 
 # Task 4.2: Используем PUNCT_WEIGHTS из config.py вместо локального словаря
 PUNCT_WEIGHTS = DEFAULT_CONFIG.PUNCT_WEIGHTS
@@ -127,6 +132,10 @@ class LyricMeter:
 
     vowels = set("aeiouyауоыиэяюёеAEIOUYАУОЫИЭЯЮЁЕ")
 
+    def __init__(self):
+        # Task 9.1: Hash-based cache to prevent re-analyzing the same text multiple times
+        self._cache: Dict[str, Dict[str, Any]] = {}
+
     def _syllables(self, s: str) -> int:
         return max(1, sum(1 for ch in s if ch in self.vowels))
 
@@ -139,7 +148,9 @@ class LyricMeter:
             return None
         try:
             return float(match.group("bpm"))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as e:
+            # Task 5.1: Log error instead of silent failure
+            log.error(f"Rhythm error: Failed to parse BPM from header '{match.group('bpm')}': {e}")
             return None
 
     def _strip_header_lines(self, text: str) -> str:
@@ -411,6 +422,25 @@ class LyricMeter:
         tlp: Optional[Dict[str, float]] = None,
         emotion_weight: Optional[float] = None,
     ) -> RhythmAnalysis:
+        # Task 9.1: Use hash-based cache to prevent re-analyzing the same text
+        # Create cache key from text and parameters that affect the result
+        cache_key_parts = [
+            text,
+            str(header_bpm) if header_bpm is not None else "",
+            str(sorted(emotions.items())) if emotions else "",
+            str(cf) if cf is not None else "",
+            str(sorted(tlp.items())) if tlp else "",
+            str(emotion_weight) if emotion_weight is not None else "",
+            str(sorted(structured_sections.items())) if structured_sections else "",
+        ]
+        cache_key_str = "|".join(cache_key_parts)
+        text_hash = hashlib.md5(cache_key_str.encode("utf-8")).hexdigest()
+        
+        if text_hash in self._cache:
+            # Return cached result
+            cached_result = self._cache[text_hash].copy()
+            return RhythmAnalysis(**cached_result)
+        
         # Task 4.1: Используем значение из config.py если не передано
         if emotion_weight is None:
             emotion_weight = DEFAULT_CONFIG.rhythm["EMOTION_WEIGHT"]
@@ -482,7 +512,7 @@ class LyricMeter:
             "notes": f"header={header}, estimated={estimated_global}, density={density_global}, resolved={global_bpm}",
         }
 
-        return RhythmAnalysis(
+        result = RhythmAnalysis(
             global_bpm=global_bpm,
             header_bpm=header,
             estimated_bpm=estimated_global,
@@ -491,6 +521,11 @@ class LyricMeter:
             section_order=list(section_results.keys()),
             conflict=conflict,
         )
+        
+        # Task 9.1: Cache the result using hash
+        self._cache[text_hash] = dict(result)
+        
+        return result
 
     def bpm_from_density(
         self,

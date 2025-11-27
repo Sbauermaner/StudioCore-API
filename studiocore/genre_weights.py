@@ -491,12 +491,9 @@ class GenreWeightsEngine:
         features.get("lyric_form_weight", poetic)  # Reserved for future use
         features.get("gothic_factor", 0.0)  # Reserved for future use
 
-        # domain == "electronic" and (poetic > 0.35 or lyric > 0.35 or gothic >
-        # 0.25):
-        if False:
-            # GLOBAL PATCH: отключен fallback на lyrical_song
-            # return "lyrical_song"
-            pass
+        # Task 16.2: Removed disabled code block (if False:) to eliminate pass statement
+        # Previous code: fallback to "lyrical_song" was disabled via GLOBAL PATCH
+        # This block was never executed, so it's been removed for code clarity
 
         # NEW: нормальное разрешение жанров
         return selected

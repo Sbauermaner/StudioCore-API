@@ -10,23 +10,28 @@ from __future__ import annotations
 
 import os
 import logging
+import time
+from collections import defaultdict
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from studiocore.core_v6 import StudioCoreV6
+from studiocore.config import DEFAULT_CONFIG
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Инициализация FastAPI
+# Task 6.2: Import version from config instead of hardcoding
 app = FastAPI(
     title="StudioCore API",
     description="REST API for StudioCore IMMORTAL v7 - Music Analysis Engine",
-    version="1.0.0",
+    version=DEFAULT_CONFIG.API_VERSION,
 )
 
 # CORS middleware для поддержки cross-origin запросов
@@ -47,6 +52,56 @@ app.add_middleware(
 
 # Инициализация ядра
 core = StudioCoreV6()
+
+# Task 4.1: Rate Limiting - Simple in-memory rate limiter (60 req/min per IP)
+_rate_limit_store: dict[str, list[float]] = defaultdict(list)
+RATE_LIMIT_REQUESTS = 60
+RATE_LIMIT_WINDOW = 60  # seconds
+
+
+def _cleanup_old_requests(ip: str, current_time: float) -> None:
+    """Remove requests older than the rate limit window."""
+    _rate_limit_store[ip] = [
+        req_time
+        for req_time in _rate_limit_store[ip]
+        if current_time - req_time < RATE_LIMIT_WINDOW
+    ]
+
+
+def _check_rate_limit(ip: str) -> bool:
+    """Check if IP has exceeded rate limit. Returns True if allowed, False if rate limited."""
+    current_time = time.time()
+    _cleanup_old_requests(ip, current_time)
+    
+    if len(_rate_limit_store[ip]) >= RATE_LIMIT_REQUESTS:
+        return False
+    
+    _rate_limit_store[ip].append(current_time)
+    return True
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Task 4.1: Rate limiting middleware - 60 requests per minute per IP."""
+    # Skip rate limiting for health check endpoints
+    if request.url.path in ["/", "/health"]:
+        return await call_next(request)
+    
+    # Get client IP
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Check rate limit
+    if not _check_rate_limit(client_ip):
+        logger.warning("Rate limit exceeded for IP: %s", client_ip)
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                "error": "Rate limit exceeded",
+                "detail": f"Maximum {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW} seconds allowed",
+            },
+        )
+    
+    return await call_next(request)
 
 # API Key authentication (опционально)
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)

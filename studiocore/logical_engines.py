@@ -12,6 +12,7 @@ run in restricted environments while still producing structured data.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections import Counter
 from statistics import mean
@@ -20,7 +21,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Tuple  # noqa: F401
 
-from typing import Any, Dict, Iterable, List, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .color_engine_adapter import EMOTION_COLOR_MAP, get_emotion_colors
 from .emotion import AutoEmotionalAnalyzer
@@ -334,13 +335,22 @@ class EmotionEngine:
         self._analyzer = AutoEmotionalAnalyzer()
         # Initialize TLP for vector calculation
         self._tlp_engine = TruthLovePainEngine()
+        # Task 2.1: Cache using text hash to prevent re-analyzing the same text multiple times
+        self._cache: Dict[str, Dict[str, float]] = {}
 
     def emotion_detection(self, text: str) -> Dict[str, float]:
         """
         MASTER - PATCH v2: Добавляем пост - фильтр для дорожной исповеди.
         MASTER - PATCH v4.0: Добавляем Rage - mode конфликт резолвер.
         """
-        emo = self._analyzer.analyze(text)
+        # Task 2.1: Use cache with text hash to prevent re-analyzing the same text
+        text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+        if text_hash in self._cache:
+            emo = self._cache[text_hash].copy()
+        else:
+            emo = self._analyzer.analyze(text)
+            # Cache the result using hash
+            self._cache[text_hash] = emo.copy()
 
         # Мягкий фильтр для дорожной исповеди: sensual не доминирует над sorrow
         # / determination.
@@ -379,6 +389,72 @@ class EmotionEngine:
 
         return emo
 
+    def resolve_emotion_genre_conflict(
+        self, emotions: Dict[str, float], genre: str
+    ) -> Tuple[Optional[str], bool]:
+        """
+        Task 19.2: Resolve emotion-genre conflicts.
+        
+        Rules from KONFLIKTE_UND_PROZESSE.md:
+        - love + metal → conflict (suggest: lyrical, soft_pop)
+        - rage + lyrical → conflict (suggest: metal, hardcore_rap)
+        - joy + gothic → conflict (suggest: pop, electronic, dark_pop)
+        - sadness + pop → conflict (suggest: gothic, darkwave)
+        - peace + metal → conflict (suggest: soft, ambient)
+        
+        Args:
+            emotions: Dictionary of emotion scores
+            genre: Current genre string
+        
+        Returns:
+            Tuple of (suggested_genre, was_resolved)
+        """
+        if not emotions or not genre:
+            return None, False
+        
+        genre_lower = str(genre).lower()
+        was_resolved = False
+        suggested_genre = None
+        
+        # Get dominant emotion
+        dominant_emotion = max(emotions, key=emotions.get) if emotions else None
+        if not dominant_emotion:
+            return None, False
+        
+        dominant_value = emotions.get(dominant_emotion, 0.0)
+        
+        # Conflict 1: love + metal
+        if dominant_emotion == "love" and dominant_value > 0.3:
+            if "metal" in genre_lower or "thrash" in genre_lower or "death" in genre_lower:
+                suggested_genre = "lyrical_song"  # or "soft_pop"
+                was_resolved = True
+        
+        # Conflict 2: rage + lyrical
+        elif (dominant_emotion == "anger" or dominant_emotion == "tension") and dominant_value > 0.25:
+            if "lyrical" in genre_lower or "ballad" in genre_lower or "soft" in genre_lower:
+                suggested_genre = "metal"  # or "hardcore_rap"
+                was_resolved = True
+        
+        # Conflict 3: joy + gothic
+        elif dominant_emotion == "joy" and dominant_value > 0.3:
+            if "gothic" in genre_lower or "darkwave" in genre_lower or "dark" in genre_lower:
+                suggested_genre = "pop"  # or "electronic", "dark_pop"
+                was_resolved = True
+        
+        # Conflict 4: sadness + pop
+        elif dominant_emotion == "sadness" and dominant_value > 0.3:
+            if "pop" in genre_lower and "dark" not in genre_lower:
+                suggested_genre = "gothic_rock"  # or "darkwave"
+                was_resolved = True
+        
+        # Conflict 5: peace + metal
+        elif dominant_emotion == "peace" and dominant_value > 0.3:
+            if "metal" in genre_lower or "thrash" in genre_lower or "death" in genre_lower:
+                suggested_genre = "soft"  # or "ambient"
+                was_resolved = True
+        
+        return suggested_genre, was_resolved
+
     def export_emotion_vector(self, text: str) -> EmotionVector:
         """
         Delegates to the unified TLP engine implementation.
@@ -391,8 +467,23 @@ class EmotionEngine:
         if not sentences:
             return []
         curve: List[float] = []
+        # Task 2.1: Cache full text analysis if available using hash
+        text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+        full_text_emo = self._cache.get(text_hash)
+        
         for sentence in sentences:
-            scores = self._analyzer.analyze(sentence)
+            # For sentence-level analysis, we still analyze each sentence separately
+            # but can use cached full text if sentence matches full text
+            if sentence == text and full_text_emo:
+                scores = full_text_emo
+            else:
+                # Cache sentence-level analysis too
+                sentence_hash = hashlib.md5(sentence.encode("utf-8")).hexdigest()
+                if sentence_hash in self._cache:
+                    scores = self._cache[sentence_hash].copy()
+                else:
+                    scores = self._analyzer.analyze(sentence)
+                    self._cache[sentence_hash] = scores.copy()
             intensity = sum(scores.values())
             curve.append(round(intensity, 3))
         return curve
@@ -412,7 +503,14 @@ class EmotionEngine:
         if isinstance(text, dict):
             scores = dict(text)
         else:
-            scores = self._analyzer.analyze(text)
+            # Task 2.1: Use cache with text hash
+            text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+            if text_hash in self._cache:
+                scores = self._cache[text_hash].copy()
+            else:
+                scores = self._analyzer.analyze(text)
+                # Cache the result using hash
+                self._cache[text_hash] = scores.copy()
         if not scores:
             return {}
         dominant = max(scores, key=scores.get)
@@ -422,7 +520,14 @@ class EmotionEngine:
         if isinstance(text, dict):
             scores = dict(text)
         else:
-            scores = self._analyzer.analyze(text)
+            # Task 2.1: Use cache with text hash
+            text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+            if text_hash in self._cache:
+                scores = self._cache[text_hash].copy()
+            else:
+                scores = self._analyzer.analyze(text)
+                # Cache the result using hash
+                self._cache[text_hash] = scores.copy()
         if not scores:
             return {"conflict": 0.0, "primary": None, "secondary": None}
         ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)
