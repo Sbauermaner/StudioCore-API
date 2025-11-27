@@ -1,0 +1,78 @@
+{
+    "project_repair_plan_v3": {
+      "meta": {
+        "status_reference": "STATUS_UPDATE_NACH_PHASE1_2.md",
+        "previous_phases": "Phase 1 (Safety) & Phase 2.1 (Emotion Caching) - COMPLETED",
+        "objective": "Execute remaining P1 tasks: Rate Limiting, Thread Safety, and Error Handling."
+      },
+      "phases": [
+        {
+          "id": "PHASE_4_INFRASTRUCTURE_STABILITY",
+          "name": "API Protection & Thread Safety",
+          "priority": "HIGH (P1)",
+          "description": "Protect the API from abuse and fix global state concurrency issues.",
+          "target_files": [
+            "api.py",
+            "studiocore/emotion.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "4.1",
+              "issue": "API lacks Rate Limiting (Risk: DDoS/Abuse).",
+              "location": "api.py",
+              "action": "Implement a simple rate limiter middleware. Allow max 60 requests/minute per IP. Return 429 Too Many Requests if exceeded."
+            },
+            {
+              "task_id": "4.2",
+              "issue": "Global variable `_EMOTION_MODEL_CACHE` is not thread-safe.",
+              "location": "studiocore/emotion.py:722",
+              "action": "Wrap access to `_EMOTION_MODEL_CACHE` with a `threading.Lock()`. Ensure `load_model` acquires the lock before writing."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_5_ROBUSTNESS",
+          "name": "Eliminate Silent Failures",
+          "priority": "HIGH (P1)",
+          "description": "Find and fix empty except blocks that hide critical bugs.",
+          "target_files": [
+            "studiocore/rhythm.py",
+            "studiocore/monolith_v4_3_1.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "5.1",
+              "issue": "Silent failures (except: pass) swallow errors in Rhythm engine.",
+              "location": "studiocore/rhythm.py",
+              "action": "Identify `except: pass` blocks (e.g. in `_density_bpm`). Replace with `logger.error(f'Rhythm error: {e}')` or raise custom exception."
+            },
+            {
+              "task_id": "5.2",
+              "issue": "Broad exception handling in Monolith fallback logic.",
+              "location": "studiocore/monolith_v4_3_1.py",
+              "action": "Ensure fallback blocks log the specific error before falling back to defaults."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_6_CLEANUP",
+          "name": "Refactor Hardcodes",
+          "priority": "MEDIUM (P2)",
+          "description": "Centralize versioning and configuration.",
+          "target_files": [
+            "studiocore/config.py",
+            "studiocore/monolith_v4_3_1.py",
+            "diagnostics_v8.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "6.1",
+              "issue": "Version strings ('v6.4', 'v4.3.11') are hardcoded in multiple files.",
+              "location": "Multiple Files",
+              "action": "Define `MONOLITH_VERSION` and `STUDIOCORE_VERSION` in `studiocore/config.py`. Update other files to import these constants."
+            }
+          ]
+        }
+      ]
+    }
+  }

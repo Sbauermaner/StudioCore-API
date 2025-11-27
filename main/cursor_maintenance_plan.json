@@ -1,0 +1,69 @@
+{
+    "maintenance_repair_plan": {
+      "meta": {
+        "status_reference": "VOLLSTAENDIGER_AUDIT_MAIN.md",
+        "objective": "Fix critical reliability and security issues in maintenance scripts (main/ directory)."
+      },
+      "phases": [
+        {
+          "id": "PHASE_1_CRITICAL_ENCODING_AND_SAFETY",
+          "name": "Fix Encoding & Safety Defaults",
+          "priority": "CRITICAL",
+          "description": "Fix file operations that crash on non-ASCII characters and missing timeouts.",
+          "target_files": [
+            "main/auto_log_cleaner.py",
+            "main/full_system_diagnostics.py",
+            "main/auto_trigger.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "1.1",
+              "issue": "Missing encoding='utf-8' causes crashes on Windows/Linux with special chars.",
+              "location": "main/auto_log_cleaner.py:17 & main/full_system_diagnostics.py:65",
+              "action": "Update all `open()` calls to include `encoding='utf-8'`."
+            },
+            {
+              "task_id": "1.2",
+              "issue": "Subprocess call lacks timeout, risking infinite hangs.",
+              "location": "main/auto_trigger.py:11",
+              "action": "Add `timeout=300` (5 mins) to `subprocess.run` call. Wrap in try/except `TimeoutExpired` block."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_2_SELF_HEAL_ROBUSTNESS",
+          "name": "Robust Self-Healing",
+          "priority": "HIGH",
+          "description": "Prevent `self_heal.py` from corrupting files during repair.",
+          "target_files": [
+            "main/self_heal.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "2.1",
+              "issue": "Healer modifies files without backup or validation.",
+              "location": "main/self_heal.py",
+              "action": "1. Create a `.bak` copy of target files before writing. 2. For YAML files, verify syntax with `yaml.safe_load` before saving changes."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_3_ERROR_HANDLING",
+          "name": "Stop Silent Failures",
+          "priority": "MEDIUM",
+          "description": "Replace `except: pass` with proper logging.",
+          "target_files": [
+            "main/comprehensive_analysis.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "3.1",
+              "issue": "Broad exception swallowing hides real bugs.",
+              "location": "main/comprehensive_analysis.py",
+              "action": "Replace `except Exception: pass` with `except Exception as e: print(f'Error: {e}')` (or use logging module)."
+            }
+          ]
+        }
+      ]
+    }
+  }

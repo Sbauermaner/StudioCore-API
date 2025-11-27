@@ -8,13 +8,17 @@ produced by the engines while preserving all legacy keys at the top level.
 Schema version: v8.0
 """
 
+import time
 from typing import Any, Dict, Optional
+
+from studiocore.config import DEFAULT_CONFIG
 
 
 class DiagnosticsBuilderV8:
     """Build a structured diagnostics view on top of the legacy flat dict."""
 
-    SCHEMA_VERSION = "v8.0"
+    # Task 6.2: Import version from config instead of hardcoding
+    SCHEMA_VERSION = DEFAULT_CONFIG.DIAGNOSTICS_VERSION
 
     def __init__(
         self, base: Dict[str, Any], payload: Optional[Dict[str, Any]] = None
@@ -22,6 +26,8 @@ class DiagnosticsBuilderV8:
         # base is the raw diagnostics dict built by core_v6 / monolith
         self._base = base or {}
         self._payload = payload or {}
+        # Task 10.1: Timer for runtime calculation
+        self._start_time: Optional[float] = None
 
     # --- small helpers -------------------------------------------------
 
@@ -69,6 +75,18 @@ class DiagnosticsBuilderV8:
 
         return summary_blocks
 
+    def start_timer(self) -> None:
+        """Task 10.1: Start timer for runtime calculation."""
+        self._start_time = time.time()
+
+    def stop_timer(self) -> float:
+        """Task 10.1: Stop timer and return runtime in milliseconds."""
+        if self._start_time is None:
+            return 0.0
+        runtime_ms = (time.time() - self._start_time) * 1000
+        self._start_time = None
+        return runtime_ms
+
     def _extract_meta(self) -> Dict[str, Any]:
         """Basic meta - information about diagnostics."""
         meta: Dict[str, Any] = {
@@ -80,9 +98,16 @@ class DiagnosticsBuilderV8:
         if isinstance(engine_name, str) and engine_name:
             meta["engine"] = engine_name
 
-        # Optional runtime / profiling fields if they exist in base.
-        if "runtime_ms" in self._base:
+        # Task 10.1: Calculate runtime_ms if timer was used, otherwise use value from base
+        if self._start_time is not None:
+            # Timer still running, calculate current runtime
+            meta["runtime_ms"] = int((time.time() - self._start_time) * 1000)
+        elif "runtime_ms" in self._base:
+            # Use runtime from base (e.g., from monolith)
             meta["runtime_ms"] = self._base.get("runtime_ms")
+        else:
+            # No runtime available
+            meta["runtime_ms"] = None
 
         return meta
 

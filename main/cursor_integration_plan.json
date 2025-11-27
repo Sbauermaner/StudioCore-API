@@ -1,0 +1,57 @@
+{
+    "project_conflict_integration_plan": {
+      "meta": {
+        "status_reference": "KONFLIKT_STATUS_2025.md",
+        "objective": "Integrate implemented conflict resolvers into Monolith and resolve remaining open conflicts."
+      },
+      "phases": [
+        {
+          "id": "PHASE_18_PIPELINE_INTEGRATION",
+          "name": "Activate Conflict Resolution",
+          "priority": "HIGH (P1)",
+          "description": "Connect the already implemented logic in `consistency_v8.py` and `genre_conflict_resolver.py` to the main pipeline.",
+          "target_files": [
+            "studiocore/monolith_v4_3_1.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "18.1",
+              "issue": "BPM/TLP and Genre/RDE resolvers are implemented but not called.",
+              "location": "studiocore/monolith_v4_3_1.py:analyze",
+              "action": "After `rde` calculation (around line 680), instantiate `ConsistencyLayerV8` and call:\n1. `resolve_bpm_tlp_conflict(bpm, tlp)` -> update `bpm`.\n2. `resolve_genre_rde_conflict(genre, rde)` -> update `rde`."
+            },
+            {
+              "task_id": "18.2",
+              "issue": "Color/Key resolver is implemented but not called.",
+              "location": "studiocore/monolith_v4_3_1.py:analyze",
+              "action": "After `color_wave` resolution (around line 715), instantiate `GenreConflictResolver` and call `resolve_color_key_conflict(key, color_wave, style)`. Update `key` if a resolution is suggested."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_19_REMAINING_CONFLICTS",
+          "name": "Implement Open Resolutions",
+          "priority": "MEDIUM (P2)",
+          "description": "Fix 'Open' (⚠️ OFFEN) issues from the status report.",
+          "target_files": [
+            "studiocore/color_engine_adapter.py",
+            "studiocore/logical_engines.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "19.1",
+              "issue": "Color Override Priority is undocumented/hardcoded.",
+              "location": "studiocore/color_engine_adapter.py",
+              "action": "In `resolve_color_wave`, explicitly prioritize `user_override` > `style_locked` > `emotion_color`. Add a comment block defining this hierarchy."
+            },
+            {
+              "task_id": "19.2",
+              "issue": "Emotion-Genre Auto-Resolution is missing.",
+              "location": "studiocore/logical_engines.py",
+              "action": "Implement `resolve_emotion_genre_conflict(emotion, genre)`: If `emotion='joy'` and `genre='gothic'`, force-shift genre to 'dark_pop' or similar compatible hybrid."
+            }
+          ]
+        }
+      ]
+    }
+  }

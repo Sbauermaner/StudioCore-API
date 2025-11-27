@@ -1,0 +1,79 @@
+{
+    "project_repair_plan_phase_2_3": {
+      "meta": {
+        "status_reference": "VERGLEICHSANALYSE_AKTUELLER_STAND.md",
+        "objective": "Resolve remaining 'Still Broken' (❌) and 'Partial' (⚠️) issues identified in the latest comparative analysis."
+      },
+      "phases": [
+        {
+          "id": "PHASE_2_SECURITY_INTEGRATION",
+          "name": "Integrate Safety & Security Checks",
+          "priority": "CRITICAL",
+          "description": "Safety parameters are implemented in config but NOT integrated into the Monolith (Reference: VERGLEICHSANALYSE_AKTUELLER_STAND.md - Section 8).",
+          "target_files": [
+            "studiocore/monolith_v4_3_1.py",
+            "studiocore/config.py",
+            "api.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "2.1",
+              "issue": "Safety Checks (Aggression/Input Length) are implemented but not called in `analyze`.",
+              "location": "studiocore/monolith_v4_3_1.py:analyze",
+              "action": "At the start of `analyze`: 1. Check `len(text)`. 2. Check `AGGRESSION_KEYWORDS`. Raise ValueError if violated."
+            },
+            {
+              "task_id": "2.2",
+              "issue": "CORS Policy uses wildcard '*'.",
+              "location": "api.py:35",
+              "action": "Update to use `os.getenv('CORS_ORIGINS').split(',')` for secure cross-origin requests."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_3_LOGIC_AND_REDUNDANCY",
+          "name": "Logic Repairs & Optimization",
+          "priority": "HIGH",
+          "description": "Fix unused config parameters and prevent redundant calculations in sub-engines.",
+          "target_files": [
+            "studiocore/monolith_v4_3_1.py",
+            "studiocore/vocals.py",
+            "studiocore/integrity.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "3.1",
+              "issue": "`EMOTION_HIGH_SIGNAL` is defined but marked as 'Still Broken' (❌ Not Used).",
+              "location": "studiocore/monolith_v4_3_1.py",
+              "action": "Implement usage of `self.config.EMOTION_HIGH_SIGNAL` (e.g., to filter weak emotions) inside the emotion processing block."
+            },
+            {
+              "task_id": "3.2",
+              "issue": "Redundant Analysis in Sub-Engines (Vocals/Integrity).",
+              "location": "studiocore/vocals.py & studiocore/integrity.py",
+              "action": "Modify `allocate`/`scan` methods to accept `emotions` and `tlp` as arguments. Remove internal calls to `analyze()`."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_4_CLEANUP_HARDCODES",
+          "name": "Version & Param Hardcodes",
+          "priority": "MEDIUM",
+          "description": "Centralize version strings and logic parameters.",
+          "target_files": [
+            "studiocore/monolith_v4_3_1.py",
+            "diagnostics_v8.py",
+            "studiocore/config.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "4.1",
+              "issue": "Version Hardcodes found in multiple files (marked as ⚠️ Partial).",
+              "location": "Multiple Files",
+              "action": "Replace strings like 'v4.3.11' or 'v8.0' with references to `self.config.MONOLITH_VERSION`, etc."
+            }
+          ]
+        }
+      ]
+    }
+  }

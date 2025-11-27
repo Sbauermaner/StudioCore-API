@@ -1,0 +1,69 @@
+{
+    "project_final_roadmap_2025": {
+      "meta": {
+        "status_reference": "AKTUELLER_STATUS_ANALYSE_2025.md",
+        "previous_phases": "Phases 1-8 VERIFIED & COMPLETED",
+        "objective": "Execute final remaining P1 (Rhythm Caching) and P2 tasks (Parallelism, Metrics)."
+      },
+      "phases": [
+        {
+          "id": "PHASE_9_RHYTHM_OPTIMIZATION",
+          "name": "Rhythm Engine Caching (Priority P1)",
+          "priority": "HIGH",
+          "description": "Prevent Rhythm engine from re-calculating analysis for the same text (New P1 identified in 2025 audit).",
+          "target_files": [
+            "studiocore/rhythm.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "9.1",
+              "issue": "Rhythm analysis is computationally expensive and repeated.",
+              "location": "studiocore/rhythm.py",
+              "action": "Implement hash-based caching in `LyricMeter.analyze(text)`. Use `self._cache` keyed by `md5(text)` to store and retrieve `RhythmAnalysis` results."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_10_PARALLELIZATION",
+          "name": "Parallel Engine Execution (Priority P2)",
+          "priority": "MEDIUM",
+          "description": "Run independent engines concurrently to reduce latency.",
+          "target_files": [
+            "studiocore/monolith_v4_3_1.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "10.1",
+              "issue": "Sequential execution slows down response.",
+              "location": "studiocore/monolith_v4_3_1.py:analyze",
+              "action": "Refactor start of `analyze`: Use `concurrent.futures.ThreadPoolExecutor` to run `emotion.analyze`, `tone.detect_key`, and `integrity.scan` in parallel."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_11_OBSERVABILITY",
+          "name": "Metrics & Diagnostics (Priority P2)",
+          "priority": "MEDIUM",
+          "description": "Enable real monitoring metrics.",
+          "target_files": [
+            "studiocore/diagnostics_v8.py",
+            "studiocore/monolith_v4_3_1.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "11.1",
+              "issue": "Runtime metrics are placeholders.",
+              "location": "studiocore/diagnostics_v8.py",
+              "action": "Implement `stop_timer` to calculate real `runtime_ms`."
+            },
+            {
+              "task_id": "11.2",
+              "issue": "Monolith doesn't report time.",
+              "location": "studiocore/monolith_v4_3_1.py",
+              "action": "Measure execution time of `analyze` and record it in diagnostics."
+            }
+          ]
+        }
+      ]
+    }
+  }

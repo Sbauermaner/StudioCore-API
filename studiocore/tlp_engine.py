@@ -5,8 +5,9 @@
 
 """Public wrapper for the Truth × Love × Pain engine."""
 
+import hashlib
 import math
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 from .config import DEFAULT_CONFIG
 
@@ -27,8 +28,35 @@ def _harmonic_mean(x: float, y: float, z: float) -> float:
 class TruthLovePainEngine(_TruthLovePainEngine):
     """Adds convenience helpers on top of the base TLP engine."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Task 8.1: Hash-based cache to prevent re-analyzing the same text multiple times
+        self._cache: Dict[str, Dict[str, Any]] = {}
+
+    def analyze(self, text: str) -> Dict[str, Any]:
+        """
+        Task 13.1: Override analyze() to add hash-based caching.
+        This prevents re-analyzing the same text when analyze() is called directly.
+        """
+        text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+        if text_hash in self._cache:
+            # Return cached result
+            return self._cache[text_hash].copy()
+        
+        # Call parent analyze() and cache the result
+        profile = super().analyze(text)
+        self._cache[text_hash] = profile.copy()
+        return profile
+
     def describe(self, text: str) -> Dict[str, Any]:
-        profile = self.analyze(text)
+        # Task 8.1: Use hash-based cache to prevent re-analyzing the same text
+        text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+        if text_hash in self._cache:
+            profile = self._cache[text_hash].copy()
+        else:
+            profile = self.analyze(text)
+            # Cache the result using hash
+            self._cache[text_hash] = profile.copy()
         ordered: List[Tuple[str, float]] = sorted(
             profile.items(), key=lambda item: item[1], reverse=True
         )
@@ -41,14 +69,41 @@ class TruthLovePainEngine(_TruthLovePainEngine):
         )
         return profile
 
-    def truth_score(self, text: str) -> float:
-        return float(self.analyze(text).get("truth", 0.0))
+    def truth_score(self, text: str, profile: Optional[Dict[str, Any]] = None) -> float:
+        # Task 8.1: Accept optional profile argument or use hash-based cache
+        if profile is not None:
+            return float(profile.get("truth", 0.0))
+        text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+        if text_hash in self._cache:
+            return float(self._cache[text_hash].get("truth", 0.0))
+        profile = self.analyze(text)
+        # Cache the result using hash
+        self._cache[text_hash] = profile.copy()
+        return float(profile.get("truth", 0.0))
 
-    def love_score(self, text: str) -> float:
-        return float(self.analyze(text).get("love", 0.0))
+    def love_score(self, text: str, profile: Optional[Dict[str, Any]] = None) -> float:
+        # Task 8.1: Accept optional profile argument or use hash-based cache
+        if profile is not None:
+            return float(profile.get("love", 0.0))
+        text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+        if text_hash in self._cache:
+            return float(self._cache[text_hash].get("love", 0.0))
+        profile = self.analyze(text)
+        # Cache the result using hash
+        self._cache[text_hash] = profile.copy()
+        return float(profile.get("love", 0.0))
 
-    def pain_score(self, text: str) -> float:
-        return float(self.analyze(text).get("pain", 0.0))
+    def pain_score(self, text: str, profile: Optional[Dict[str, Any]] = None) -> float:
+        # Task 8.1: Accept optional profile argument or use hash-based cache
+        if profile is not None:
+            return float(profile.get("pain", 0.0))
+        text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+        if text_hash in self._cache:
+            return float(self._cache[text_hash].get("pain", 0.0))
+        profile = self.analyze(text)
+        # Cache the result using hash
+        self._cache[text_hash] = profile.copy()
+        return float(profile.get("pain", 0.0))
 
     def tlp_vector(
         self, text: str, emotion_matrix: Dict[str, float]
@@ -121,7 +176,14 @@ class TruthLovePainEngine(_TruthLovePainEngine):
         """
         Calculates dynamic Valence and Arousal based on TLP scores.
         """
-        profile = self.analyze(text)
+        # Task 8.1: Use hash-based cache to prevent re-analyzing the same text
+        text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+        if text_hash in self._cache:
+            profile = self._cache[text_hash].copy()
+        else:
+            profile = self.analyze(text)
+            # Cache the result using hash
+            self._cache[text_hash] = profile.copy()
         truth = profile.get("truth", 0.0)
         love = profile.get("love", 0.0)
         pain = profile.get("pain", 0.0)

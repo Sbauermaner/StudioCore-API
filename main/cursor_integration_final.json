@@ -1,0 +1,57 @@
+{
+    "project_final_integration_plan": {
+      "meta": {
+        "status_reference": "VERGLEICH_KONFLIKT_STATUS_2025.md",
+        "objective": "Connect conflict resolution logic to the main pipeline and fix remaining open logic gaps."
+      },
+      "phases": [
+        {
+          "id": "PHASE_18_PIPELINE_WIRING",
+          "name": "Wire Conflict Resolvers",
+          "priority": "CRITICAL (P0)",
+          "description": "Call the existing resolution methods inside Monolith's analyze loop.",
+          "target_files": [
+            "studiocore/monolith_v4_3_1.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "18.1",
+              "issue": "ConsistencyLayerV8 methods exist but are never called.",
+              "location": "studiocore/monolith_v4_3_1.py:analyze",
+              "action": "1. Import `ConsistencyLayerV8`. 2. After calculating `bpm` and `rde`, instantiate the layer. 3. Call `resolve_bpm_tlp_conflict(bpm, tlp)` and update `bpm`. 4. Call `resolve_genre_rde_conflict(genre, rde)` and update `rde`."
+            },
+            {
+              "task_id": "18.2",
+              "issue": "GenreConflictResolver exists but is never called.",
+              "location": "studiocore/monolith_v4_3_1.py:analyze",
+              "action": "1. Import `GenreConflictResolver`. 2. After calculating `color_wave`, call `resolve_color_key_conflict(key, color_wave, style)` and update `key` if a better match is found."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_19_LOGIC_CLOSURE",
+          "name": "Close Open Logic Gaps",
+          "priority": "HIGH (P1)",
+          "description": "Implement the missing logic for Color Priorities and Emotion-Genre conflicts.",
+          "target_files": [
+            "studiocore/color_engine_adapter.py",
+            "studiocore/logical_engines.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "19.1",
+              "issue": "Color Override Priority is ambiguous (Status: OFFEN).",
+              "location": "studiocore/color_engine_adapter.py",
+              "action": "Refactor `resolve_color_wave` to strictly follow: User Override > Style Lock > Emotion Default. Add comments confirming this order."
+            },
+            {
+              "task_id": "19.2",
+              "issue": "Emotion-Genre conflicts (e.g. Joy+Gothic) are not handled (Status: OFFEN).",
+              "location": "studiocore/logical_engines.py",
+              "action": "Add `resolve_emotion_genre_conflict(emotion, genre)` method. If incompatible pairs are found (like 'joy' & 'gothic'), suggest a genre shift (e.g., to 'dark_pop' or 'glam_rock')."
+            }
+          ]
+        }
+      ]
+    }
+  }

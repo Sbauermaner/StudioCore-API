@@ -21,8 +21,11 @@ class HybridGenreEngine:
     """
 
     def __init__(self):
-        # No state initialization here to prevent leaks
-        pass
+        # Task 16.1: Initialize references to config for better code clarity
+        # Stateless design - no instance variables that persist between calls
+        # Store references to config for easier access (these are module-level constants)
+        self.weights = GENRE_WEIGHTS
+        self.thresholds = GENRE_THRESHOLDS
 
     def resolve(
         self,

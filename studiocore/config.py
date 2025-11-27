@@ -156,6 +156,11 @@ DEFAULT_CONFIG = ConfigAccessor(
         "FALLBACK_NARRATIVE": "introspection → tension → release",
         "FALLBACK_STRUCTURE": "intro - verse - chorus - outro",
         "FALLBACK_EMOTION": "neutral",
+        # Task 6.1: Version constants centralized
+        "STUDIOCORE_VERSION": "v6.4 - maxi",
+        "MONOLITH_VERSION": "v4.3.11",
+        "API_VERSION": "1.0.0",
+        "DIAGNOSTICS_VERSION": "v8.0",
     }
 )
 

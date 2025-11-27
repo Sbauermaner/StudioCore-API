@@ -1,0 +1,132 @@
+{
+    "cursor_master_plan": {
+      "meta": {
+        "project": "StudioCore-API",
+        "source_files": [
+          "main/PROZESSE_PROBLEME.md",
+          "main/WIEDERHOLUNGEN_PROBLEME.md",
+          "main/FUNKTIONS_STATUS_UND_HARDCODES.md",
+          "main/ERGAENZENDE_ANALYSE.md"
+        ],
+        "objective": "Eliminate all architectural breaks, redundancies, security flaws, and hardcodes identified in the main/ audit files."
+      },
+      "phases": [
+        {
+          "id": "PHASE_1_CORE_LOGIC_REPAIR",
+          "name": "Restore Broken Pipeline (Priority: Critical)",
+          "description": "Fix 'monolith_v4_3_1.py' where critical processes are skipped or hardcoded (Source: PROZESSE_PROBLEME.md).",
+          "target_files": ["studiocore/monolith_v4_3_1.py"],
+          "tasks": [
+            {
+              "id": "1.1",
+              "issue": "TLP Analysis is passed as None to rhythm.analyze.",
+              "location": "monolith_v4_3_1.py:536",
+              "action": "Insert `tlp = self.tlp.analyze(raw)` and `cf = tlp.get('conscious_frequency')` immediately after emotion analysis."
+            },
+            {
+              "id": "1.2",
+              "issue": "Style.build() is skipped; code uses static FALLBACK values.",
+              "location": "monolith_v4_3_1.py:556-565",
+              "action": "Remove fallback hardcodes. Call `style_result = self.style.build(emotions, tlp, raw, bpm, semantic_hints, voice_hint)`."
+            },
+            {
+              "id": "1.3",
+              "issue": "Section Analysis and Semantic Layers are never invoked.",
+              "location": "monolith_v4_3_1.py:314-396",
+              "action": "Call `section_profiles = self._analyze_sections(...)` and `semantic_layers = self._build_semantic_layers(...)`."
+            },
+            {
+              "id": "1.4",
+              "issue": "Text Annotation (UI/Suno) is missing.",
+              "location": "monolith_v4_3_1.py:402-514",
+              "action": "Call `annotated_ui, annotated_suno = self.annotate_text(...)` before return."
+            },
+            {
+              "id": "1.5",
+              "issue": "Return dictionary is incomplete.",
+              "location": "monolith_v4_3_1.py:569",
+              "action": "Update return dict to include `tlp`, `vocal`, `integrity`, `semantic_layers`, and annotated texts."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_2_REDUNDANCY_ELIMINATION",
+          "name": "Optimize Performance (Priority: High)",
+          "description": "Stop sub-engines from re-analyzing text multiple times (Source: WIEDERHOLUNGEN_PROBLEME.md).",
+          "target_files": ["studiocore/vocals.py", "studiocore/integrity.py", "studiocore/monolith_v4_3_1.py"],
+          "tasks": [
+            {
+              "id": "2.1",
+              "issue": "Vocals engine re-analyzes Emotion and TLP internally.",
+              "location": "studiocore/vocals.py",
+              "action": "Refactor `allocate` method to accept `emotions` and `tlp` arguments. Remove internal `analyze()` calls."
+            },
+            {
+              "id": "2.2",
+              "issue": "Integrity engine instantiates new analyzers unnecessarily.",
+              "location": "studiocore/integrity.py",
+              "action": "Refactor `scan` method to accept pre-calculated `emotions` and `tlp`. Remove internal instantiation."
+            },
+            {
+              "id": "2.3",
+              "issue": "Monolith calls need updating.",
+              "location": "studiocore/monolith_v4_3_1.py",
+              "action": "Update calls to `self.vocal_allocator.allocate` and `self.integrity.scan` to pass the `emotions` and `tlp` variables."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_3_SECURITY_HARDENING",
+          "name": "Security & Validation (Priority: High)",
+          "description": "Implement missing safety checks and validation (Source: ERGAENZENDE_ANALYSE.md).",
+          "target_files": ["studiocore/monolith_v4_3_1.py", "api.py", "studiocore/config.py"],
+          "tasks": [
+            {
+              "id": "3.1",
+              "issue": "No input validation in Monolith (MAX_INPUT_LENGTH check missing).",
+              "location": "studiocore/monolith_v4_3_1.py:analyze",
+              "action": "Add check: `if not text or len(text) > self.config.MAX_INPUT_LENGTH: raise ValueError(...)`."
+            },
+            {
+              "id": "3.2",
+              "issue": "Aggression filter keywords exist in config but are unused.",
+              "location": "studiocore/monolith_v4_3_1.py",
+              "action": "Implement check against `self.config.AGGRESSION_KEYWORDS` at start of analysis."
+            },
+            {
+              "id": "3.3",
+              "issue": "CORS allows all origins ('*').",
+              "location": "api.py:35",
+              "action": "Update CORS to use `os.getenv('CORS_ORIGINS').split(',')`."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_4_CLEANUP_HARDCODES",
+          "name": "Refactor Hardcodes (Priority: Medium)",
+          "description": "Move hardcoded values to config (Source: FUNKTIONS_STATUS_UND_HARDCODES.md).",
+          "target_files": ["studiocore/rhythm.py", "studiocore/config.py", "studiocore/fallback.py"],
+          "tasks": [
+            {
+              "id": "4.1",
+              "issue": "Rhythm engine has 35+ hardcoded weights/thresholds.",
+              "location": "studiocore/rhythm.py",
+              "action": "Move values like `120.0` (default BPM) and Punctuation Weights to `studiocore/config.py`."
+            },
+            {
+              "id": "4.2",
+              "issue": "Fallback engine crashes (Stub).",
+              "location": "studiocore/fallback.py",
+              "action": "Implement a minimal `analyze` method that returns a valid JSON structure instead of raising RuntimeError."
+            },
+            {
+              "id": "4.3",
+              "issue": "Version strings are scattered.",
+              "location": "Multiple files",
+              "action": "Centralize version strings in `studiocore/config.py`."
+            }
+          ]
+        }
+      ]
+    }
+  }

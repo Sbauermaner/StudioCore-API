@@ -389,12 +389,8 @@ class VocalProfileRegistry:
         ):
             if emotions is not None and tlp is not None:
                 form = self._auto_form(emotions, tlp, text)
-            elif self.emo_analyzer and self.tlp_analyzer:
-                emo = self.emo_analyzer.analyze(text)
-                tlp_local = self.tlp_analyzer.analyze(text)
-                form = self._auto_form(emo, tlp_local, text)
             else:
-                log.warning("Emo / TLP анализаторы не загружены, _auto_form пропущен.")
+                log.warning("Emotions и TLP не переданы, _auto_form пропущен. Форма остается 'solo'.")
         log.debug(f"Финальная форма: {form}")
 
         # 3. Определяем состав (male / female / mixed)
@@ -432,10 +428,13 @@ class VocalProfileRegistry:
                 vox = male_vox + female_vox
             else:
                 # Task 2.1: Используем переданные emotions вместо повторного анализа
-                emo = emotions if emotions is not None else (self.emo_analyzer.analyze(text) if self.emo_analyzer else {})
-                joy_peace = emo.get("joy", 0) + emo.get("peace", 0)
-                anger_epic = emo.get("anger", 0) + emo.get("epic", 0)
-                vox = female_vox if joy_peace > anger_epic else male_vox
+                if emotions is not None:
+                    joy_peace = emotions.get("joy", 0) + emotions.get("peace", 0)
+                    anger_epic = emotions.get("anger", 0) + emotions.get("epic", 0)
+                    vox = female_vox if joy_peace > anger_epic else male_vox
+                else:
+                    log.warning("Emotions не переданы, используется fallback: male_vox")
+                    vox = male_vox
 
         # 5. Очистка и возврат
         vox = [form] + vox

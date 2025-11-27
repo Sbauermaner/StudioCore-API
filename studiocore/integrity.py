@@ -61,13 +61,16 @@ class IntegrityScanEngine:
         }
 
         # Task 2.2: Используем переданные emotions и tlp вместо создания новых экземпляров
+        # Monolith всегда передает emotions и tlp, поэтому fallback вызовы удалены
         if emotions is None:
-            emo = AutoEmotionalAnalyzer().analyze(text)
+            log.warning("Emotions не переданы в integrity.analyze(), используется пустой словарь.")
+            emo = {}
         else:
             emo = emotions
         
         if tlp is None:
-            tlp_local = TruthLovePainEngine().analyze(text)
+            log.warning("TLP не передан в integrity.analyze(), используется пустой словарь.")
+            tlp_local = {}
         else:
             tlp_local = tlp
         

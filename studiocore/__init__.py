@@ -28,9 +28,10 @@ FINGERPRINT = "StudioCore - FP - 2025 - SB - 9fd72e27"
 
 
 # Version fingerprint linked to FINGERPRINT: StudioCore - FP - 2025 - SB - 9fd72e27
-# NOTE: This is the canonical public version; config.py mirrors this value
-# for consistency.
-STUDIOCORE_VERSION = "v6.4 - maxi"
+# Task 6.2: Import version from config instead of hardcoding
+from .config import DEFAULT_CONFIG
+
+STUDIOCORE_VERSION = DEFAULT_CONFIG.STUDIOCORE_VERSION
 DEFAULT_MONOLITH = "monolith_v4_3_1"
 DEFAULT_LOADER_ORDER = ("v6", "v5", "monolith", "fallback")
 

@@ -4,14 +4,17 @@
 # Hash: 22ae - df91 - bc11 - 6c7e
 # -*- coding: utf - 8 -*-
 """
-StudioCore v4.3.11 — Monolith (v6 - Suno Аннотации)
+StudioCore Monolith (v6 - Suno Аннотации)
 - Исправлена ошибка f - string (строка 259)
 - Внедрено централизованное логирование
 - Внедрена Suno - аннотация в 'annotate_text'
+- Task 6.2: Version now imported from config.py
 """
 
 import re
+import time
 from typing import Dict, Any, List, Tuple, Optional
+from concurrent.futures import ThreadPoolExecutor
 import logging
 
 # === 1. Импорт ядра ===
@@ -24,6 +27,10 @@ import logging
 # without explicit written permission from the Author is prohibited.
 
 from .config import DEFAULT_CONFIG, load_config
+
+# Task 6.2: Import version from config instead of hardcoding
+MONOLITH_VERSION = DEFAULT_CONFIG.MONOLITH_VERSION
+STUDIOCORE_VERSION = DEFAULT_CONFIG.STUDIOCORE_VERSION
 
 # v16: ИСПРАВЛЕН ImportError
 from .text_utils import normalize_text_preserve_symbols, extract_raw_blocks
@@ -41,6 +48,9 @@ from .rhythm import LyricMeter
 from .style import PatchedStyleMatrix
 from .color_engine_adapter import ColorEngineAdapter
 from .rde_engine import RhythmDynamicsEmotionEngine
+# Task 18.1: Import conflict resolution classes
+from .consistency_v8 import ConsistencyLayerV8
+from .genre_conflict_resolver import GenreConflictResolver
 
 # === 2. Настройка логгера ===
 log = logging.getLogger(__name__)
@@ -532,25 +542,22 @@ class StudioCore:
     # 🚀 Главный Пайплайн
     # -------------------------------------------------------
 
-    def analyze(
-        self,
-        text: str,
-        preferred_gender: str = "auto",
-        version: Optional[str] = None,
-        semantic_hints: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        log.debug(f"--- ЗАПУСК АНАЛИЗА (v{STUDIOCORE_VERSION}) ---")
-        log.debug(f"Preferred Gender: {preferred_gender}, Text: {text[:40]}...")
-
-        # Task 3.1: Input Validation
+    def _check_safety(self, text: str) -> str:
+        """
+        Task 1.1: Safety check method that validates input length and checks for aggression keywords.
+        Returns the text (possibly replaced with neutral text if aggression detected).
+        """
+        # Input type validation
         if not text or not isinstance(text, str):
             raise ValueError("Text input is required and must be a string")
+        
+        # Length validation
         if len(text) > DEFAULT_CONFIG.MAX_INPUT_LENGTH:
             raise ValueError(
                 f"Text length ({len(text)}) exceeds maximum allowed length ({DEFAULT_CONFIG.MAX_INPUT_LENGTH})"
             )
-
-        # Task 3.3: Aggression Filter
+        
+        # Aggression filter
         aggression_keywords = DEFAULT_CONFIG.AGGRESSION_KEYWORDS
         text_lower = text.lower()
         found_keywords = [kw for kw in aggression_keywords if kw.lower() in text_lower]
@@ -559,6 +566,24 @@ class StudioCore:
                 f"Aggression keywords detected: {found_keywords}. Replacing with neutral text."
             )
             text = DEFAULT_CONFIG.FALLBACK_NEUTRAL_TEXT
+        
+        return text
+
+    def analyze(
+        self,
+        text: str,
+        preferred_gender: str = "auto",
+        version: Optional[str] = None,
+        semantic_hints: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        # Task 10.2: Start timer for runtime metrics
+        start_time = time.time()
+        
+        log.debug(f"--- ЗАПУСК АНАЛИЗА (v{STUDIOCORE_VERSION}) ---")
+        log.debug(f"Preferred Gender: {preferred_gender}, Text: {text[:40]}...")
+
+        # Task 1.1: Safety check at the start of analyze
+        text = self._check_safety(text)
 
         raw = normalize_text_preserve_symbols(text)
         text_blocks = extract_raw_blocks(raw)
@@ -568,8 +593,51 @@ class StudioCore:
         section_profiles = section_result.get("section_profiles", [])
         voice_hint = section_result.get("user_voice_hint")
 
-        emotions = self.emotion.analyze(raw)
-        log.debug(f"Результат EMO: {emotions}")
+        # Task 10.1: Run independent engines in parallel using ThreadPoolExecutor
+        # emotion and tone are independent, so they can run in parallel
+        emotions = None
+        tone_hint = None
+        
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            # Submit independent tasks (emotion and tone don't depend on each other)
+            future_emotion = executor.submit(self.emotion.analyze, raw)
+            future_tone = executor.submit(self.tone.detect_key, raw)
+            
+            # Wait for results
+            emotions = future_emotion.result()
+            tone_hint = future_tone.result()
+        
+        # Initialize integrity_result to None (will be set later after tlp is available)
+        integrity_result = None
+        
+        log.debug(f"Результат EMO (до фильтрации): {emotions}")
+        
+        # Task 3.1: Использование EMOTION_HIGH_SIGNAL для фильтрации слабых эмоций
+        emotion_high_signal = DEFAULT_CONFIG.EMOTION_HIGH_SIGNAL
+        if emotions:
+            # Фильтруем эмоции, которые ниже порога EMOTION_HIGH_SIGNAL
+            # Оставляем только значимые эмоции для дальнейшей обработки
+            filtered_emotions = {
+                k: v for k, v in emotions.items() 
+                if v >= emotion_high_signal or k == max(emotions, key=emotions.get)
+            }
+            # Если после фильтрации осталась только доминирующая эмоция, 
+            # перераспределяем веса для сохранения нормализации
+            if len(filtered_emotions) < len(emotions) and len(filtered_emotions) > 0:
+                total_filtered = sum(filtered_emotions.values())
+                if total_filtered > 0:
+                    # Нормализуем отфильтрованные эмоции
+                    emotions = {k: v / total_filtered for k, v in filtered_emotions.items()}
+                    log.debug(f"Эмоции отфильтрованы по EMOTION_HIGH_SIGNAL ({emotion_high_signal}): {emotions}")
+                else:
+                    # Если все отфильтрованы, оставляем доминирующую
+                    dominant = max(emotions, key=emotions.get)
+                    emotions = {dominant: 1.0}
+                    log.debug(f"Все эмоции ниже порога, оставлена доминирующая: {dominant}")
+            else:
+                log.debug(f"Эмоции не требуют фильтрации (все выше порога {emotion_high_signal})")
+        
+        log.debug(f"Результат EMO (после фильтрации): {emotions}")
 
         # Task 1.1: TLP Analysis
         tlp = self.tlp.analyze(raw)
@@ -584,8 +652,15 @@ class StudioCore:
             rhythm_analysis.get("header_bpm"),
             rhythm_analysis.get("estimated_bpm"),
         )
+        
+        # Task 18.1: Auto-resolve BPM-TLP conflicts
+        consistency = ConsistencyLayerV8({"bpm": bpm, "tlp": tlp})
+        suggested_bpm, was_resolved = consistency.resolve_bpm_tlp_conflict(bpm, tlp)
+        if was_resolved:
+            log.debug(f"BPM-TLP Konflikt aufgelöst: {bpm} → {suggested_bpm}")
+            bpm = int(round(suggested_bpm))
 
-        tone_hint = self.tone.detect_key(raw)
+        # Task 9.1: tone_hint already obtained from parallel execution
         key = tone_hint.get("key") if tone_hint else DEFAULT_CONFIG.FALLBACK_KEY
         if not key or key == "auto":
             key = DEFAULT_CONFIG.FALLBACK_KEY
@@ -631,6 +706,7 @@ class StudioCore:
 
         # Task 1.6: Integrity Scan
         # Task 2.3: Передаем emotions и tlp для устранения повторных анализов
+        # Note: integrity requires emotions and tlp, so it runs after they are available (not in parallel)
         integrity_result = self.integrity.analyze(raw, emotions=emotions, tlp=tlp)
         log.debug(f"Результат Integrity: {integrity_result}")
 
@@ -648,6 +724,17 @@ class StudioCore:
         }
         color_resolution = self.color_engine.resolve_color_wave(intermediate_result)
         color_wave = color_resolution.colors if color_resolution else []
+        
+        # Task 18.2: Auto-resolve Color-Key conflicts
+        resolver = GenreConflictResolver()
+        suggested_key, was_resolved = resolver.resolve_color_key_conflict(
+            key, color_wave, style
+        )
+        if was_resolved:
+            log.debug(f"Color-Key Konflikt aufgelöst: {key} → {suggested_key}")
+            key = suggested_key
+            # Update style dict with new key
+            style["key"] = key
 
         # Дополнительно: RDE Analysis
         # RDE требует bpm_payload, breathing_profile, emotion_profile, instrumentation_payload
@@ -666,11 +753,20 @@ class StudioCore:
                 }
             except Exception as e:
                 log.warning(f"Не удалось экспортировать RDE emotion vector: {e}")
+        
+        # Task 18.1: Auto-resolve Genre-RDE conflicts
+        genre = style.get("genre", "")
+        adjusted_rde, was_resolved = consistency.resolve_genre_rde_conflict(genre, rde_result)
+        if was_resolved:
+            log.debug(f"Genre-RDE Konflikt aufgelöst: {rde_result} → {adjusted_rde}")
+            rde_result = adjusted_rde
 
-        log.debug("--- АНАЛИЗ УСПЕШНО ЗАВЕРШЕН ---")
+        # Task 10.2: Calculate runtime and add to result
+        runtime_ms = int((time.time() - start_time) * 1000)
+        log.debug(f"--- АНАЛИЗ УСПЕШНО ЗАВЕРШЕН (runtime: {runtime_ms}ms) ---")
 
         # Task 1.7: Обновленный return словарь с всеми рассчитанными данными
-        return {
+        result = {
             "emotions": emotions,
             "tlp": tlp,
             "bpm": bpm,
@@ -684,7 +780,11 @@ class StudioCore:
             "annotated_text_suno": annotated_text_suno,
             "color_wave": color_wave,
             "rde": rde_result,
+            # Task 10.2: Add runtime metrics for diagnostics
+            "runtime_ms": runtime_ms,
         }
+        
+        return result
 
 
 class StudioCoreV5:
@@ -742,9 +842,9 @@ class StudioCoreV5:
 
 
 # ==========================================================
-STUDIOCORE_VERSION = "v4.3.11"
+# Task 6.2: Version is now imported from config.py
 log.info(
-    f"🔹 [StudioCore {STUDIOCORE_VERSION}] Monolith loaded (Section - Aware Duet Mode v2)."
+    f"🔹 [StudioCore {MONOLITH_VERSION}] Monolith loaded (Section - Aware Duet Mode v2)."
 )
 
 # StudioCore Signature Block (Do Not Remove)

@@ -174,9 +174,18 @@ class ColorEngineAdapter:
     """
 
     def resolve_color_wave(self, result: Dict[str, Any]) -> ColorResolution:
+        """
+        Task 19.1: Color resolution with strict priority order.
+        
+        Priority (highest to lowest):
+        1. User Override (_color_locked) - User explicitly locked color
+        2. Style Lock (neutral_profile) - Low-emotion profile forces neutral
+        3. Folk Mode (_folk_mode) - Genre-specific override
+        4. Hybrid Genre - Hybrid genre color mixing
+        5. Emotion Default - Emotion-based color mapping (lowest priority)
+        """
         # MASTER - PATCH v3.1 — Neutral Mode Color Override
-        # If style already locked color (road narrative, neutral mode), freeze
-        # output
+        # Priority 1: If style already locked color (road narrative, neutral mode), freeze output
         style_payload = result.get("style", {})
         if style_payload and style_payload.get("_color_locked"):
             color_wave = style_payload.get("color_wave")
@@ -198,6 +207,7 @@ class ColorEngineAdapter:
         else:
             emo_profile = emo if isinstance(emo, dict) else {}
 
+        # Task 19.1: Priority 2 - Style Lock (neutral_profile)
         # MASTER - PATCH v3.1: проверка на low - emotion по TLP (приоритет)
         pain = float(tlp.get("pain", 0.0))
         truth = float(tlp.get("truth", 0.0))
@@ -241,10 +251,11 @@ class ColorEngineAdapter:
         dominant = max(filtered_scores, key=filtered_scores.get)
         colors = get_emotion_colors(dominant)
 
-        # Folk mode color override
+        # Task 19.1: Priority 3 - Folk Mode color override
         if style_payload.get("_folk_mode") is True:
             return ColorResolution(colors=["#6B4F2A", "#C89D66"], source="folk_mode")
 
+        # Task 19.1: Priority 4 - Hybrid Genre color mixing
         # MASTER - PATCH v6.0: ColorEngine v3 для гибридных жанров
         genre_label = style_payload.get("genre", "")
         if genre_label and "hybrid" in str(genre_label).lower():
@@ -254,6 +265,7 @@ class ColorEngineAdapter:
             if hybrid_colors:
                 return ColorResolution(colors=hybrid_colors, source="hybrid_genre")
 
+        # Task 19.1: Priority 5 - Emotion Default (lowest priority)
         # нормальная ветка
         return ColorResolution(
             colors=colors,

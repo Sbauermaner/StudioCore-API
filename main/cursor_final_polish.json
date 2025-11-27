@@ -1,0 +1,69 @@
+{
+    "project_repair_plan_final": {
+      "meta": {
+        "status_reference": "AKTUELLER_STATUS_ANALYSE.md",
+        "objective": "Integrate safety checks, eliminate deep redundancies, and implement stubs."
+      },
+      "phases": [
+        {
+          "id": "PHASE_2_SECURITY_ACTIVATION",
+          "name": "Activate Safety Checks",
+          "priority": "CRITICAL",
+          "description": "Safety logic exists in config but is not enforced in Monolith (Reference: AKTUELLER_STATUS_ANALYSE.md - Section 9).",
+          "target_files": [
+            "studiocore/monolith_v4_3_1.py",
+            "studiocore/config.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "2.1",
+              "issue": "Input validation (length & aggression) is missing in `analyze`.",
+              "location": "studiocore/monolith_v4_3_1.py:analyze",
+              "action": "At the very start of `analyze`, add:\n1. `if len(text) > self.config.MAX_INPUT_LENGTH: raise ValueError(...)`\n2. Check `text` against `self.config.AGGRESSION_KEYWORDS`. If found, raise ValueError or return safety fallback."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_3_DEEP_OPTIMIZATION",
+          "name": "Fix Engine Redundancies",
+          "priority": "HIGH",
+          "description": "logical_engines and tlp_engine re-analyze text multiple times per request (Reference: WIEDERHOLUNGEN_PROBLEME.md).",
+          "target_files": [
+            "studiocore/logical_engines.py",
+            "studiocore/tlp_engine.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "3.1",
+              "issue": "`logical_engines.py` analyzes Emotion 4 times (intensity curve, conflict map, etc.).",
+              "location": "studiocore/logical_engines.py",
+              "action": "Implement a simple cache (e.g., `_last_analysis`) in `EmotionEngine` class. If `analyze(text)` is called with the same text, return cached result."
+            },
+            {
+              "task_id": "3.2",
+              "issue": "`tlp_engine.py` analyzes TLP 5 times (score methods call analyze independently).",
+              "location": "studiocore/tlp_engine.py",
+              "action": "Refactor `truth_score`, `love_score`, `pain_score` to accept an optional `profile` argument. If not provided, use a cached analysis logic similar to task 3.1."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_4_STUB_IMPLEMENTATION",
+          "name": "Implement Critical Stubs",
+          "priority": "MEDIUM",
+          "description": "Fallback engine is empty and crashes on use.",
+          "target_files": [
+            "studiocore/fallback.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "4.1",
+              "issue": "`StudioCoreFallback.analyze` raises RuntimeError immediately.",
+              "location": "studiocore/fallback.py",
+              "action": "Implement a basic `analyze` method that returns a valid (but static/minimal) result dictionary using `DEFAULT_CONFIG` values, ensuring the API doesn't crash if Monolith fails."
+            }
+          ]
+        }
+      ]
+    }
+  }

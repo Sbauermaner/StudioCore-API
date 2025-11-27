@@ -1,0 +1,90 @@
+{
+    "project_repair_plan_phase_2": {
+      "meta": {
+        "status_reference": "STATUS_ANALYSE_BEHOBEN_VS_KAPUTT.md",
+        "objective": "Address remaining 'Still Broken' (❌) and 'Partial' (⚠️) issues: Security, Redundancy, and Hardcodes."
+      },
+      "phases": [
+        {
+          "id": "PHASE_2_SECURITY_HARDENING",
+          "name": "Implement Safety & Security Checks",
+          "priority": "CRITICAL",
+          "description": "Implement missing safety parameters defined in config but unused in code (Reference: FUNKTIONS_STATUS_UND_HARDCODES.md).",
+          "target_files": [
+            "studiocore/monolith_v4_3_1.py",
+            "studiocore/config.py",
+            "api.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "2.1",
+              "issue": "Aggression filter defined in config (`AGGRESSION_KEYWORDS`) but never checked.",
+              "location": "studiocore/monolith_v4_3_1.py:analyze",
+              "action": "Implement a check at the start of `analyze`: if input text contains words from `self.config.AGGRESSION_KEYWORDS`, raise a ValueError or flag the content."
+            },
+            {
+              "task_id": "2.2",
+              "issue": "CORS policy is insecure (`allow_origins=['*']`).",
+              "location": "api.py:35",
+              "action": "Update `CORSMiddleware` to use `os.getenv('CORS_ORIGINS', '').split(',')` instead of wildcard."
+            },
+            {
+              "task_id": "2.3",
+              "issue": "Input length validation is missing in Monolith.",
+              "location": "studiocore/monolith_v4_3_1.py:analyze",
+              "action": "Add strict check: `if len(text) > self.config.MAX_INPUT_LENGTH: raise ValueError(...)`."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_3_ELIMINATE_REDUNDANCY",
+          "name": "Optimization & Redundancy Removal",
+          "priority": "HIGH",
+          "description": "Prevent sub-engines from re-calculating Emotion/TLP (Reference: WIEDERHOLUNGEN_PROBLEME.md).",
+          "target_files": [
+            "studiocore/vocals.py",
+            "studiocore/integrity.py",
+            "studiocore/monolith_v4_3_1.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "3.1",
+              "issue": "`VocalProfileRegistry` re-runs analysis internally.",
+              "location": "studiocore/vocals.py:387-388",
+              "action": "Refactor `allocate` (or `get`) method signature to accept `emotions` and `tlp` as arguments. Use passed data instead of running `self.emo_analyzer.analyze()`."
+            },
+            {
+              "task_id": "3.2",
+              "issue": "`IntegrityScanEngine` instantiates new analyzers.",
+              "location": "studiocore/integrity.py:58-59",
+              "action": "Refactor `scan` (or `analyze`) method to accept `emotions` and `tlp`. Remove internal instantiation of analyzers."
+            },
+            {
+              "task_id": "3.3",
+              "issue": "Monolith calls to updated engines need arguments.",
+              "location": "studiocore/monolith_v4_3_1.py",
+              "action": "Update calls to `self.vocal_allocator.allocate` and `self.integrity.scan` in `analyze()` to pass the `emotions` and `tlp` variables calculated earlier."
+            }
+          ]
+        },
+        {
+          "id": "PHASE_4_CLEANUP_HARDCODES",
+          "name": "Final Hardcode Refactoring",
+          "priority": "MEDIUM",
+          "description": "Move logic parameters from code to config (Reference: FUNKTIONS_STATUS_UND_HARDCODES.md).",
+          "target_files": [
+            "studiocore/rhythm.py",
+            "studiocore/config.py"
+          ],
+          "tasks": [
+            {
+              "task_id": "4.1",
+              "issue": "Rhythm engine contains local punctuation weights and thresholds.",
+              "location": "studiocore/rhythm.py",
+              "action": "Replace local `PUNCT_WEIGHTS` dict with `self.config.PUNCT_WEIGHTS` (ensure it's passed or accessible). Move numeric constants (e.g. `120.0` default BPM) to `config.py`."
+            }
+          ]
+        }
+      ]
+    }
+  }
