@@ -1,0 +1,19 @@
+{
+    "version": "1.0",
+    "goal": "Enrich analysis output for Text-Only mode",
+    "target": "studiocore/monolith_v4_3_1.py",
+    "tasks": [
+      {
+        "issue": "Empty Color/Resonance",
+        "action": "In `analyze()`, if audio is missing, map `emotions` to `color_signature` and `resonance_hz` using a lookup table."
+      },
+      {
+        "issue": "Missing Vocal Texture",
+        "action": "Infer vocal gender from text grammar (Russian endings like 'ла' vs 'л') and assign a default texture (e.g., 'dynamic')."
+      },
+      {
+        "issue": "ZeroPulse Missing",
+        "action": "Ensure the Breathing/ZeroPulse map is generated based on comma/sentence structure if not present."
+      }
+    ]
+  }

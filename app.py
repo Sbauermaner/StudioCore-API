@@ -51,6 +51,51 @@ def extract_main_outputs(analysis_result):
         or ""
     )
 
+    # If style_prompt is still empty, construct it from available data
+    if not style_prompt:
+        style = (
+            analysis_result.get("style", {})
+            if isinstance(analysis_result.get("style"), dict)
+            else {}
+        )
+        genre = style.get("genre") or style.get("style") or "adaptive"
+        
+        # Try to get mood from multiple sources
+        mood = (
+            style.get("mood")
+            or style.get("atmosphere")
+            or (analysis_result.get("emotions", {}) if isinstance(analysis_result.get("emotions"), dict) else {}).get("dominant")
+            or "neutral"
+        )
+        
+        bpm = analysis_result.get("bpm")
+        if isinstance(bpm, dict):
+            bpm_val = bpm.get("estimate") or bpm.get("target_bpm") or bpm
+        else:
+            bpm_val = bpm or "auto"
+        
+        key = analysis_result.get("key")
+        if isinstance(key, dict):
+            key_val = key.get("key") or key.get("key_root") or "auto"
+        else:
+            key_val = key or "auto"
+        
+        # Build style prompt string
+        style_parts = []
+        if genre and genre != "adaptive":
+            style_parts.append(f"Genre: {genre}")
+        if mood and mood != "neutral":
+            style_parts.append(f"Mood: {mood}")
+        if bpm_val and bpm_val != "auto" and bpm_val is not None:
+            style_parts.append(f"BPM: {bpm_val}")
+        if key_val and key_val != "auto" and key_val is not None:
+            style_parts.append(f"Key: {key_val}")
+        
+        if style_parts:
+            style_prompt = " | ".join(style_parts)
+        else:
+            style_prompt = "Genre: adaptive | Mood: neutral | BPM: auto | Key: auto"
+
     # Try multiple possible locations for lyrics_prompt
     lyrics_prompt = (
         fanf.get("lyrics_prompt")
@@ -60,6 +105,14 @@ def extract_main_outputs(analysis_result):
         or analysis_result.get("fanf", {}).get("suno_lyrics_prompt", "")
         or ""
     )
+    
+    # If lyrics_prompt is still empty, use annotated_text_suno
+    if not lyrics_prompt:
+        lyrics_prompt = (
+            analysis_result.get("annotated_text_suno")
+            or analysis_result.get("annotated_text_ui")
+            or ""
+        )
 
     ui_text = (
         fanf.get("ui_text")
@@ -189,9 +242,9 @@ def build_rde_section_text(analysis_result):
         if isinstance(analysis_result.get("rde"), dict)
         else {}
     )
-    rhythm = rde.get("rhythm", rde.get("resonance", "—"))
-    dynamics = rde.get("dynamics", rde.get("fracture", "—"))
-    emotion = rde.get("emotion", rde.get("entropy", "—"))
+    rhythm = rde.get("rhythm", rde.get("resonance", "balanced"))
+    dynamics = rde.get("dynamics", rde.get("fracture", "stable"))
+    emotion = rde.get("emotion", rde.get("entropy", "neutral"))
     structure = (
         analysis_result.get("structure", {})
         if isinstance(analysis_result.get("structure"), dict)
@@ -248,16 +301,16 @@ def build_rde_section_text(analysis_result):
                 line_count = 0
 
             # Получаем вокальную технику и эмоцию для секции
-            vocal_tech = "—"
-            section_emotion = "—"
+            vocal_tech = None
+            section_emotion = None
             if i < len(lyrics_sections) and isinstance(lyrics_sections[i], dict):
-                vocal_tech = lyrics_sections[i].get("vocal_technique", "—")
-                section_emotion = lyrics_sections[i].get("emotion", "—")
+                vocal_tech = lyrics_sections[i].get("vocal_technique")
+                section_emotion = lyrics_sections[i].get("emotion")
 
             section_info = f"  {i + 1}. {section_name} ({line_count} строк)"
-            if vocal_tech != "—":
+            if vocal_tech and vocal_tech != "adaptive":
                 section_info += f" | Vocal: {vocal_tech}"
-            if section_emotion != "—":
+            if section_emotion and section_emotion != "neutral":
                 section_info += f" | Emotion: {section_emotion}"
 
             lines.append(section_info)
@@ -282,12 +335,51 @@ def build_tone_bpm_text(analysis_result):
         if isinstance(analysis_result.get("style"), dict)
         else {}
     )
-    bpm_val = analysis_result.get("bpm", "—")
+    rde = (
+        analysis_result.get("rde", {})
+        if isinstance(analysis_result.get("rde"), dict)
+        else {}
+    )
+    bpm_val = analysis_result.get("bpm", "auto")
     key_root = tone.get("key_root") or style.get("key_root") or None
     key_mode = tone.get("key_mode") or style.get("mode") or None
-    key_full = tone.get("key_full") or style.get("key") or None
-    color_sig = tone.get("color_signature") or style.get("color") or None
-    resonance = tone.get("resonance_hz", "—")
+    key_full = tone.get("key_full") or style.get("key") or analysis_result.get("key") or None
+    
+    # Fix Color signature: try color_wave, color_signature, or color_temperature
+    color_wave = analysis_result.get("color_wave", [])
+    if isinstance(color_wave, list) and color_wave:
+        color_sig = ", ".join(color_wave)
+    else:
+        color_sig = (
+            style.get("color_signature")
+            or style.get("color_temperature")
+            or tone.get("color_signature")
+            or style.get("color")
+            or None
+        )
+    
+    # Fix Resonance Hz: try rde.resonance_hz, or compute from key
+    resonance = rde.get("resonance_hz") or tone.get("resonance_hz")
+    if not resonance:
+        # Compute from key if available
+        key_str = str(key_full or "").upper() if key_full else ""
+        if key_str:
+            # Extract key root (first letter)
+            key_root_char = key_str.split()[0] if key_str else ""
+            # Base frequencies for common keys
+            key_freq_map = {
+                "C": 130.81, "C#": 138.59, "D": 146.83, "D#": 155.56,
+                "E": 164.81, "F": 174.61, "F#": 185.00, "G": 196.00,
+                "G#": 207.65, "A": 220.00, "A#": 233.08, "B": 246.94,
+            }
+            base_freq = key_freq_map.get(key_root_char, 130.81)
+            # Minor keys typically ~10Hz lower
+            if "minor" in key_str.lower():
+                base_freq -= 10.0
+            resonance = round(base_freq, 2)
+        else:
+            resonance = "auto"
+    
     safe_octaves = (
         tone.get("safe_octaves", [])
         if isinstance(tone.get("safe_octaves"), list)
@@ -301,9 +393,9 @@ def build_tone_bpm_text(analysis_result):
             f"  Mode: {key_mode or 'auto'}",
             f"  Key full: {key_full or 'auto'}",
             "",
-            f"  Color signature: {color_sig or 'n/a'}",
+            f"  Color signature: {color_sig or 'adaptive'}",
             f"  Resonance Hz   : {resonance}",
-            f"  Safe octaves   : {safe_octaves or 'n/a'}",
+            f"  Safe octaves   : {safe_octaves if safe_octaves else 'auto'}",
         ]
     )
 
@@ -329,8 +421,41 @@ def build_genre_vocal_text(analysis_result):
         else {}
     )
     primary = genre.get("primary") or style.get("genre") or None
-    secondary = genre.get("secondary") or None
+    secondary = genre.get("secondary") or style.get("secondary") or None
     hybrid = genre.get("hybrid") or None
+    
+    # Infer Secondary/Hybrid from Primary if empty
+    if primary and not secondary:
+        primary_lower = str(primary).lower()
+        # Genre inference map
+        genre_inference = {
+            "cinematic": "Ambient / Orchestral",
+            "lyrical": "Folk / Acoustic",
+            "electronic": "Synth / Ambient",
+            "rock": "Alternative / Indie",
+            "folk": "Acoustic / Traditional",
+            "jazz": "Smooth / Bossa",
+            "blues": "Soul / R&B",
+            "pop": "Indie / Alternative",
+            "metal": "Progressive / Hard",
+            "hip-hop": "Trap / R&B",
+            "country": "Folk / Americana",
+            "classical": "Orchestral / Chamber",
+        }
+        for key, value in genre_inference.items():
+            if key in primary_lower:
+                secondary = value
+                break
+        # If still empty, try to extract from hybrid genre name
+        if not secondary and "hybrid" in primary_lower:
+            parts = primary_lower.replace(" hybrid", "").split()
+            if len(parts) >= 2:
+                secondary = parts[1].capitalize()
+    
+    # If hybrid is empty but primary contains "hybrid", extract it
+    if primary and not hybrid and "hybrid" in str(primary).lower():
+        hybrid = primary
+    
     gender = (
         vocal.get("gender")
         or analysis_result.get("final_gender_preference")
@@ -349,40 +474,106 @@ def build_genre_vocal_text(analysis_result):
         techniques_info = "\n\nVocal Techniques by Section:"
         for idx, tech in enumerate(section_techniques):
             techniques_info += f"\n  Section {idx + 1}: {tech}"
+    
+    # Build output - don't show "—" for empty fields, show inferred or skip
+    genre_lines = ["Genre Fusion:", f"  Primary  : {primary or 'adaptive'}"]
+    if secondary:
+        genre_lines.append(f"  Secondary: {secondary}")
+    if hybrid:
+        genre_lines.append(f"  Hybrid   : {hybrid}")
+    genre_lines.append("")
+    
     return (
         "\n".join(
-            [
-                "Genre Fusion:",
-                f"  Primary  : {primary or '—'}",
-                f"  Secondary: {secondary or '—'}",
-                f"  Hybrid   : {hybrid or '—'}",
-                "",
+            genre_lines
+            + [
                 "Vocal Profile:",
                 f"  Gender : {gender or 'auto'}",
                 f"  Form   : {form or 'adaptive'}",
-                f"  Texture: {texture or '—'}",
+                f"  Texture: {texture or 'dynamic'}",
             ]
         )
         + techniques_info
     )
 
 
-def build_breath_map_text(analysis_result):
+def build_breath_map_text(analysis_result, text=None):
     """Task 11.1: Safely build breath map text with defaults for missing fields."""
     if not isinstance(analysis_result, dict):
         return "Breathing / ZeroPulse map: No data available"
 
+    # Try to get breathing data from multiple locations
+    breathing = analysis_result.get("breathing") or {}
+    zeropulse = analysis_result.get("zeropulse") or {}
     diagnostics = analysis_result.get("diagnostics", {}) or {}
-    breath = diagnostics.get("breathing") or diagnostics.get("zero_pulse") or {}
-    if not breath:
-        return "Breathing / ZeroPulse map не предоставлен ядром."
-    lines = ["Breathing / ZeroPulse map:"]
-    try:
-        for k, v in breath.items():
-            lines.append(f"  {k}: {v}")
-    except (AttributeError, TypeError):
-        return "Breathing / ZeroPulse map: Invalid data format"
-    return "\n".join(lines)
+    breath = (
+        breathing
+        or zeropulse
+        or diagnostics.get("breathing")
+        or diagnostics.get("zero_pulse")
+        or {}
+    )
+    
+    if breath and isinstance(breath, dict):
+        lines = ["Breathing / ZeroPulse map:"]
+        try:
+            for k, v in breath.items():
+                lines.append(f"  {k}: {v}")
+            return "\n".join(lines)
+        except (AttributeError, TypeError):
+            pass
+    
+    # If no breathing data, generate ASCII visualization from text structure
+    if text:
+        return _generate_breathing_ascii(text)
+    
+    # Try to extract text from annotated_text_ui or annotated_text_suno
+    text_source = (
+        analysis_result.get("annotated_text_ui")
+        or analysis_result.get("annotated_text_suno")
+        or ""
+    )
+    if text_source:
+        # Extract original text (remove annotations)
+        import re
+        # Remove annotation markers like [INTRO - mood: ...]
+        clean_text = re.sub(r'\[.*?\]', '', text_source)
+        # Remove BPM/key markers
+        clean_text = re.sub(r'\[\d+\s+BPM.*?\]', '', clean_text)
+        if clean_text.strip():
+            return _generate_breathing_ascii(clean_text)
+    
+    return "Breathing / ZeroPulse map: No data available"
+
+
+def _generate_breathing_ascii(text):
+    """
+    Generate ASCII visualization of breathing pattern from text structure.
+    Short lines = (..) (inhale), Long lines = [=====] (exhale).
+    """
+    if not text:
+        return "Breathing / ZeroPulse map: No text available"
+    
+    lines = text.split('\n')
+    breathing_lines = ["Breathing / ZeroPulse map (ASCII visualization):", ""]
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        line_length = len(line)
+        # Short lines (<= 30 chars) = inhale (..)
+        # Long lines (> 30 chars) = exhale [=====]
+        if line_length <= 30:
+            breathing_lines.append(f"(..) {line[:50]}")
+        else:
+            # Create visual bar proportional to line length
+            bar_length = min(20, line_length // 3)
+            bar = "=" * bar_length
+            breathing_lines.append(f"[{bar}] {line[:50]}")
+    
+    return "\n".join(breathing_lines)
 
 
 def run_full_analysis(text, gender):
@@ -429,7 +620,7 @@ def run_full_analysis(text, gender):
             "",
             genre_vocal,
             "",
-            build_breath_map_text(analysis_result),
+            build_breath_map_text(analysis_result, text=text),
         ]
     )
     return (

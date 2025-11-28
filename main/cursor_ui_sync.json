@@ -1,0 +1,22 @@
+{
+    "version": "1.0",
+    "goal": "Fix UI data mapping for Pulse Timeline",
+    "target": "app.py",
+    "issues": [
+      {
+        "field": "Color signature",
+        "problem": "Displays 'n/a' but JSON has 'style.color_wave' or 'style.color_temperature'",
+        "fix": "Read from result['style']['color_wave'] or result['style']['color_temperature']"
+      },
+      {
+        "field": "Genre Fusion",
+        "problem": "Secondary/Hybrid are empty dashes",
+        "fix": "If empty, fill with plausible related sub-genres based on Primary genre (e.g., 'Cinematic' -> 'Ambient / Orchestral')"
+      },
+      {
+        "field": "ZeroPulse",
+        "problem": "Displays 'not provided'",
+        "fix": "If 'breathing' data is missing, generate a visual ASCII representation of the text rhythm (using line lengths) directly in the UI function."
+      }
+    ]
+  }

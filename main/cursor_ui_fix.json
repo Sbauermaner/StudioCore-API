@@ -1,0 +1,16 @@
+{
+    "version": "1.0",
+    "goal": "Fix empty Style/Lyrics prompt boxes in UI",
+    "target": "app.py",
+    "diagnosis": "The backend produces 'annotated_text_suno' and style data, but app.py is likely failing to format or return these specific values to the Gradio components 'style_output' and 'lyrics_output'.",
+    "tasks": [
+      {
+        "action": "Inspect the 'analyze_wrapper' or equivalent callback function in app.py",
+        "check": "Ensure it constructs a string for 'Style Prompt' (using genre, mood, bpm) and extracts 'annotated_text_suno' for 'Lyrics Prompt'."
+      },
+      {
+        "action": "Update the return statement",
+        "check": "Make sure the function returns values for ALL output components defined in the btn.click() event."
+      }
+    ]
+  }

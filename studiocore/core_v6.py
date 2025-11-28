@@ -83,6 +83,14 @@ class StudioCoreV6:
                         # Обновляем жанр в style, если он был уточнен
                         style["genre"] = resolved_genre
                         style["genre_source"] = "hybrid_genre_engine"
+                        
+                        # Try to extract secondary genre from hybrid genre name
+                        if not style.get("secondary") and "hybrid" in resolved_genre.lower():
+                            genre_parts = resolved_genre.lower().replace(" hybrid", "").split()
+                            if len(genre_parts) >= 2:
+                                style["secondary"] = genre_parts[1]
+                                log.debug(f"Extracted secondary genre from hybrid: {style['secondary']}")
+                        
                         result["style"] = style
                 except (AttributeError, TypeError, ValueError) as e:
                     # Логируем ошибку, но не прерываем выполнение
