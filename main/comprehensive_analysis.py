@@ -196,10 +196,13 @@ class ComprehensiveAnalyzer:
 
     def find_state_variables(self, tree: ast.AST, file_path: str, lines: List[str]):
         """Findet State-Variablen (Module-Level)."""
+        # Build parent map using NodeVisitor before checking nodes
+        parent_map = self._build_parent_map(tree)
+        
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
                 # Prüfe ob es Module-Level ist (nicht in Funktion/Klasse)
-                if not self._is_inside_function_or_class(node):
+                if not self._is_inside_function_or_class(node, parent_map):
                     for target in node.targets:
                         if isinstance(target, ast.Name):
                             self.state_variables[file_path].append(
@@ -209,13 +212,43 @@ class ComprehensiveAnalyzer:
                                 )
                             )
 
-    def _is_inside_function_or_class(self, node: ast.AST) -> bool:
-        """Prüft ob Node innerhalb einer Funktion oder Klasse ist."""
-        parent = getattr(node, "parent", None)
-        while parent:
-            if isinstance(parent, (ast.FunctionDef, ast.ClassDef)):
+    def _build_parent_map(self, tree: ast.AST) -> Dict[ast.AST, ast.AST]:
+        """
+        Builds a mapping of AST nodes to their parent nodes.
+        Uses NodeVisitor to traverse the tree and track parent relationships.
+        """
+        parent_map: Dict[ast.AST, ast.AST] = {}
+
+        class ParentVisitor(ast.NodeVisitor):
+            def __init__(self, parent_map_ref):
+                self.parent_map = parent_map_ref
+                self.parent_stack: List[ast.AST] = []
+
+            def visit(self, node: ast.AST):
+                # Set parent for current node if we have a parent in stack
+                if self.parent_stack:
+                    self.parent_map[node] = self.parent_stack[-1]
+                
+                # Push current node to stack and visit children
+                self.parent_stack.append(node)
+                self.generic_visit(node)
+                # Pop after visiting children
+                self.parent_stack.pop()
+
+        visitor = ParentVisitor(parent_map)
+        visitor.visit(tree)
+        return parent_map
+
+    def _is_inside_function_or_class(self, node: ast.AST, parent_map: Dict[ast.AST, ast.AST]) -> bool:
+        """
+        Prüft ob Node innerhalb einer Funktion oder Klasse ist.
+        Uses the parent_map built by _build_parent_map to traverse up the tree.
+        """
+        current = node
+        while current in parent_map:
+            current = parent_map[current]
+            if isinstance(current, (ast.FunctionDef, ast.ClassDef)):
                 return True
-            parent = getattr(parent, "parent", None)
         return False
 
     def analyze_imports(self):

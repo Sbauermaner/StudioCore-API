@@ -8,6 +8,7 @@ StudioCore V6 - Adapter wrapper around monolith with v6 features
 """
 
 from __future__ import annotations
+import logging
 import sys
 from typing import Any, Dict, Optional
 
@@ -34,7 +35,7 @@ class StudioCoreV6:
         try:
             # Try to get core via loader (prefers v6, falls back to monolith)
             self._core = get_core(prefer_v6=False)
-        except Exception:
+        except (ImportError, RuntimeError, AttributeError):
             # Fallback to monolith directly
             self._core = MonolithStudioCore(config_path)
 
@@ -83,9 +84,8 @@ class StudioCoreV6:
                         style["genre"] = resolved_genre
                         style["genre_source"] = "hybrid_genre_engine"
                         result["style"] = style
-                except Exception as e:
+                except (AttributeError, TypeError, ValueError) as e:
                     # Логируем ошибку, но не прерываем выполнение
-                    import logging
                     log = logging.getLogger(__name__)
                     log.warning(f"HybridGenreEngine.resolve() failed: {e}")
         

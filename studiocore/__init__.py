@@ -221,7 +221,10 @@ def get_core(*, prefer_v6: bool | None = None, **kwargs: Any) -> Any:
     errors: List[str] = []
     for loader_key in _requested_loader_order(prefer_v6):
         meta = LOADER_GRAPH.get(loader_key)
-        loader_cls = meta.get("loader") if meta else None
+        # Guard clause: skip if meta is None or missing
+        if not meta:
+            continue
+        loader_cls = meta.get("loader")
         if not loader_cls:
             continue
         attempts.append(loader_key)
@@ -239,7 +242,9 @@ def get_core(*, prefer_v6: bool | None = None, **kwargs: Any) -> Any:
             _update_diagnostics(active=loader_key, attempted=attempts, errors=errors)
             return instance
         except Exception as exc:  # pragma: no cover - defensive guard
-            message = f"{meta['name']} failed: {exc}"
+            # Safe access to meta['name'] - we already checked meta is not None
+            loader_name = meta.get("name", loader_key)
+            message = f"{loader_name} failed: {exc}"
             _LOGGER.warning(message)
             errors.append(message)
 

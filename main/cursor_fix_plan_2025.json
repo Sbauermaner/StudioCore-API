@@ -1,0 +1,39 @@
+{
+    "version": "1.0",
+    "goal": "Fix identified issues from 2025 Audit Reports",
+    "phases": [
+      {
+        "id": "phase_1_critical",
+        "target": "studiocore/symbiosis_audit.py",
+        "priority": "HIGH",
+        "tasks": [
+          "Fix relative path resolution (use pathlib.Path(__file__).parent)",
+          "Fix broken path string with spaces ('studiocore / engines')",
+          "Fix naive string replacement in check_imports()"
+        ]
+      },
+      {
+        "id": "phase_2_logic_main",
+        "target": ["main/comprehensive_analysis.py", "main/deep_scan_audit.py"],
+        "priority": "MEDIUM",
+        "tasks": [
+          "Fix AST parent attribute error in comprehensive_analysis.py using NodeVisitor",
+          "Implement actual scope checking in deep_scan_audit.py"
+        ]
+      },
+      {
+        "id": "phase_3_robustness",
+        "target": ["studiocore/__init__.py", "studiocore/core_v6.py"],
+        "priority": "LOW",
+        "tasks": [
+          "Add None checks for 'meta' dictionary in __init__.py",
+          "Narrow down broad 'except Exception' clauses",
+          "Move imports out of try/except blocks where possible"
+        ]
+      }
+    ],
+    "reference_files": [
+      "AUDIT_MAIN_FILES.md",
+      "AUDIT_STUDIOCORE_DETAILED.md"
+    ]
+  }

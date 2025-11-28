@@ -29,7 +29,8 @@ class SymbiosisAudit:
     def __init__(self):
         self.report = []
         self.errors = []
-        self.root = Path("studiocore")
+        # Use absolute path to studiocore folder (parent of this file)
+        self.root = Path(__file__).parent.resolve()
 
     # =====================================
     # UTILS
@@ -47,16 +48,19 @@ class SymbiosisAudit:
     # =====================================
 
     def check_structure(self):
+        # Check directories relative to self.root (studiocore folder)
+        # Note: 'tests' is expected to be in the project root, not in studiocore
+        project_root = self.root.parent
         required_dirs = [
-            "studiocore",
-            "studiocore / engines",
-            "tests",
+            (self.root, "studiocore"),
+            (self.root / "engines", "studiocore/engines"),  # Fixed: removed spaces
+            (project_root / "tests", "tests"),  # tests is in project root
         ]
-        for d in required_dirs:
-            if not Path(d).exists():
-                self.err(f"Missing directory: {d}")
+        for dir_path, display_name in required_dirs:
+            if not dir_path.exists():
+                self.err(f"Missing directory: {display_name}")
             else:
-                self.log(f"[OK] Directory exists: {d}")
+                self.log(f"[OK] Directory exists: {display_name}")
 
     # =====================================
     # CHECK PYTHON FILES
@@ -74,8 +78,34 @@ class SymbiosisAudit:
     # =====================================
 
     def check_imports(self):
+        """
+        Check imports using proper pathlib-based module resolution.
+        Finds 'studiocore' in path.parts and constructs module name from there.
+        """
         for path in self.root.rglob("*.py"):
-            module = str(path).replace("/", ".").replace(".py", "")
+            # Skip __pycache__ directories
+            if "__pycache__" in path.parts:
+                continue
+            
+            # Convert Path to absolute for reliable parts extraction
+            abs_path = path.resolve()
+            parts = list(abs_path.parts)
+            
+            # Find 'studiocore' in the path parts
+            try:
+                studiocore_idx = parts.index("studiocore")
+                # Get all parts from 'studiocore' onwards, excluding .py extension
+                module_parts = parts[studiocore_idx:]
+                # Remove .py extension from last part
+                if module_parts[-1].endswith(".py"):
+                    module_parts[-1] = module_parts[-1][:-3]
+                # Join with dots to create module name
+                module = ".".join(module_parts)
+            except ValueError:
+                # 'studiocore' not found in path, skip this file
+                self.err(f"Cannot resolve module path for: {path}")
+                continue
+            
             try:
                 importlib.import_module(module)
                 self.log(f"[IMPORT OK] {module}")
