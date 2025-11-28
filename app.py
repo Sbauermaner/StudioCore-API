@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 StudioCore IMMORTAL v7 — Premium UI v3 (Impulse Analysis Panel)
+
+Gradio-based web interface for StudioCore text analysis engine.
+Provides interactive UI for analyzing lyrics and generating style prompts.
+
 Автор: Сергей Бауэр (@Sbauermaner)
 """
 
 import json
+import logging
 import traceback
 import gradio as gr
 
@@ -24,16 +29,44 @@ def _safe_get(d, path, default=None):
     return cur
 
 
-def extract_main_outputs(result):
+def extract_main_outputs(analysis_result):
     """Task 11.1: Safely extract main outputs with defaults for missing optional fields."""
-    if not isinstance(result, dict):
+    if not isinstance(analysis_result, dict):
         return "", "", "", "", "{}"
-    
+
     # Task 11.1: Safe extraction with defaults
-    fanf = result.get("fanf", {}) if isinstance(result.get("fanf"), dict) else {}
-    style_prompt = fanf.get("style_prompt") or result.get("style_prompt") or ""
-    lyrics_prompt = fanf.get("lyrics_prompt") or result.get("lyrics_prompt") or ""
-    ui_text = fanf.get("ui_text") or result.get("annotated_text") or result.get("annotated_text_ui") or ""
+    fanf = (
+        analysis_result.get("fanf", {})
+        if isinstance(analysis_result.get("fanf"), dict)
+        else {}
+    )
+
+    # Try multiple possible locations for style_prompt
+    style_prompt = (
+        fanf.get("style_prompt")
+        or fanf.get("suno_style_prompt")
+        or analysis_result.get("style_prompt")
+        or analysis_result.get("suno_style_prompt")
+        or analysis_result.get("fanf", {}).get("suno_style_prompt", "")
+        or ""
+    )
+
+    # Try multiple possible locations for lyrics_prompt
+    lyrics_prompt = (
+        fanf.get("lyrics_prompt")
+        or fanf.get("suno_lyrics_prompt")
+        or analysis_result.get("lyrics_prompt")
+        or analysis_result.get("suno_lyrics_prompt")
+        or analysis_result.get("fanf", {}).get("suno_lyrics_prompt", "")
+        or ""
+    )
+
+    ui_text = (
+        fanf.get("ui_text")
+        or analysis_result.get("annotated_text")
+        or analysis_result.get("annotated_text_ui")
+        or ""
+    )
     fanf_text = (
         fanf.get("full")
         or fanf.get("summary")
@@ -42,14 +75,19 @@ def extract_main_outputs(result):
         or ""
     )
     try:
-        summary_json = json.dumps(result, ensure_ascii=False, indent=2)
-    except Exception:
-        summary_json = str(result) if result else "{}"
+        summary_json = json.dumps(analysis_result, ensure_ascii=False, indent=2)
+    except (TypeError, ValueError) as e:
+        # Log the error but continue with fallback
+        summary_json = str(analysis_result) if analysis_result else "{}"
+        logging.getLogger(__name__).warning(
+            "Failed to serialize result to JSON: %s", e
+        )
     return style_prompt, lyrics_prompt, ui_text, fanf_text, summary_json
 
 
-def build_core_pulse_timeline(result):
-    diagnostics = result.get("diagnostics", {}) or {}
+def build_core_pulse_timeline(analysis_result):
+    """Build HTML timeline visualization for core pulse stages."""
+    diagnostics = analysis_result.get("diagnostics", {}) or {}
     engines = (
         diagnostics.get("engines", {})
         if isinstance(diagnostics.get("engines"), dict)
@@ -109,55 +147,72 @@ def build_core_pulse_timeline(result):
     return "\n".join(html)
 
 
-def build_tlp_pulse_text(result):
+def build_tlp_pulse_text(analysis_result):
     """Task 11.1: Safely build TLP pulse text with defaults for missing fields."""
-    if not isinstance(result, dict):
+    if not isinstance(analysis_result, dict):
         return "TLP Pulse: No data available"
-    
-    tlp = result.get("tlp", {}) if isinstance(result.get("tlp"), dict) else {}
+
+    tlp = (
+        analysis_result.get("tlp", {})
+        if isinstance(analysis_result.get("tlp"), dict)
+        else {}
+    )
     truth = tlp.get("truth", 0.0)
     love = tlp.get("love", 0.0)
     pain = tlp.get("pain", 0.0)
     cf = tlp.get("conscious_frequency", tlp.get("cf", 0.0))
 
-    def bar(v):
-        v = max(0.0, min(1.0, float(v)))
-        item = int(v * 20)
+    def create_bar_visualization(value):
+        """Create a visual bar representation of a value (0.0 to 1.0)."""
+        value = max(0.0, min(1.0, float(value)))
+        item = int(value * 20)
         return "█" * item + "·" * (20 - item)
 
     return "\n".join(
         [
-            f"Truth: {truth:.2f} |{bar(truth)}|",
-            f"Love : {love:.2f} |{bar(love)}|",
-            f"Pain : {pain:.2f} |{bar(pain)}|",
+            f"Truth: {truth:.2f} |{create_bar_visualization(truth)}|",
+            f"Love : {love:.2f} |{create_bar_visualization(love)}|",
+            f"Pain : {pain:.2f} |{create_bar_visualization(pain)}|",
             "",
             f"Conscious Frequency (CF): {cf:.3f}",
         ]
     )
 
 
-def build_rde_section_text(result):
+def build_rde_section_text(analysis_result):
     """Task 11.1: Safely build RDE section text with defaults for missing fields."""
-    if not isinstance(result, dict):
+    if not isinstance(analysis_result, dict):
         return "RDE / Sections: No data available"
-    
-    rde = result.get("rde", {}) if isinstance(result.get("rde"), dict) else {}
+
+    rde = (
+        analysis_result.get("rde", {})
+        if isinstance(analysis_result.get("rde"), dict)
+        else {}
+    )
     rhythm = rde.get("rhythm", rde.get("resonance", "—"))
     dynamics = rde.get("dynamics", rde.get("fracture", "—"))
     emotion = rde.get("emotion", rde.get("entropy", "—"))
     structure = (
-        result.get("structure", {}) if isinstance(result.get("structure"), dict) else {}
+        analysis_result.get("structure", {})
+        if isinstance(analysis_result.get("structure"), dict)
+        else {}
     )
     section_list = structure.get("sections") or []
     headers = structure.get("headers") or []
 
     # Task 11.1: Safe extraction of fanf and lyrics_sections with defaults
-    fanf = result.get("fanf", {}) if isinstance(result.get("fanf"), dict) else {}
+    fanf = (
+        analysis_result.get("fanf", {})
+        if isinstance(analysis_result.get("fanf"), dict)
+        else {}
+    )
     lyrics_sections = fanf.get("lyrics_sections") or []
     if not lyrics_sections:
         # Пытаемся получить из другого места
         lyrics_data = (
-            result.get("lyrics", {}) if isinstance(result.get("lyrics"), dict) else {}
+            analysis_result.get("lyrics", {})
+            if isinstance(analysis_result.get("lyrics"), dict)
+            else {}
         )
         lyrics_sections = lyrics_data.get("sections", [])
 
@@ -212,20 +267,32 @@ def build_rde_section_text(result):
     return "\n".join(lines)
 
 
-def build_tone_bpm_text(result):
+def build_tone_bpm_text(analysis_result):
     """Task 11.1: Safely build tone/bpm text with defaults for missing fields."""
-    if not isinstance(result, dict):
+    if not isinstance(analysis_result, dict):
         return "Tone / Key / BPM: No data available"
-    
-    tone = result.get("tone", {}) if isinstance(result.get("tone"), dict) else {}
-    style = result.get("style", {}) if isinstance(result.get("style"), dict) else {}
-    bpm_val = result.get("bpm", "—")
+
+    tone = (
+        analysis_result.get("tone", {})
+        if isinstance(analysis_result.get("tone"), dict)
+        else {}
+    )
+    style = (
+        analysis_result.get("style", {})
+        if isinstance(analysis_result.get("style"), dict)
+        else {}
+    )
+    bpm_val = analysis_result.get("bpm", "—")
     key_root = tone.get("key_root") or style.get("key_root") or None
     key_mode = tone.get("key_mode") or style.get("mode") or None
     key_full = tone.get("key_full") or style.get("key") or None
     color_sig = tone.get("color_signature") or style.get("color") or None
     resonance = tone.get("resonance_hz", "—")
-    safe_octaves = tone.get("safe_octaves", []) if isinstance(tone.get("safe_octaves"), list) else []
+    safe_octaves = (
+        tone.get("safe_octaves", [])
+        if isinstance(tone.get("safe_octaves"), list)
+        else []
+    )
     return "\n".join(
         [
             "Tone / Key / BPM:",
@@ -241,22 +308,42 @@ def build_tone_bpm_text(result):
     )
 
 
-def build_genre_vocal_text(result):
+def build_genre_vocal_text(analysis_result):
     """Task 11.1: Safely build genre/vocal text with defaults for missing fields."""
-    if not isinstance(result, dict):
+    if not isinstance(analysis_result, dict):
         return "Genre Fusion / Vocal Profile: No data available"
-    
-    genre = result.get("genre", {}) if isinstance(result.get("genre"), dict) else {}
-    style = result.get("style", {}) if isinstance(result.get("style"), dict) else {}
-    vocal = result.get("vocal", {}) if isinstance(result.get("vocal"), dict) else {}
+
+    genre = (
+        analysis_result.get("genre", {})
+        if isinstance(analysis_result.get("genre"), dict)
+        else {}
+    )
+    style = (
+        analysis_result.get("style", {})
+        if isinstance(analysis_result.get("style"), dict)
+        else {}
+    )
+    vocal = (
+        analysis_result.get("vocal", {})
+        if isinstance(analysis_result.get("vocal"), dict)
+        else {}
+    )
     primary = genre.get("primary") or style.get("genre") or None
     secondary = genre.get("secondary") or None
     hybrid = genre.get("hybrid") or None
-    gender = vocal.get("gender") or result.get("final_gender_preference") or None
+    gender = (
+        vocal.get("gender")
+        or analysis_result.get("final_gender_preference")
+        or None
+    )
     form = vocal.get("form") or style.get("vocal_form") or None
     texture = vocal.get("texture") or None
     # Task 11.1: Safe extraction of section_techniques with default
-    section_techniques = vocal.get("section_techniques", []) if isinstance(vocal.get("section_techniques"), list) else []
+    section_techniques = (
+        vocal.get("section_techniques", [])
+        if isinstance(vocal.get("section_techniques"), list)
+        else []
+    )
     techniques_info = ""
     if section_techniques:
         techniques_info = "\n\nVocal Techniques by Section:"
@@ -280,12 +367,12 @@ def build_genre_vocal_text(result):
     )
 
 
-def build_breath_map_text(result):
+def build_breath_map_text(analysis_result):
     """Task 11.1: Safely build breath map text with defaults for missing fields."""
-    if not isinstance(result, dict):
+    if not isinstance(analysis_result, dict):
         return "Breathing / ZeroPulse map: No data available"
-    
-    diagnostics = result.get("diagnostics", {}) or {}
+
+    diagnostics = analysis_result.get("diagnostics", {}) or {}
     breath = diagnostics.get("breathing") or diagnostics.get("zero_pulse") or {}
     if not breath:
         return "Breathing / ZeroPulse map не предоставлен ядром."
@@ -299,6 +386,16 @@ def build_breath_map_text(result):
 
 
 def run_full_analysis(text, gender):
+    """
+    Run full analysis on input text and return formatted results.
+
+    Args:
+        text: Input text to analyze
+        gender: Preferred gender for vocal analysis
+
+    Returns:
+        Tuple of formatted output strings for UI display
+    """
     if not text.strip():
         msg = "⚠️ Введите текст."
         return (
@@ -312,56 +409,131 @@ def run_full_analysis(text, gender):
             "",
         )
     try:
-        result = engine.analyze(
+        analysis_result = engine.analyze(
             text=text,
             preferred_gender=gender if gender != "auto" else None,
         )
-    except Exception as e:
+    except (AttributeError, TypeError, ValueError, RuntimeError) as e:
         tb = traceback.format_exc()
         err = f"<div style='color:#ff5555'>Exception: {e}</div>"
         return ("", "", "", "", err, tb, "", "")
-    style_p, lyrics_p, ui_t, fanf_t, summary_json = extract_main_outputs(result)
-    pulse_html = build_core_pulse_timeline(result)
-    tlp_pulse = build_tlp_pulse_text(result)
-    rde_section = build_rde_section_text(result)
-    tone_bpm = build_tone_bpm_text(result)
-    genre_vocal = build_genre_vocal_text(result)
-    lower_panel = "\n\n".join(
-        [tone_bpm, "", genre_vocal, "", build_breath_map_text(result)]
+    style_p, lyrics_p, ui_t, fanf_t, _ = extract_main_outputs(analysis_result)
+    pulse_html_output = build_core_pulse_timeline(analysis_result)
+    tlp_pulse = build_tlp_pulse_text(analysis_result)
+    rde_section = build_rde_section_text(analysis_result)
+    tone_bpm = build_tone_bpm_text(analysis_result)
+    genre_vocal = build_genre_vocal_text(analysis_result)
+    lower_panel_output = "\n\n".join(
+        [
+            tone_bpm,
+            "",
+            genre_vocal,
+            "",
+            build_breath_map_text(analysis_result),
+        ]
     )
     return (
         style_p,
         lyrics_p,
         ui_t,
         fanf_t,
-        pulse_html,
+        pulse_html_output,
         tlp_pulse,
         rde_section,
-        lower_panel,
+        lower_panel_output,
     )
 
 
 def run_raw_diagnostics(text):
+    """Run raw diagnostics analysis and return full result as JSON."""
     if not text.strip():
         return {"error": "Пустой ввод."}
     try:
-        result = engine.analyze(text=text, preferred_gender=None)
-        return result if isinstance(result, dict) else {"raw_result": str(result)}
-    except Exception as e:
+        analysis_result = engine.analyze(text=text, preferred_gender=None)
+        return (
+            analysis_result
+            if isinstance(analysis_result, dict)
+            else {"raw_result": str(analysis_result)}
+        )
+    except (AttributeError, TypeError, ValueError, RuntimeError) as e:
         return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 def _build_theme_kwargs():
+    """
+    Build theme kwargs safely.
+    Some Gradio versions don't support theme parameter for gr.Blocks().
+    This function safely checks and only returns theme if supported.
+    """
     try:
+        # Check Gradio version
         version = gr.__version__
-        major = int(version.split(".")[0])
-        # Gradio 4.x и выше — поддерживают theme=
-        if major >= 4:
-            return {"theme": gr.themes.Soft()}
-        else:
+        version_parts = version.split(".")
+        major = int(version_parts[0])
+
+        # Theme support check: only for Gradio 4.0+
+        if major < 4:
             return {}
-    except Exception:
+
+        # Try to check if Blocks.__init__ accepts 'theme' parameter
+        import inspect  # pylint: disable=import-outside-toplevel
+        try:
+            blocks_init = gr.Blocks.__init__
+            sig = inspect.signature(blocks_init)
+
+            # Check if 'theme' is in the signature
+            if 'theme' not in sig.parameters:
+                # Theme parameter not supported in this Gradio version
+                return {}
+
+            # If we get here, theme is supported, try to create it
+            try:
+                theme_obj = gr.themes.Soft()
+                return {"theme": theme_obj}
+            except (AttributeError, TypeError):
+                # Themes module not available
+                return {}
+
+        except (AttributeError, TypeError, ValueError):
+            # Can't inspect signature, play it safe
+            return {}
+
+    except (AttributeError, TypeError, ValueError, ImportError):
+        # Any error: don't use theme
         return {}
+
+
+def _safe_textbox_kwargs(**kwargs):
+    """
+    Safely create Textbox kwargs, removing unsupported parameters.
+    This ensures compatibility with older Gradio versions that don't support certain features.
+    """
+    # Check if show_copy_button is requested
+    if kwargs.get('show_copy_button', False):
+        try:
+            # Try to check if Textbox.__init__ accepts 'show_copy_button'
+            import inspect  # pylint: disable=import-outside-toplevel
+            sig = inspect.signature(gr.Textbox.__init__)
+            if 'show_copy_button' not in sig.parameters:
+                # Remove show_copy_button if not supported
+                kwargs = {k: v for k, v in kwargs.items() if k != 'show_copy_button'}
+        except (AttributeError, TypeError, ValueError):
+            # Can't inspect, remove show_copy_button to be safe
+            kwargs = {k: v for k, v in kwargs.items() if k != 'show_copy_button'}
+
+    # Check if max_lines is requested
+    if 'max_lines' in kwargs:
+        try:
+            import inspect  # pylint: disable=import-outside-toplevel
+            sig = inspect.signature(gr.Textbox.__init__)
+            if 'max_lines' not in sig.parameters:
+                # Remove max_lines if not supported
+                kwargs = {k: v for k, v in kwargs.items() if k != 'max_lines'}
+        except (AttributeError, TypeError, ValueError):
+            # Can't inspect, remove max_lines to be safe
+            kwargs = {k: v for k, v in kwargs.items() if k != 'max_lines'}
+
+    return kwargs
 
 
 theme_kwargs = _build_theme_kwargs()
@@ -379,6 +551,7 @@ with gr.Blocks(
                 ["auto", "male", "female"], value="auto", label="Пол вокала"
             )
             analyze_btn = gr.Button("Анализировать", variant="primary")
+            clear_btn = gr.Button("Очистить", variant="secondary", size="sm")
             core_status_box = gr.Markdown("Готово к анализу.")
 
     gr.Markdown("## Core Pulse Timeline")
@@ -387,24 +560,74 @@ with gr.Blocks(
     gr.Markdown("## Основные результаты")
     with gr.Tab("Style / Lyrics"):
         with gr.Row():
-            style_out = gr.Textbox(label="Style Prompt", lines=8, show_copy_button=True)
+            style_out = gr.Textbox(
+                **_safe_textbox_kwargs(
+                    label="Style Prompt",
+                    lines=15,
+                    max_lines=50,
+                    show_copy_button=True,
+                    interactive=False,
+                )
+            )
             lyrics_out = gr.Textbox(
-                label="Lyrics Prompt", lines=12, show_copy_button=True
+                **_safe_textbox_kwargs(
+                    label="Lyrics Prompt",
+                    lines=15,
+                    max_lines=50,
+                    show_copy_button=True,
+                    interactive=False,
+                )
             )
 
     with gr.Tab("Annotated UI / FANF"):
         with gr.Row():
             ui_text_out = gr.Textbox(
-                label="Аннотированный текст", lines=14, show_copy_button=True
+                **_safe_textbox_kwargs(
+                    label="Аннотированный текст",
+                    lines=20,
+                    max_lines=100,
+                    show_copy_button=True,
+                    interactive=False,
+                )
             )
-            fanf_out = gr.Textbox(label="FANF", lines=14, show_copy_button=True)
+            fanf_out = gr.Textbox(
+                **_safe_textbox_kwargs(
+                    label="FANF",
+                    lines=20,
+                    max_lines=100,
+                    show_copy_button=True,
+                    interactive=False,
+                )
+            )
 
     with gr.Tab("Impulse Panels"):
         with gr.Row():
-            tlp_pulse_out = gr.Textbox(label="TLP Pulse", lines=8)
-            rde_section_out = gr.Textbox(label="RDE / Sections", lines=8)
+            tlp_pulse_out = gr.Textbox(
+                **_safe_textbox_kwargs(
+                    label="TLP Pulse",
+                    lines=12,
+                    max_lines=30,
+                    show_copy_button=True,
+                    interactive=False,
+                )
+            )
+            rde_section_out = gr.Textbox(
+                **_safe_textbox_kwargs(
+                    label="RDE / Sections",
+                    lines=12,
+                    max_lines=50,
+                    show_copy_button=True,
+                    interactive=False,
+                )
+            )
         lower_panel = gr.Textbox(
-            label="Tone / BPM / Genre / Vocal / Breathing", lines=12
+            **_safe_textbox_kwargs(
+                label="Tone / BPM / Genre / Vocal / Breathing",
+                lines=15,
+                max_lines=60,
+                show_copy_button=True,
+                interactive=False,
+            )
         )
 
     with gr.Tab("Diagnostics / JSON"):
@@ -428,6 +651,7 @@ with gr.Blocks(
             "Статус: готово.",
         )
 
+    # pylint: disable=no-member
     analyze_btn.click(
         fn=_on_analyze,
         inputs=[txt_input, gender_radio],
@@ -444,7 +668,14 @@ with gr.Blocks(
         ],
     )
 
-    diag_btn.click(fn=run_raw_diagnostics, inputs=[diag_input], outputs=[diag_json_out])
+    # pylint: disable=no-member
+    diag_btn.click(
+        fn=run_raw_diagnostics, inputs=[diag_input], outputs=[diag_json_out]
+    )
+
+    # Clear button functionality
+    # pylint: disable=no-member
+    clear_btn.click(fn=lambda: "", inputs=None, outputs=[txt_input])
 
 if __name__ == "__main__":
     import os
@@ -458,22 +689,23 @@ if __name__ == "__main__":
         print()
 
         try:
-            from studiocore.core_v6 import StudioCoreV6
-
+            # StudioCoreV6 already imported at top level, reuse it
             core = StudioCoreV6()
             print("✅ StudioCoreV6 initialized successfully")
             print()
 
             # Test analyze with sample text
-            test_text = "[Verse 1]\nTest lyrics for app test"
+            sample_input_text = "[Verse 1]\nTest lyrics for app test"
             print("Testing analyze() with sample text...")
-            result = core.analyze(test_text)
+            test_result = core.analyze(sample_input_text)
 
-            if isinstance(result, dict):
+            if isinstance(test_result, dict):
                 print("✅ analyze() returned valid dict")
-                print(f"   Keys: {list(result.keys())[:10]}...")
+                print(f"   Keys: {list(test_result.keys())[:10]}...")
             else:
-                print(f"⚠️  analyze() returned unexpected type: {type(result)}")
+                print(
+                    f"⚠️  analyze() returned unexpected type: {type(test_result)}"
+                )
 
             print()
             print("=" * 80)
@@ -481,13 +713,14 @@ if __name__ == "__main__":
             print("=" * 80)
             sys.exit(0)
 
-        except Exception as e:
+        except (AttributeError, TypeError, ValueError, RuntimeError) as e:
             print(f"❌ App test failed: {e}")
             traceback.print_exc()
             sys.exit(1)
 
     # Конфигурация для деплоя
-    server_port = int(os.getenv("PORT", 7860))
+    port_str = os.getenv("PORT", "7860")
+    server_port = int(port_str) if port_str.isdigit() else 7860
     server_name = os.getenv("SERVER_NAME", "0.0.0.0")
     share = os.getenv("GRADIO_SHARE", "False").lower() == "true"
 

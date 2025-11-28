@@ -242,7 +242,8 @@ def load_config_weights(path: str = "config_weights.json") -> dict:
     if not config_path.exists():
         # Return empty dict if file doesn't exist (fallback to hardcoded
         # values)
-        logger.warning(f"Config weights file not found: {path}, using hardcoded values")
+        # Use debug level since this is expected behavior - hardcoded values are the default
+        logger.debug(f"Config weights file not found: {path}, using hardcoded values")
         return {}
 
     try:

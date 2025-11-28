@@ -2,7 +2,17 @@
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
 # Hash: 22ae - df91 - bc11 - 6c7e
-# -*- coding: utf - 8 -*-
+# -*- coding: utf-8 -*-
+"""
+Text utilities for StudioCore: normalization, section extraction, and parsing.
+
+This module provides functions for:
+- Text normalization and typography cleanup
+- Section detection and parsing (Verse, Chorus, Bridge, etc.)
+- Command extraction from text blocks
+- Language detection
+- Translation hooks for multilingual support
+"""
 # StudioCore Signature Block (Do Not Remove)
 # Author: Сергей Бауэр (@Sbauermaner)
 # Fingerprint: StudioCore - FP - 2025 - SB - 9fd72e27
@@ -182,7 +192,8 @@ def _assign_section_names(sections: List[Dict[str, Any]]) -> None:
     """
     Автоматически присваивает имена секциям согласно структуре песни.
 
-    ВАЖНО: Не перезаписывает теги, которые уже установлены из маркеров (например, из круглых скобок).
+    ВАЖНО: Не перезаписывает теги, которые уже установлены из маркеров
+    (например, из круглых скобок).
 
     Структура:
     - Intro (Вступление): Музыкальная часть в начале
@@ -200,8 +211,10 @@ def _assign_section_names(sections: List[Dict[str, Any]]) -> None:
     - 4 секции: Intro, Verse, Chorus, Outro
     - 5 секций: Intro, Verse, Pre - Chorus, Chorus, Outro
     - 6 секций: Intro, Verse 1, Pre - Chorus, Chorus, Verse 2, Outro
-    - 7 секций: Verse 1, Chorus, Verse 2, Chorus, Bridge, Final Chorus, Outro (если нет явных маркеров)
-    - 8+ секций: Intro, Verse 1, Pre - Chorus, Chorus, Verse 2, Bridge, Chorus, Outro...
+    - 7 секций: Verse 1, Chorus, Verse 2, Chorus, Bridge, Final Chorus, Outro
+      (если нет явных маркеров)
+    - 8+ секций: Intro, Verse 1, Pre - Chorus, Chorus, Verse 2, Bridge,
+      Chorus, Outro...
     """
     if not sections:
         return
@@ -473,7 +486,8 @@ def _close_section(current: Dict[str, Any], sections: List[Dict[str, Any]]) -> N
     """
     Закрывает текущую секцию и добавляет её в список.
 
-    ВАЖНО: Сохраняет секцию даже если в ней только текст в скобках (например, "(Oh, that's just Brandon)").
+    ВАЖНО: Сохраняет секцию даже если в ней только текст в скобках
+    (например, "(Oh, that's just Brandon)").
     Секция сохраняется, если у неё есть тег (маркер) или есть содержимое.
 
     Args:
@@ -680,6 +694,15 @@ def extract_sections(text: str) -> List[Dict[str, Any]]:
 
 
 def flatten_sections_to_lines(sections: List[Dict[str, Any]]) -> List[str]:
+    """
+    Flatten sections into a flat list of lines.
+
+    Args:
+        sections: List of section dictionaries with 'lines' keys
+
+    Returns:
+        Flat list of all lines from all sections
+    """
     out: List[str] = []
     for s in sections:
         out.extend(s.get("lines", []))
@@ -764,7 +787,8 @@ def translate_text_for_analysis(text: str, language: str) -> Tuple[str, bool]:
     # 3. Концептуальный Fallback: Имитация успешного перевода (для выполнения
     # контракта)
     log.info(
-        "Simulating translation from '%s' to 'en' (multilingual enablement) to fulfill core analysis contract.",
+        "Simulating translation from '%s' to 'en' "
+        "(multilingual enablement) to fulfill core analysis contract.",
         language,
     )
     return text, True  # Возвращаем исходный текст, но с флагом True

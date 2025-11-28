@@ -85,19 +85,39 @@ class DeepScanAuditor:
             return False
 
     def check_integrity(self, content: str, file_path: Path) -> Optional[str]:
-        """Prüft auf undefined variables/functions."""
+        """
+        Prüft auf undefined variables/functions.
+        
+        NOTE: This is a SHALLOW CHECK ONLY. Full scope analysis would require
+        tracking scopes (function, class, global) and handling closures, which
+        is complex. For production use, consider using pylint or mypy.
+        
+        TODO: Implement full scope tracking for accurate undefined variable detection.
+        """
         issues = []
 
         try:
             tree = ast.parse(content, filename=str(file_path))
 
-            # Sammle alle definierten Namen
+            # Sammle alle definierten Namen (global scope)
             defined_names = set()
             imported_names = set()
+            # Track function-local names (for basic check)
+            function_local_names = {}  # function_name -> set of local names
 
+            # First pass: collect all definitions
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     defined_names.add(node.name)
+                    # Collect function parameters and local assignments
+                    local_names = set()
+                    local_names.update(arg.arg for arg in node.args.args)
+                    for child in ast.walk(node):
+                        if isinstance(child, ast.Assign):
+                            for target in child.targets:
+                                if isinstance(target, ast.Name):
+                                    local_names.add(target.id)
+                    function_local_names[node.name] = local_names
                 elif isinstance(node, ast.ClassDef):
                     defined_names.add(node.name)
                 elif isinstance(node, ast.Import):
@@ -108,16 +128,48 @@ class DeepScanAuditor:
                         imported_names.add(node.module.split(".")[0])
                     for alias in node.names:
                         imported_names.add(alias.name)
+                elif isinstance(node, ast.Assign):
+                    # Module-level assignments
+                    for target in node.targets:
+                        if isinstance(target, ast.Name):
+                            defined_names.add(target.id)
 
-            # Prüfe auf offensichtliche undefined calls (vereinfacht)
-            # In Produktion würde man einen vollständigen Scope-Tracker
-            # verwenden
+            # Second pass: check for undefined names (basic check)
+            # This only checks global scope, not function-local scopes
+            all_defined = defined_names | imported_names
+            # Add common builtins to avoid false positives
+            builtin_names = set(dir(__builtins__)) | {'self', 'cls', 'True', 'False', 'None'}
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                    name = node.id
+                    # Skip if it's a builtin or common Python names
+                    if name in builtin_names:
+                        continue
+                    # Skip if it's defined globally
+                    if name in all_defined:
+                        continue
+                    # Skip if it's likely a function parameter (would need scope tracking)
+                    # For now, we only flag obvious undefined names at module level
+                    # This is a limitation - full implementation requires scope tracking
+                    lineno = getattr(node, 'lineno', 0)
+                    if lineno > 0:
+                        # Only flag if it's not obviously a local variable
+                        # (This is a heuristic - not perfect)
+                        issues.append(f"Potential undefined name '{name}' at line {lineno} (shallow check)")
 
-        except Exception:
+        except SyntaxError:
+            # Syntax errors are caught by check_syntax, skip here
             pass
+        except Exception as e:
+            # Log but don't fail on integrity check errors
+            issues.append(f"Integrity check error: {e}")
 
         if issues:
-            return "; ".join(issues)
+            # Add warning that this is a shallow check
+            warning_msg = "SHALLOW CHECK ONLY - Full scope analysis not implemented. "
+            warning_msg += "Consider using pylint or mypy for accurate undefined variable detection."
+            return warning_msg + " Issues: " + "; ".join(issues[:5])  # Limit to first 5 issues
         return None
 
     def check_audit_fixes(self):

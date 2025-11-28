@@ -39,10 +39,12 @@ class TestIntegrationV7(unittest.TestCase):
         self.assertIsInstance(result1, dict)
 
         # Verify system components are preserved
+        # _hge is on StudioCoreV6 directly
         self.assertIsNotNone(self.core._hge, "_hge should be preserved")
-        self.assertIsNotNone(self.core._text_engine, "_text_engine should be preserved")
+        # Other engines are in _core (monolith)
+        self.assertIsNotNone(self.core._core.tlp, "tlp (text engine) should be preserved")
         self.assertIsNotNone(
-            self.core._emotion_engine, "_emotion_engine should be preserved"
+            self.core._core.emotion, "emotion engine should be preserved"
         )
 
         # Second call (critical test)
@@ -52,24 +54,24 @@ class TestIntegrationV7(unittest.TestCase):
         # Verify components are still intact
         self.assertIsNotNone(self.core._hge, "_hge should still be preserved")
         self.assertIsNotNone(
-            self.core._text_engine, "_text_engine should still be preserved"
+            self.core._core.tlp, "tlp (text engine) should still be preserved"
         )
 
     def test_engine_initialization(self):
         """Test that engines are initialized once in __init__."""
-        # Verify engines are initialized
-        self.assertIsNotNone(self.core._text_engine)
-        self.assertIsNotNone(self.core._emotion_engine)
-        self.assertIsNotNone(self.core._bpm_engine)
-        self.assertIsNotNone(self.core._section_parser)
+        # Verify engines are initialized in monolith (_core)
+        self.assertIsNotNone(self.core._core.tlp, "tlp (text engine) should be initialized")
+        self.assertIsNotNone(self.core._core.emotion, "emotion engine should be initialized")
+        self.assertIsNotNone(self.core._core.freq, "freq (bpm engine) should be initialized")
+        self.assertIsNotNone(self.core._core.rhythm, "rhythm (section parser) should be initialized")
 
         # Verify engines are reused (same object references)
-        engines1 = self.core._text_engine
+        tlp_engine1 = self.core._core.tlp
         self.core.analyze("Test")
-        engines2 = self.core._text_engine
+        tlp_engine2 = self.core._core.tlp
 
         self.assertIs(
-            engines1, engines2, "Engines should be reused, not re-instantiated"
+            tlp_engine1, tlp_engine2, "Engines should be reused, not re-instantiated"
         )
 
     def test_configuration_loading(self):
@@ -112,8 +114,10 @@ class TestIntegrationV7(unittest.TestCase):
             self.assertIn("style", result)
 
             # Verify state is preserved
+            # _hge is on StudioCoreV6 directly
             self.assertIsNotNone(self.core._hge)
-            self.assertIsNotNone(self.core._text_engine)
+            # Other engines are in _core (monolith)
+            self.assertIsNotNone(self.core._core.tlp)
 
     def test_genre_weights_structure(self):
         """Test that genre weights have correct structure."""

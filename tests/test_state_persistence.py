@@ -23,11 +23,18 @@ class TestStatePersistence(unittest.TestCase):
         self.core = StudioCoreV6()
 
         # Store references to system components
+        # _hge is on StudioCoreV6 directly
         self.initial_hge = self.core._hge
-        self.initial_text_engine = self.core._text_engine
-        self.initial_section_parser = self.core._section_parser
-        self.initial_emotion_engine = self.core._emotion_engine
-        self.initial_bpm_engine = self.core._bpm_engine
+        # Other engines are in _core (monolith)
+        # Handle both StudioCore and StudioCoreV5 wrapper
+        actual_core = self.core._core
+        if hasattr(actual_core, '_core'):
+            # It's a wrapper (StudioCoreV5), access inner core
+            actual_core = actual_core._core
+        self.initial_tlp = actual_core.tlp
+        self.initial_rhythm = actual_core.rhythm
+        self.initial_emotion = actual_core.emotion
+        self.initial_freq = actual_core.freq
 
     def test_system_components_preserved_after_first_analyze(self):
         """Test that system components are preserved after first analyze() call."""
@@ -38,29 +45,34 @@ class TestStatePersistence(unittest.TestCase):
         self.assertIsInstance(result1, dict)
         self.assertNotIn("error", result1)
 
+        # Get actual core (handle wrapper if present)
+        actual_core = self.core._core
+        if hasattr(actual_core, '_core'):
+            actual_core = actual_core._core
+
         # Verify system components are still the same objects
         self.assertIs(
             self.core._hge, self.initial_hge, "_hge should be preserved after analyze()"
         )
         self.assertIs(
-            self.core._text_engine,
-            self.initial_text_engine,
-            "_text_engine should be preserved after analyze()",
+            actual_core.tlp,
+            self.initial_tlp,
+            "tlp (text engine) should be preserved after analyze()",
         )
         self.assertIs(
-            self.core._section_parser,
-            self.initial_section_parser,
-            "_section_parser should be preserved after analyze()",
+            actual_core.rhythm,
+            self.initial_rhythm,
+            "rhythm (section parser) should be preserved after analyze()",
         )
         self.assertIs(
-            self.core._emotion_engine,
-            self.initial_emotion_engine,
-            "_emotion_engine should be preserved after analyze()",
+            actual_core.emotion,
+            self.initial_emotion,
+            "emotion engine should be preserved after analyze()",
         )
         self.assertIs(
-            self.core._bpm_engine,
-            self.initial_bpm_engine,
-            "_bpm_engine should be preserved after analyze()",
+            actual_core.freq,
+            self.initial_freq,
+            "freq (bpm engine) should be preserved after analyze()",
         )
 
     def test_system_components_preserved_after_multiple_analyze(self):
@@ -70,6 +82,11 @@ class TestStatePersistence(unittest.TestCase):
             result = self.core.analyze(f"Test text {i} for multiple calls.")
             self.assertIsInstance(result, dict)
 
+        # Get actual core (handle wrapper if present)
+        actual_core = self.core._core
+        if hasattr(actual_core, '_core'):
+            actual_core = actual_core._core
+
         # Verify system components are still the same objects
         self.assertIs(
             self.core._hge,
@@ -77,14 +94,14 @@ class TestStatePersistence(unittest.TestCase):
             "_hge should be preserved after multiple analyze() calls",
         )
         self.assertIs(
-            self.core._text_engine,
-            self.initial_text_engine,
-            "_text_engine should be preserved after multiple analyze() calls",
+            actual_core.tlp,
+            self.initial_tlp,
+            "tlp (text engine) should be preserved after multiple analyze() calls",
         )
         self.assertIs(
-            self.core._section_parser,
-            self.initial_section_parser,
-            "_section_parser should be preserved after multiple analyze() calls",
+            actual_core.rhythm,
+            self.initial_rhythm,
+            "rhythm (section parser) should be preserved after multiple analyze() calls",
         )
 
     def test_engine_bundle_cleared_after_analyze(self):
@@ -131,9 +148,14 @@ class TestStatePersistence(unittest.TestCase):
             self.assertIsInstance(result, dict)
 
             # Verify system components are still intact
+            # _hge is on StudioCoreV6 directly
             self.assertIsNotNone(self.core._hge)
-            self.assertIsNotNone(self.core._text_engine)
-            self.assertIsNotNone(self.core._section_parser)
+            # Other engines are in _core (monolith)
+            actual_core = self.core._core
+            if hasattr(actual_core, '_core'):
+                actual_core = actual_core._core
+            self.assertIsNotNone(actual_core.tlp)
+            self.assertIsNotNone(actual_core.rhythm)
 
 
 if __name__ == "__main__":
