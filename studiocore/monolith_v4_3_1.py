@@ -569,6 +569,239 @@ class StudioCore:
         
         return text
 
+    def _infer_gender_from_text(self, text: str) -> Optional[str]:
+        """
+        Infer gender from Russian text grammar (past tense verb endings).
+        Returns 'male', 'female', or None if unclear.
+        """
+        # Russian past tense patterns: "л" (male) vs "ла" (female)
+        male_patterns = [
+            r'\b\w+л\b',  # Words ending with "л" (past tense, male)
+            r'\b\w+лся\b',  # Reflexive verbs ending with "лся" (male)
+        ]
+        female_patterns = [
+            r'\b\w+ла\b',  # Words ending with "ла" (past tense, female)
+            r'\b\w+лась\b',  # Reflexive verbs ending with "лась" (female)
+        ]
+        
+        male_matches = []
+        female_matches = []
+        for pattern in male_patterns:
+            male_matches.extend(re.findall(pattern, text, re.IGNORECASE))
+        for pattern in female_patterns:
+            female_matches.extend(re.findall(pattern, text, re.IGNORECASE))
+        
+        male_count = len(male_matches)
+        female_count = len(female_matches)
+        
+        if male_count > female_count and male_count > 0:
+            return "male"
+        elif female_count > male_count and female_count > 0:
+            return "female"
+        elif male_count == female_count and male_count > 0:
+            # If equal, check which appears first in text
+            first_male_pos = min((text.lower().find(m) for m in male_matches), default=len(text))
+            first_female_pos = min((text.lower().find(m) for m in female_matches), default=len(text))
+            if first_male_pos < first_female_pos:
+                return "male"
+            elif first_female_pos < first_male_pos:
+                return "female"
+        return None
+
+    def _infer_texture_from_mood(self, mood: str, emotions: Dict[str, float]) -> str:
+        """
+        Infer vocal texture based on mood and emotions.
+        """
+        mood_lower = (mood or "").lower()
+        emotion_keys = [k.lower() for k in emotions.keys()] if emotions else []
+        
+        # Reflective/introspective moods -> breathy/intimate
+        if any(word in mood_lower for word in ["reflective", "introspective", "melancholic", "nostalgic", "peaceful"]):
+            return "breathy/intimate"
+        if any(word in emotion_keys for word in ["peace", "nostalgia", "melancholy"]):
+            return "breathy/intimate"
+        
+        # Uplifting/energetic moods -> resonant
+        if any(word in mood_lower for word in ["uplifting", "energetic", "joyful", "triumphant"]):
+            return "resonant"
+        if any(word in emotion_keys for word in ["joy", "triumph", "energy"]):
+            return "resonant"
+        
+        # Default
+        return "dynamic"
+
+    def _generate_color_signature_from_emotions(self, emotions: Dict[str, float]) -> str:
+        """
+        Generate color signature from primary emotion.
+        """
+        if not emotions:
+            return "neutral"
+        
+        dominant = max(emotions, key=emotions.get)
+        
+        # Emotion to color mapping
+        emotion_color_map = {
+            "nostalgia": "sepia/orange",
+            "pain": "grey/blue",
+            "joy": "yellow/gold",
+            "peace": "green/teal",
+            "love": "pink/rose",
+            "melancholy": "blue/grey",
+            "triumph": "red/orange",
+            "anger": "red/dark",
+            "fear": "purple/dark",
+            "sadness": "blue/indigo",
+        }
+        
+        return emotion_color_map.get(dominant.lower(), "neutral")
+
+    def _generate_resonance_hz_from_key(self, key: str) -> float:
+        """
+        Generate mock resonance_hz based on key.
+        """
+        # Base frequencies for common keys (approximate)
+        key_freq_map = {
+            "c": 130.81,
+            "c#": 138.59,
+            "d": 146.83,
+            "d#": 155.56,
+            "e": 164.81,
+            "f": 174.61,
+            "f#": 185.00,
+            "g": 196.00,
+            "g#": 207.65,
+            "a": 220.00,
+            "a#": 233.08,
+            "b": 246.94,
+        }
+        
+        # Extract key root (first letter, case-insensitive)
+        key_lower = (key or "").lower().strip()
+        key_root = key_lower.split()[0] if key_lower else "c"
+        
+        # Remove # and b (sharp/flat) for matching
+        key_root = key_root.replace("#", "").replace("b", "")
+        
+        base_freq = key_freq_map.get(key_root, 130.81)
+        
+        # Minor keys typically ~10Hz lower
+        if "minor" in key_lower:
+            base_freq -= 10.0
+        
+        return round(base_freq, 2)
+
+    def _generate_breathing_map_from_punctuation(self, text: str) -> Dict[str, Any]:
+        """
+        Generate simple breathing map based on punctuation.
+        Commas = short breath, periods = long breath.
+        """
+        breathing_points = []
+        text_length = len(text)
+        
+        for i, char in enumerate(text):
+            if char == ',':
+                breathing_points.append({
+                    "position": i,
+                    "type": "short",
+                    "duration_ms": 200,
+                })
+            elif char in '.!?':
+                breathing_points.append({
+                    "position": i,
+                    "type": "long",
+                    "duration_ms": 500,
+                })
+        
+        return {
+            "breathing_points": breathing_points,
+            "total_points": len(breathing_points),
+            "inhale_points": [p["position"] for p in breathing_points if p["type"] == "long"],
+            "exhale_points": [p["position"] for p in breathing_points if p["type"] == "short"],
+        }
+
+    def _enrich_result_with_smart_defaults(
+        self, result: Dict[str, Any], text: str, preferred_gender: str
+    ) -> Dict[str, Any]:
+        """
+        Enrich result dictionary with smart defaults for missing fields.
+        """
+        # 1. Vocal Inference
+        vocal = result.get("vocal", {})
+        if isinstance(vocal, dict):
+            # Infer gender if auto and not set
+            if preferred_gender == "auto" and vocal.get("gender") == "auto":
+                inferred_gender = self._infer_gender_from_text(text)
+                if inferred_gender:
+                    vocal["gender"] = inferred_gender
+                    log.debug(f"Inferred gender from text: {inferred_gender}")
+            
+            # Set texture based on mood if missing
+            if not vocal.get("texture"):
+                style = result.get("style", {})
+                mood = style.get("mood") or style.get("atmosphere") or "neutral"
+                emotions = result.get("emotions", {})
+                texture = self._infer_texture_from_mood(mood, emotions)
+                vocal["texture"] = texture
+                log.debug(f"Inferred texture from mood: {texture}")
+            
+            result["vocal"] = vocal
+        
+        # 2. Color & Resonance
+        style = result.get("style", {})
+        if isinstance(style, dict):
+            # Add color_signature if missing
+            if not style.get("color_signature"):
+                emotions = result.get("emotions", {})
+                color_sig = self._generate_color_signature_from_emotions(emotions)
+                style["color_signature"] = color_sig
+                log.debug(f"Generated color_signature: {color_sig}")
+            
+            result["style"] = style
+        
+        # Add resonance_hz to RDE if missing
+        rde = result.get("rde", {})
+        if isinstance(rde, dict) and not rde.get("resonance_hz"):
+            key = result.get("key", "C major")
+            resonance_hz = self._generate_resonance_hz_from_key(key)
+            rde["resonance_hz"] = resonance_hz
+            log.debug(f"Generated resonance_hz from key: {resonance_hz}")
+            result["rde"] = rde
+        
+        # 3. ZeroPulse / Breathing
+        if not result.get("breathing") and not result.get("zeropulse"):
+            breathing_map = self._generate_breathing_map_from_punctuation(text)
+            result["breathing"] = breathing_map
+            # ZeroPulse is typically derived from breathing
+            result["zeropulse"] = {
+                "breathing_sync": breathing_map.get("total_points", 0) > 0,
+                "points": breathing_map.get("breathing_points", []),
+            }
+            log.debug(f"Generated breathing map with {breathing_map.get('total_points', 0)} points")
+        
+        # 4. Genre - Ensure secondary is populated
+        style = result.get("style", {})
+        if isinstance(style, dict) and not style.get("secondary"):
+            genre = style.get("genre", "")
+            # If genre contains "hybrid", try to extract secondary from it
+            if genre and "hybrid" in str(genre).lower():
+                # Split hybrid genre (e.g., "folk rock hybrid" -> ["folk", "rock"])
+                genre_parts = str(genre).lower().replace(" hybrid", "").split()
+                if len(genre_parts) >= 2:
+                    # Use the second part as secondary
+                    style["secondary"] = genre_parts[1]
+                    log.debug(f"Extracted secondary genre from hybrid: {style['secondary']}")
+            # If genre_source indicates hybrid_genre_engine was used, we can infer secondary
+            elif style.get("genre_source") == "hybrid_genre_engine" and genre:
+                # Try to extract from genre name if it has multiple words
+                genre_words = str(genre).split()
+                if len(genre_words) >= 2:
+                    style["secondary"] = genre_words[1]
+                    log.debug(f"Inferred secondary genre: {style['secondary']}")
+            
+            result["style"] = style
+        
+        return result
+
     def analyze(
         self,
         text: str,
@@ -783,6 +1016,9 @@ class StudioCore:
             # Task 10.2: Add runtime metrics for diagnostics
             "runtime_ms": runtime_ms,
         }
+        
+        # Enrich result with smart defaults for missing fields
+        result = self._enrich_result_with_smart_defaults(result, text, preferred_gender)
         
         return result
 

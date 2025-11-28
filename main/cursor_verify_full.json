@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "goal": "Final Backend Verification (Simulation)",
+  "tasks": [
+    {
+      "name": "Create Simulation Script",
+      "action": "Create 'verify_engine.py' to simulate user input without UI"
+    },
+    {
+      "name": "Run Diagnostics",
+      "command": "python3 main/full_system_diagnostics.py"
+    },
+    {
+      "name": "Run Simulation",
+      "command": "python3 verify_engine.py"
+    }
+  ]
+}
