@@ -429,9 +429,49 @@ class VocalProfileRegistry:
             else:
                 # Task 2.1: Используем переданные emotions вместо повторного анализа
                 if emotions is not None:
-                    joy_peace = emotions.get("joy", 0) + emotions.get("peace", 0)
-                    anger_epic = emotions.get("anger", 0) + emotions.get("epic", 0)
-                    vox = female_vox if joy_peace > anger_epic else male_vox
+                    # Используем детальный маппинг из vocal_techniques
+                    try:
+                        from .vocal_techniques import get_vocal_for_emotion
+                        
+                        # Находим доминирующую эмоцию
+                        if emotions and isinstance(emotions, dict) and len(emotions) > 0:
+                            dominant_emotion = max(emotions, key=emotions.get)
+                            intensity = emotions[dominant_emotion]
+                            
+                            # Получаем вокальные техники для эмоции
+                            vocal_techniques = get_vocal_for_emotion(dominant_emotion, intensity)
+                            
+                            # Определяем тип голоса на основе техник
+                            # Женские техники: soprano, mezzo_soprano, contralto, lyric_soprano, coloratura_soprano, soft_female_alto, head_voice, falsetto, whistle_register
+                            # Мужские техники: tenor, baritone, bass, lyric_tenor, lyric_baritone, warm_baritone, dramatic_tenor, dramatic_baritone, chest_voice, guttural
+                            female_keywords = ["soprano", "mezzo", "contralto", "female", "head_voice", "falsetto", "whistle", "coloratura", "lyric_soprano", "soft_female", "airy", "ethereal", "angelic"]
+                            male_keywords = ["tenor", "baritone", "bass", "male", "chest_voice", "guttural", "dramatic", "warm_baritone", "lyric_tenor", "gentle_male"]
+                            
+                            # Подсчитываем женские и мужские техники
+                            female_count = sum(1 for tech in vocal_techniques if any(kw in tech.lower() for kw in female_keywords))
+                            male_count = sum(1 for tech in vocal_techniques if any(kw in tech.lower() for kw in male_keywords))
+                            
+                            # Выбираем голос на основе техник
+                            if female_count > male_count:
+                                vox = female_vox
+                            elif male_count > female_count:
+                                vox = male_vox
+                            else:
+                                # Если равное количество или неопределено, используем старую логику
+                                joy_peace = emotions.get("joy", 0) + emotions.get("peace", 0) + emotions.get("love", 0) + emotions.get("awe", 0)
+                                anger_epic = emotions.get("anger", 0) + emotions.get("epic", 0) + emotions.get("rage", 0) + emotions.get("fear", 0)
+                                vox = female_vox if joy_peace > anger_epic else male_vox
+                        else:
+                            # Fallback на старую логику
+                            joy_peace = emotions.get("joy", 0) + emotions.get("peace", 0)
+                            anger_epic = emotions.get("anger", 0) + emotions.get("epic", 0)
+                            vox = female_vox if joy_peace > anger_epic else male_vox
+                    except (ImportError, AttributeError, Exception) as e:
+                        log.warning(f"Не удалось использовать детальный маппинг голосов: {e}, используется упрощенная логика")
+                        # Fallback на старую логику
+                        joy_peace = emotions.get("joy", 0) + emotions.get("peace", 0) + emotions.get("love", 0) + emotions.get("awe", 0)
+                        anger_epic = emotions.get("anger", 0) + emotions.get("epic", 0) + emotions.get("rage", 0) + emotions.get("fear", 0)
+                        vox = female_vox if joy_peace > anger_epic else male_vox
                 else:
                     log.warning("Emotions не переданы, используется fallback: male_vox")
                     vox = male_vox

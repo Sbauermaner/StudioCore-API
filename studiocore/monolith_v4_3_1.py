@@ -12,9 +12,9 @@ StudioCore Monolith (v6 - Suno Аннотации)
 """
 
 import re
+import random
 import time
 from typing import Dict, Any, List, Tuple, Optional
-from concurrent.futures import ThreadPoolExecutor
 import logging
 
 # === 1. Импорт ядра ===
@@ -54,6 +54,71 @@ from .genre_conflict_resolver import GenreConflictResolver
 
 # === 2. Настройка логгера ===
 log = logging.getLogger(__name__)
+
+# Legacy Bridge: Import Suno prompt builder
+try:
+    from .adapter import build_suno_prompt
+    LEGACY_SUNO_AVAILABLE = True
+except ImportError:
+    LEGACY_SUNO_AVAILABLE = False
+    log.warning("[Legacy Bridge] build_suno_prompt not available, will use fallback")
+
+# Fusion Engine: Import FusionEngineV64 and GenreRoutingEngineV64
+try:
+    from .fusion_engine_v64 import FusionEngineV64
+    from .genre_routing_engine import GenreRoutingEngineV64
+    FUSION_ENGINE_AVAILABLE = True
+except ImportError:
+    FUSION_ENGINE_AVAILABLE = False
+    log.warning("[Fusion Engine] FusionEngineV64 not available, will skip fusion")
+
+# Hybrid Genre Engine: Import HybridGenreEngine
+try:
+    from .hybrid_genre_engine import HybridGenreEngine
+    HYBRID_GENRE_ENGINE_AVAILABLE = True
+except ImportError:
+    HYBRID_GENRE_ENGINE_AVAILABLE = False
+    log.warning("[Hybrid Genre Engine] HybridGenreEngine not available, will skip hybrid genre resolution")
+
+# Suno Prompt Engine: Import SunoPromptEngine for advanced tags
+try:
+    from .suno_advanced_prompts import SunoPromptEngine
+    SUNO_PROMPT_ENGINE_AVAILABLE = True
+except ImportError:
+    SUNO_PROMPT_ENGINE_AVAILABLE = False
+    log.warning("[Suno Prompt Engine] SunoPromptEngine not available, will skip advanced tags")
+
+# Emotion-Driven Suno Adapter: Import for emotion-based annotations
+try:
+    from .suno_annotations import EmotionDrivenSunoAdapter, build_suno_annotations
+    EMOTION_SUNO_ADAPTER_AVAILABLE = True
+except ImportError:
+    EMOTION_SUNO_ADAPTER_AVAILABLE = False
+    log.warning("[Emotion Suno Adapter] EmotionDrivenSunoAdapter not available, will skip emotion-driven annotations")
+
+# Suno Annotation Engine: Import for safe annotations
+try:
+    from .suno_annotations import SunoAnnotationEngine
+    SUNO_ANNOTATION_ENGINE_AVAILABLE = True
+except ImportError:
+    SUNO_ANNOTATION_ENGINE_AVAILABLE = False
+    log.warning("[Suno Annotation Engine] SunoAnnotationEngine not available, will skip safe annotations")
+
+# Dynamic Emotion Engine: Import for normalized emotion profile
+try:
+    from .dynamic_emotion_engine import DynamicEmotionEngine
+    DYNAMIC_EMOTION_ENGINE_AVAILABLE = True
+except ImportError:
+    DYNAMIC_EMOTION_ENGINE_AVAILABLE = False
+    log.warning("[Dynamic Emotion Engine] DynamicEmotionEngine not available, will skip normalized emotion profile")
+
+# Genre Database Loader: Import for expanded genre database
+try:
+    from .genre_database_loader import GenreDatabaseLoader
+    GENRE_DATABASE_LOADER_AVAILABLE = True
+except ImportError:
+    GENRE_DATABASE_LOADER_AVAILABLE = False
+    log.warning("[Genre Database Loader] GenreDatabaseLoader not available, will skip expanded genre database")
 
 # ==========================================================
 # 🗣️ Утилиты определения вокала (v2 - перенесено из style.py)
@@ -216,11 +281,104 @@ class AdaptiveVocalAllocator:
                 if v in ["solo", "duet", "trio", "quartet", "quintet", "choir"]
             ]
         )
+        
+        # Определяем gender на основе эмоций и TLP
+        gender = "auto"
+        if emo and isinstance(emo, dict) and len(emo) > 0:
+            try:
+                from .vocal_techniques import get_vocal_for_emotion
+                
+                # Находим доминирующую эмоцию
+                dominant_emotion = max(emo, key=emo.get)
+                intensity = emo[dominant_emotion]
+                
+                # Получаем вокальные техники для эмоции
+                vocal_techniques = get_vocal_for_emotion(dominant_emotion, intensity)
+                
+                # Определяем тип голоса на основе техник
+                female_keywords = ["soprano", "mezzo", "contralto", "female", "head_voice", "falsetto", "whistle", "coloratura", "lyric_soprano", "soft_female", "airy", "ethereal", "angelic"]
+                male_keywords = ["tenor", "baritone", "bass", "male", "chest_voice", "guttural", "dramatic", "warm_baritone", "lyric_tenor", "gentle_male"]
+                
+                # Подсчитываем женские и мужские техники
+                female_count = sum(1 for tech in vocal_techniques if any(kw in tech.lower() for kw in female_keywords))
+                male_count = sum(1 for tech in vocal_techniques if any(kw in tech.lower() for kw in male_keywords))
+                
+                # Выбираем gender на основе техник
+                if female_count > male_count:
+                    gender = "female"
+                elif male_count > female_count:
+                    gender = "male"
+                else:
+                    # Если равное количество, используем TLP для определения
+                    if tlp and isinstance(tlp, dict):
+                        love = tlp.get("love", 0.0)
+                        pain = tlp.get("pain", 0.0)
+                        truth = tlp.get("truth", 0.0)
+                        
+                        # Love -> female, Pain/Truth -> male
+                        if love > pain and love > truth:
+                            gender = "female"
+                        elif pain > love or truth > love:
+                            gender = "male"
+                        else:
+                            # Fallback на эмоции
+                            joy_peace = emo.get("joy", 0) + emo.get("peace", 0) + emo.get("love", 0) + emo.get("awe", 0)
+                            anger_epic = emo.get("anger", 0) + emo.get("epic", 0) + emo.get("rage", 0) + emo.get("fear", 0)
+                            gender = "female" if joy_peace > anger_epic else "male"
+            except (ImportError, AttributeError, Exception) as e:
+                log.debug(f"[Vocal Allocator] Could not determine gender from emotions/TLP: {e}, using auto")
+                # Fallback на простую логику
+                if emo and isinstance(emo, dict):
+                    joy_peace = emo.get("joy", 0) + emo.get("peace", 0) + emo.get("love", 0)
+                    anger_epic = emo.get("anger", 0) + emo.get("epic", 0) + emo.get("rage", 0)
+                    gender = "female" if joy_peace > anger_epic else "male"
+        
+        # Определяем vocal style на основе эмоций и TLP
+        vocal_style = "standard"
+        if emo and isinstance(emo, dict) and len(emo) > 0:
+            dominant_emotion = max(emo, key=emo.get) if emo else "neutral"
+            
+            # Маппинг эмоций к стилям
+            emotion_to_style = {
+                "joy": "bright",
+                "happiness": "bright",
+                "love": "soft",
+                "peace": "gentle",
+                "sadness": "melancholic",
+                "melancholy": "melancholic",
+                "anger": "aggressive",
+                "rage": "harsh",
+                "fear": "tense",
+                "awe": "epic",
+                "epic": "epic",
+            }
+            vocal_style = emotion_to_style.get(dominant_emotion, "standard")
+        
+        # Определяем vocal tone на основе TLP
+        vocal_tone = "neutral"
+        if tlp and isinstance(tlp, dict):
+            love = tlp.get("love", 0.0)
+            pain = tlp.get("pain", 0.0)
+            truth = tlp.get("truth", 0.0)
+            
+            if love > 0.6:
+                vocal_tone = "warm"
+            elif pain > 0.6:
+                vocal_tone = "dark"
+            elif truth > 0.6:
+                vocal_tone = "clear"
+            else:
+                # Определяем по доминирующей оси
+                dominant_axis = max(("love", love), ("pain", pain), ("truth", truth), key=lambda x: x[1])
+                if dominant_axis[1] > 0.3:
+                    vocal_tone = {"love": "warm", "pain": "dark", "truth": "clear"}.get(dominant_axis[0], "neutral")
 
         return {
             "vocal_form": vocal_form,
-            "gender": "auto",
+            "gender": gender,
             "vocal_count": vocal_count or 1,
+            "style": vocal_style,  # Добавляем style
+            "tone": vocal_tone,  # Добавляем tone
         }
 
 
@@ -231,26 +389,46 @@ class AdaptiveVocalAllocator:
 
 class StudioCore:
     def __init__(self, config_path: Optional[str] = None):
+        """
+        Инициализация StudioCore согласно ACTIVATION_BLUEPRINT.
+        Модули загружаются в строгом порядке согласно init_sequence.
+        """
         log.debug("Инициализация StudioCore...")
+        
+        # === PHASE 0: ConfigLoader ===
+        log.debug("Загрузка: ConfigLoader")
         self.cfg = load_config(config_path or "studio_config.json")
 
-        log.debug("Загрузка: AutoEmotionalAnalyzer")
+        # === PHASE 1: EmotionEngine ===
+        log.debug("Загрузка: EmotionEngine (AutoEmotionalAnalyzer)")
         self.emotion = AutoEmotionalAnalyzer()
-        log.debug("Загрузка: TruthLovePainEngine")
+        
+        # === PHASE 2: TLPEngine ===
+        log.debug("Загрузка: TLPEngine (TruthLovePainEngine)")
         self.tlp = TruthLovePainEngine()
 
-        log.debug("Загрузка: PatchedLyricMeter")
+        # === PHASE 3: RhythmEngine ===
+        log.debug("Загрузка: RhythmEngine (PatchedLyricMeter)")
         self.rhythm = PatchedLyricMeter()
-        log.debug("Загрузка: PatchedUniversalFrequencyEngine")
+        
+        # === PHASE 4: FrequencyEngine ===
+        log.debug("Загрузка: FrequencyEngine (PatchedUniversalFrequencyEngine)")
         self.freq = PatchedUniversalFrequencyEngine()
-        log.debug("Загрузка: PatchedRNSSafety")
+        
+        # === PHASE 5: SafetyEngine ===
+        log.debug("Загрузка: SafetyEngine (PatchedRNSSafety)")
         self.safety = PatchedRNSSafety(self.cfg)
-        log.debug("Загрузка: PatchedIntegrityScanEngine")
+        
+        # === PHASE 6: IntegrityScan ===
+        log.debug("Загрузка: IntegrityScan (PatchedIntegrityScanEngine)")
         self.integrity = PatchedIntegrityScanEngine()
-        log.debug("Загрузка: VocalProfileRegistry")
+        
+        # === PHASE 7: VocalRegistry ===
+        log.debug("Загрузка: VocalRegistry (VocalProfileRegistry)")
         self.vocals = VocalProfileRegistry()
 
-        log.debug("Загрузка: PatchedStyleMatrix")
+        # === PHASE 8: StyleMatrix ===
+        log.debug("Загрузка: StyleMatrix (PatchedStyleMatrix)")
         try:
             # (PatchedStyleMatrix - это наш StyleMatrix v11)
             self.style = PatchedStyleMatrix()
@@ -261,19 +439,137 @@ class StudioCore:
             log.error(f"НЕ УДАЛОСЬ загрузить PatchedStyleMatrix: {e}")
             self.style = None  # type: ignore
 
-        log.debug("Загрузка: ToneSyncEngine")
+        # === PHASE 9: ToneEngine ===
+        log.debug("Загрузка: ToneEngine (ToneSyncEngine)")
         self.tone = ToneSyncEngine()
-        log.debug("Загрузка: AdaptiveVocalAllocator")
+        
+        # === PHASE 10: VocalAllocator ===
+        log.debug("Загрузка: VocalAllocator (AdaptiveVocalAllocator)")
         self.vocal_allocator = AdaptiveVocalAllocator()
         
-        log.debug("Загрузка: ColorEngineAdapter")
+        # === PHASE 11: ColorEngine ===
+        log.debug("Загрузка: ColorEngine (ColorEngineAdapter)")
         self.color_engine = ColorEngineAdapter()
         
-        log.debug("Загрузка: RhythmDynamicsEmotionEngine")
+        # === PHASE 12: RDEEngine ===
+        log.debug("Загрузка: RDEEngine (RhythmDynamicsEmotionEngine)")
         self.rde_engine = RhythmDynamicsEmotionEngine()
+        
+        # === PHASE 13: GenreDatabase ===
+        log.debug("Загрузка: GenreDatabase (GenreDatabaseLoader)")
+        self.genre_database = None
+        if GENRE_DATABASE_LOADER_AVAILABLE:
+            try:
+                self.genre_database = GenreDatabaseLoader()
+                log.info("✅ [Genre Database Loader] GenreDatabaseLoader loaded")
+            except (ImportError, AttributeError, TypeError) as e:
+                log.warning(f"[Genre Database Loader] Failed to initialize: {e}")
+                self.genre_database = None
+            except Exception as e:
+                log.error(f"[Genre Database Loader] Unexpected error during initialization: {e}", exc_info=True)
+                self.genre_database = None
+
+        # === PHASE 14: FusionEngine ===
+        log.debug("Загрузка: FusionEngine (FusionEngineV64, GenreRoutingEngineV64)")
+        self.fusion_engine = None
+        self.genre_routing_engine = None
+        if FUSION_ENGINE_AVAILABLE:
+            try:
+                self.fusion_engine = FusionEngineV64()
+                self.genre_routing_engine = GenreRoutingEngineV64()
+                log.info("✅ [Fusion Engine] FusionEngineV64 and GenreRoutingEngineV64 loaded")
+            except (ImportError, AttributeError, TypeError) as e:
+                log.warning(f"[Fusion Engine] Failed to initialize: {e}")
+                self.fusion_engine = None
+                self.genre_routing_engine = None
+            except Exception as e:
+                log.error(f"[Fusion Engine] Unexpected error during initialization: {e}", exc_info=True)
+                self.fusion_engine = None
+                self.genre_routing_engine = None
+
+        # --- HYBRID GENRE ENGINE SUPPORT (Optional) ---
+        self.hybrid_genre_engine = None
+        if HYBRID_GENRE_ENGINE_AVAILABLE:
+            try:
+                self.hybrid_genre_engine = HybridGenreEngine()
+                log.info("✅ [Hybrid Genre Engine] HybridGenreEngine loaded")
+            except (ImportError, AttributeError, TypeError) as e:
+                log.warning(f"[Hybrid Genre Engine] Failed to initialize: {e}")
+                self.hybrid_genre_engine = None
+            except Exception as e:
+                log.error(f"[Hybrid Genre Engine] Unexpected error during initialization: {e}", exc_info=True)
+                self.hybrid_genre_engine = None
+
+        # --- SUNO PROMPT ENGINE SUPPORT (Optional) ---
+        self.suno_prompt_engine = None
+        if SUNO_PROMPT_ENGINE_AVAILABLE:
+            try:
+                self.suno_prompt_engine = SunoPromptEngine()
+                log.info("✅ [Suno Prompt Engine] SunoPromptEngine loaded")
+            except (ImportError, AttributeError, TypeError) as e:
+                log.warning(f"[Suno Prompt Engine] Failed to initialize: {e}")
+                self.suno_prompt_engine = None
+            except Exception as e:
+                log.error(f"[Suno Prompt Engine] Unexpected error during initialization: {e}", exc_info=True)
+                self.suno_prompt_engine = None
+
+        # --- EMOTION-DRIVEN SUNO ADAPTER SUPPORT (Optional) ---
+        self.emotion_suno_adapter_available = EMOTION_SUNO_ADAPTER_AVAILABLE
+        if EMOTION_SUNO_ADAPTER_AVAILABLE:
+            log.info("✅ [Emotion Suno Adapter] EmotionDrivenSunoAdapter available")
+
+        # --- SUNO ANNOTATION ENGINE SUPPORT (Optional) ---
+        self.suno_annotation_engine = None
+        if SUNO_ANNOTATION_ENGINE_AVAILABLE:
+            try:
+                self.suno_annotation_engine = SunoAnnotationEngine()
+                log.info("✅ [Suno Annotation Engine] SunoAnnotationEngine loaded")
+            except (ImportError, AttributeError, TypeError) as e:
+                log.warning(f"[Suno Annotation Engine] Failed to initialize: {e}")
+                self.suno_annotation_engine = None
+            except Exception as e:
+                log.error(f"[Suno Annotation Engine] Unexpected error during initialization: {e}", exc_info=True)
+                self.suno_annotation_engine = None
+
+        # --- DYNAMIC EMOTION ENGINE SUPPORT (Optional) ---
+        self.dynamic_emotion_engine = None
+        if DYNAMIC_EMOTION_ENGINE_AVAILABLE:
+            try:
+                self.dynamic_emotion_engine = DynamicEmotionEngine()
+                log.info("✅ [Dynamic Emotion Engine] DynamicEmotionEngine loaded")
+            except (ImportError, AttributeError, TypeError) as e:
+                log.warning(f"[Dynamic Emotion Engine] Failed to initialize: {e}")
+                self.dynamic_emotion_engine = None
+            except Exception as e:
+                log.error(f"[Dynamic Emotion Engine] Unexpected error during initialization: {e}", exc_info=True)
+                self.dynamic_emotion_engine = None
+
+        # --- MATRIX ARCHITECTURE SUPPORT (Optional) ---
+        self.matrix_enabled = False
+        self.matrix_genre_engine = None
+        self.matrix_instrument_engine = None
+        self.matrix_serendipity = None
+        self.matrix_breathing_engine = None
+        
+        try:
+            from .engines.universal_matrix import UniversalMatrixGenreEngine
+            from .engines.instrument_engine import InstrumentEngine
+            from .engines.serendipity_engine import SerendipityEngine
+            from .engines.rhythm_breathing import RhythmBreathingEngine
+            
+            self.matrix_genre_engine = UniversalMatrixGenreEngine()
+            self.matrix_instrument_engine = InstrumentEngine()
+            self.matrix_serendipity = SerendipityEngine()
+            self.matrix_breathing_engine = RhythmBreathingEngine()
+            self.matrix_enabled = True
+            log.info("✅ [Matrix Architecture] New engines loaded: UniversalMatrix, InstrumentEngine, SerendipityEngine, RhythmBreathingEngine")
+        except ImportError as e:
+            log.debug(f"[Matrix Architecture] Not available (fallback to legacy): {e}")
+            self.matrix_enabled = False
 
         log.info(
             f"🔹 [StudioCore {STUDIOCORE_VERSION}] Monolith loaded (Section - Aware Duet Mode v2)."
+            + (f" [Matrix: {'ENABLED' if self.matrix_enabled else 'LEGACY'}]" if hasattr(self, 'matrix_enabled') else "")
         )
 
     # -------------------------------------------------------
@@ -719,6 +1015,144 @@ class StudioCore:
             "exhale_points": [p["position"] for p in breathing_points if p["type"] == "short"],
         }
 
+    def _enhance_suno_annotations(
+        self,
+        annotated_text: str,
+        emotions: Dict[str, float],
+        vocal_result: Dict[str, Any],
+        style: Dict[str, Any]
+    ) -> str:
+        """
+        Enhance Suno annotations with advanced tags from SunoPromptEngine.
+        Adds voice tags, emotion tags, and FX tags where appropriate.
+        """
+        if not self.suno_prompt_engine or not annotated_text:
+            return annotated_text
+        
+        try:
+            lines = annotated_text.split('\n')
+            enhanced_lines = []
+            
+            # Get dominant emotion for voice tags
+            dominant_emotion = max(emotions, key=emotions.get) if emotions and isinstance(emotions, dict) else "neutral"
+            intensity = emotions.get(dominant_emotion, 1.0) if emotions and isinstance(emotions, dict) else 1.0
+            
+            # Map emotions to voice tags using detailed mapping
+            try:
+                from .vocal_techniques import get_vocal_for_emotion
+                
+                # Получаем вокальные техники для эмоции
+                vocal_techniques = get_vocal_for_emotion(dominant_emotion, intensity)
+                
+                # Преобразуем техники в теги
+                if vocal_techniques:
+                    # Берем первую технику и преобразуем в тег
+                    primary_technique = vocal_techniques[0]
+                    
+                    # Маппинг техник к тегам
+                    technique_to_tag = {
+                        "harsh": "[Aggressive]",
+                        "scream": "[Gritty]",
+                        "guttural": "[Gritty]",
+                        "rasp": "[Gritty]",
+                        "melancholy": "[Melancholic]",
+                        "soft": "[Melancholic]",
+                        "vibrato": "[Emotional]",
+                        "emotional": "[Emotional]",
+                        "ethereal": "[Angelic]",
+                        "angelic": "[Angelic]",
+                        "breathy": "[Soulful]",
+                        "warm": "[Soulful]",
+                        "belting": "[Powerful]",
+                        "powerful": "[Powerful]",
+                        "dramatic": "[Dramatic]",
+                    }
+                    
+                    # Ищем подходящий тег
+                    voice_tag = ""
+                    for tech_key, tag in technique_to_tag.items():
+                        if tech_key in primary_technique.lower():
+                            voice_tag = tag
+                            break
+                    
+                    # Если не нашли, используем общий тег на основе эмоции
+                    if not voice_tag:
+                        emotion_to_voice_fallback = {
+                            "anger": "[Aggressive]",
+                            "rage": "[Gritty]",
+                            "sadness": "[Melancholic]",
+                            "joy": "[Emotional]",
+                            "peace": "[Angelic]",
+                            "love": "[Soulful]",
+                            "fear": "[Tense]",
+                            "awe": "[Epic]",
+                            "epic": "[Epic]",
+                        }
+                        voice_tag = emotion_to_voice_fallback.get(dominant_emotion, "")
+            except (ImportError, AttributeError, Exception) as e:
+                log.debug(f"Не удалось использовать детальный маппинг голосов для тегов: {e}, используется упрощенный маппинг")
+                # Fallback на старый маппинг
+            emotion_to_voice = {
+                "anger": "[Aggressive]",
+                "rage": "[Gritty]",
+                "sadness": "[Melancholic]",
+                "joy": "[Emotional]",
+                "peace": "[Angelic]",
+                "love": "[Soulful]",
+            }
+            voice_tag = emotion_to_voice.get(dominant_emotion, "")
+            
+            # Add voice tag at the beginning if not present
+            if voice_tag and voice_tag not in annotated_text:
+                enhanced_lines.append(voice_tag)
+            
+            # Process each line and enhance sections using construct_section
+            current_section_type = None
+            for line in lines:
+                # Check if line is a section tag
+                if line.strip().startswith('[') and line.strip().endswith(']'):
+                    section_tag = line.strip()[1:-1].upper()
+                    # Try to extract section type (Intro, Verse, Chorus, etc.)
+                    for section_type in ["INTRO", "VERSE", "CHORUS", "BRIDGE", "OUTRO", "PRE-CHORUS"]:
+                        if section_type in section_tag:
+                            current_section_type = section_type
+                            # Use construct_section with modifiers based on emotions
+                            modifiers = []
+                            if dominant_emotion in ["anger", "rage"]:
+                                modifiers.append("Aggressive")
+                            elif dominant_emotion in ["sadness", "melancholy"]:
+                                modifiers.append("Melancholic")
+                            elif dominant_emotion in ["joy", "love"]:
+                                modifiers.append("Emotional")
+                            
+                            # Use construct_section for better structure
+                            if modifiers:
+                                enhanced_section = self.suno_prompt_engine.construct_section(
+                                    current_section_type, modifiers=modifiers, lyrics=""
+                                )
+                                enhanced_lines.append(enhanced_section.strip())
+                            else:
+                                enhanced_lines.append(line)
+                            break
+                    else:
+                        enhanced_lines.append(line)
+                else:
+                    enhanced_lines.append(line)
+                
+                # Add FX tags for dramatic pauses using experimental_stack
+                if line.strip() and not line.strip().startswith('['):
+                    # Check if line ends with punctuation that suggests pause
+                    if line.strip().endswith(('.', '!', '?')):
+                        # Add pause tag occasionally for dramatic effect
+                        if len(enhanced_lines) % 3 == 0:  # Every 3rd section
+                            pause_tag = self.suno_prompt_engine.experimental_stack("Pause", "Dramatic")
+                            enhanced_lines.append(pause_tag)
+            
+            return '\n'.join(enhanced_lines)
+        except Exception as e:
+            log.warning(f"[Suno Prompt Engine] Error enhancing annotations: {e}")
+            return annotated_text
+
     def _enrich_result_with_smart_defaults(
         self, result: Dict[str, Any], text: str, preferred_gender: str
     ) -> Dict[str, Any]:
@@ -768,8 +1202,26 @@ class StudioCore:
             result["rde"] = rde
         
         # 3. ZeroPulse / Breathing
+        # 🔧 ИСПРАВЛЕНИЕ: Инициализируем breathing_map из result, если он уже существует
+        breathing_map = result.get("breathing", {})
+        if not isinstance(breathing_map, dict):
+            breathing_map = {}
+        
         if not result.get("breathing") and not result.get("zeropulse"):
-            breathing_map = self._generate_breathing_map_from_punctuation(text)
+            # Use RhythmBreathingEngine if available (Matrix Architecture), otherwise fallback to legacy method
+            if self.matrix_breathing_engine:
+                try:
+                    breathing_map = self.matrix_breathing_engine.create_map(text)
+                    log.debug(f"[Matrix Breathing] Generated breathing map with {breathing_map.get('total_points', 0)} points")
+                except (AttributeError, TypeError, ValueError) as e:
+                    log.warning(f"[Matrix Breathing] Failed to use RhythmBreathingEngine, falling back to legacy: {e}")
+                    breathing_map = self._generate_breathing_map_from_punctuation(text)
+                except Exception as e:
+                    log.error(f"[Matrix Breathing] Unexpected error: {e}", exc_info=True)
+                    breathing_map = self._generate_breathing_map_from_punctuation(text)
+            else:
+                breathing_map = self._generate_breathing_map_from_punctuation(text)
+            
             result["breathing"] = breathing_map
             # ZeroPulse is typically derived from breathing
             result["zeropulse"] = {
@@ -802,6 +1254,14 @@ class StudioCore:
         
         return result
 
+    def _apply_quantum_jitter(self, value: float, intensity: float = 0.08) -> float:
+        """
+        Adds random variation to break static analysis loops.
+        This introduces 'Creative Noise' to prevent deterministic results.
+        """
+        jitter = random.uniform(-intensity, intensity)
+        return max(0.0, min(1.0, value + jitter))
+
     def analyze(
         self,
         text: str,
@@ -809,154 +1269,681 @@ class StudioCore:
         version: Optional[str] = None,
         semantic_hints: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        """
+        Главный метод анализа согласно ACTIVATION_BLUEPRINT.
+        Выполняет анализ в строгом порядке фаз:
+        - Phase 0: PREPARE (валидация, безопасность, нормализация)
+        - Phase 1: PARALLEL_BATCH_A (независимые модули)
+        - Phase 2: SEQUENTIAL_DEPENDENT (rhythm после emotions/tlp)
+        - Phase 3: PARALLEL_BATCH_B (зависимые модули)
+        - Phase 4: CORE_LOGIC (фильтрация, разрешение конфликтов)
+        - Phase 5: FUSION_AND_FINALIZE (финальная сборка)
+        """
+        # ============================================================
+        # PHASE 0: PREPARE
+        # ============================================================
+        log.debug(f"--- ЗАПУСК АНАЛИЗА (v{STUDIOCORE_VERSION}) ---")
+        log.debug(f"Preferred Gender: {preferred_gender}, Text: {text[:40]}...")
+        
         # Task 10.2: Start timer for runtime metrics
         start_time = time.time()
         
-        log.debug(f"--- ЗАПУСК АНАЛИЗА (v{STUDIOCORE_VERSION}) ---")
-        log.debug(f"Preferred Gender: {preferred_gender}, Text: {text[:40]}...")
-
-        # Task 1.1: Safety check at the start of analyze
+        # 0.1: validate_input_length
+        import sys
+        import os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+        from security_patches import validate_text_input
+        
+        try:
+            text = validate_text_input(text)
+        except ValueError as e:
+            log.error(f"[Security] Invalid text input: {e}")
+            return {
+                "ok": False,
+                "error": str(e),
+                "result": {}
+            }
+        
+        # 0.2: check_safety
         text = self._check_safety(text)
 
+        # 0.3: normalize_text
         raw = normalize_text_preserve_symbols(text)
+        
+        # 0.4: extract_blocks
         text_blocks = extract_raw_blocks(raw)
 
-        # Task 1.2: Section Analysis
+        # Section Analysis (выполняется после extract_blocks)
         section_result = self._analyze_sections(text_blocks, preferred_gender)
         section_profiles = section_result.get("section_profiles", [])
         voice_hint = section_result.get("user_voice_hint")
 
-        # Task 10.1: Run independent engines in parallel using ThreadPoolExecutor
-        # emotion and tone are independent, so they can run in parallel
-        emotions = None
-        tone_hint = None
+        # ============================================================
+        # PHASE 1: PARALLEL_BATCH_A
+        # Независимые движки. Запускать одновременно.
+        # ============================================================
+        from .parallel_module_executor import ParallelModuleExecutor
+        from .result_deduplicator import ResultDeduplicator
         
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            # Submit independent tasks (emotion and tone don't depend on each other)
-            future_emotion = executor.submit(self.emotion.analyze, raw)
-            future_tone = executor.submit(self.tone.detect_key, raw)
+        executor = ParallelModuleExecutor(max_workers=8, timeout=30.0)
+        deduplicator = ResultDeduplicator(similarity_threshold=0.85)
+        
+        log.debug("[Phase 1] Запуск PARALLEL_BATCH_A: emotion, tone, tlp, rde_resonance, rde_fracture, rde_entropy")
+        
+        # Собираем модули для параллельного выполнения
+        parallel_batch_a_modules = []
+        parallel_batch_a_modules.append(("emotion", self.emotion.analyze, (raw,), {}))
+        parallel_batch_a_modules.append(("tone", self.tone.detect_key, (raw,), {}))
+        parallel_batch_a_modules.append(("tlp", self.tlp.analyze, (raw,), {}))
+        parallel_batch_a_modules.append(("rde_resonance", self.rde_engine.calc_resonance, (raw,), {}))
+        parallel_batch_a_modules.append(("rde_fracture", self.rde_engine.calc_fracture, (raw,), {}))
+        parallel_batch_a_modules.append(("rde_entropy", self.rde_engine.calc_entropy, (raw,), {}))
+        
+        # Выполняем параллельно
+        batch_a_results = executor.execute_independent_modules(parallel_batch_a_modules)
+        
+        # Извлекаем результаты
+        emotions = batch_a_results.get("emotion", {"neutral": 1.0})
+        tone_hint = batch_a_results.get("tone", None)
+        tlp = batch_a_results.get("tlp", {})
+        
+        # Собираем RDE результаты
+        rde_result = {
+            "resonance": batch_a_results.get("rde_resonance", 0.5),
+            "fracture": batch_a_results.get("rde_fracture", 0.5),
+            "entropy": batch_a_results.get("rde_entropy", 0.5),
+        }
+        
+        log.debug(f"[Phase 1] PARALLEL_BATCH_A завершен: emotions={bool(emotions)}, tlp={bool(tlp)}, rde={bool(rde_result)}")
+        
+        # ============================================================
+        # PHASE 2: SEQUENTIAL_DEPENDENT
+        # Критическая зависимость. Ждем данные из Batch A.
+        # Rhythm запускается ТОЛЬКО после завершения Emotion и TLP.
+        # ============================================================
+        log.debug("[Phase 2] Запуск SEQUENTIAL_DEPENDENT: rhythm (требует emotions и tlp)")
+        
+        cf = tlp.get("conscious_frequency") if tlp else None
+        
+        # Rhythm требует emotions и tlp из Phase 1
+        rhythm_analysis = self.rhythm.analyze(
+            raw,
+            emotions=emotions,
+            tlp=tlp,
+            cf=cf
+        )
+        
+        bpm = int(round(rhythm_analysis.get("global_bpm", DEFAULT_CONFIG.FALLBACK_BPM)))
+        log.debug(f"[Phase 2] SEQUENTIAL_DEPENDENT завершен: bpm={bpm}")
+        
+        # Извлечение key из tone_hint (нужно для Phase 3)
+        if tone_hint and isinstance(tone_hint, dict):
+            key = tone_hint.get("key") or DEFAULT_CONFIG.FALLBACK_KEY
+        else:
+            key = DEFAULT_CONFIG.FALLBACK_KEY
+        
+        if not key or key == "auto":
+            key = DEFAULT_CONFIG.FALLBACK_KEY
+        
+        # ============================================================
+        # PHASE 3: PARALLEL_BATCH_B
+        # Зависимые от ритма и эмоций движки. Запускать одновременно.
+        # ============================================================
+        log.debug("[Phase 3] Запуск PARALLEL_BATCH_B: vocal, integrity, annotation, color, dynamic_emotion")
+        
+        # Собираем модули для параллельного выполнения
+        parallel_batch_b_modules = []
+        
+        # Vocal Allocator
+        parallel_batch_b_modules.append(("vocal", self.vocal_allocator.analyze, (emotions, tlp, bpm, raw), {}))
+        
+        # Integrity Scan
+        parallel_batch_b_modules.append(("integrity", self.integrity.analyze, (raw,), {"emotions": emotions, "tlp": tlp}))
+        
+        # Text Annotation: УДАЛЕНО из Phase 3 - будет вызван в Phase 4 после построения semantic_sections
+        # Это устраняет двойную работу и улучшает производительность
+        
+        # Color Resolution
+        intermediate_result = {"emotions": emotions, "tlp": tlp, "style": {}}
+        parallel_batch_b_modules.append(("color", self.color_engine.resolve_color_wave, (intermediate_result,), {}))
+        
+        # Dynamic Emotion Engine
+        if self.dynamic_emotion_engine:
+            parallel_batch_b_modules.append(("dynamic_emotion", self.dynamic_emotion_engine.emotion_profile, (raw,), {}))
+        
+        # Выполняем параллельно
+        batch_b_results = executor.execute_independent_modules(parallel_batch_b_modules)
+        
+        # Извлекаем результаты
+        vocal_result = batch_b_results.get("vocal", {})
+        if not isinstance(vocal_result, dict):
+            vocal_result = {}
+        
+        # Обогащаем vocal_result дополнительными данными
+        if emotions and isinstance(emotions, dict) and len(emotions) > 0:
+            # Определяем доминирующую эмоцию для texture
+            dominant_emotion = max(emotions, key=emotions.get)
+            intensity = emotions[dominant_emotion]
             
-            # Wait for results
-            emotions = future_emotion.result()
-            tone_hint = future_tone.result()
+            # Добавляем texture если отсутствует
+            if not vocal_result.get("texture"):
+                mood = dominant_emotion
+                texture = self._infer_texture_from_mood(mood, emotions)
+                vocal_result["texture"] = texture
+            
+            # Добавляем section_techniques если есть semantic_sections
+            # (будет добавлено позже в Phase 4, когда semantic_sections будут готовы)
         
-        # Initialize integrity_result to None (will be set later after tlp is available)
-        integrity_result = None
+        integrity_result = batch_b_results.get("integrity", {})
+        # Annotation будет вызван в Phase 4 после построения semantic_sections
+        annotated_text_ui, annotated_text_suno = "", ""
         
-        log.debug(f"Результат EMO (до фильтрации): {emotions}")
+        color_resolution = batch_b_results.get("color", None)
+        emotion_profile_7axis = batch_b_results.get("dynamic_emotion", None)
         
-        # Task 3.1: Использование EMOTION_HIGH_SIGNAL для фильтрации слабых эмоций
+        # Извлечение color_wave
+        if color_resolution and hasattr(color_resolution, 'colors') and color_resolution.colors:
+            color_wave = color_resolution.colors
+        else:
+            color_wave = ["#FFFFFF", "#B0BEC5"]
+        
+        log.debug(f"[Phase 3] PARALLEL_BATCH_B завершен: vocal={bool(vocal_result)}, integrity={bool(integrity_result)}, color={bool(color_wave)}")
+        
+        # ============================================================
+        # PHASE 4: CORE_LOGIC
+        # Последовательная обработка: фильтрация, разрешение конфликтов, построение стиля
+        # ============================================================
+        log.debug("[Phase 4] Запуск CORE_LOGIC: filter_emotions, resolve_conflicts, determine_matrix_mode, hybrid_genre_refinement, build_semantic_layers")
+        
+        # 4.1: filter_emotions
         emotion_high_signal = DEFAULT_CONFIG.EMOTION_HIGH_SIGNAL
         if emotions:
-            # Фильтруем эмоции, которые ниже порога EMOTION_HIGH_SIGNAL
-            # Оставляем только значимые эмоции для дальнейшей обработки
             filtered_emotions = {
                 k: v for k, v in emotions.items() 
                 if v >= emotion_high_signal or k == max(emotions, key=emotions.get)
             }
-            # Если после фильтрации осталась только доминирующая эмоция, 
-            # перераспределяем веса для сохранения нормализации
             if len(filtered_emotions) < len(emotions) and len(filtered_emotions) > 0:
                 total_filtered = sum(filtered_emotions.values())
                 if total_filtered > 0:
-                    # Нормализуем отфильтрованные эмоции
                     emotions = {k: v / total_filtered for k, v in filtered_emotions.items()}
-                    log.debug(f"Эмоции отфильтрованы по EMOTION_HIGH_SIGNAL ({emotion_high_signal}): {emotions}")
+                    log.debug(f"[Phase 4.1] Эмоции отфильтрованы: {emotions}")
                 else:
-                    # Если все отфильтрованы, оставляем доминирующую
                     dominant = max(emotions, key=emotions.get)
                     emotions = {dominant: 1.0}
-                    log.debug(f"Все эмоции ниже порога, оставлена доминирующая: {dominant}")
-            else:
-                log.debug(f"Эмоции не требуют фильтрации (все выше порога {emotion_high_signal})")
-        
-        log.debug(f"Результат EMO (после фильтрации): {emotions}")
+                    log.debug(f"[Phase 4.1] Оставлена доминирующая эмоция: {dominant}")
 
-        # Task 1.1: TLP Analysis
-        tlp = self.tlp.analyze(raw)
-        cf = tlp.get("conscious_frequency")
-        log.debug(f"Результат TLP: {tlp}, CF: {cf}")
-
-        rhythm_analysis = self.rhythm.analyze(raw, emotions=emotions, tlp=tlp, cf=cf)
-        bpm = int(round(rhythm_analysis.get("global_bpm", DEFAULT_CONFIG.FALLBACK_BPM)))
-        log.debug(
-            "Базовый BPM: %s (header=%s, estimated=%s)",
-            bpm,
-            rhythm_analysis.get("header_bpm"),
-            rhythm_analysis.get("estimated_bpm"),
-        )
-        
-        # Task 18.1: Auto-resolve BPM-TLP conflicts
+        # 4.2: resolve_bpm_conflict
         consistency = ConsistencyLayerV8({"bpm": bpm, "tlp": tlp})
         suggested_bpm, was_resolved = consistency.resolve_bpm_tlp_conflict(bpm, tlp)
         if was_resolved:
-            log.debug(f"BPM-TLP Konflikt aufgelöst: {bpm} → {suggested_bpm}")
+            log.debug(f"[Phase 4.2] BPM-TLP конфликт разрешен: {bpm} → {suggested_bpm}")
             bpm = int(round(suggested_bpm))
 
-        # Task 9.1: tone_hint already obtained from parallel execution
-        key = tone_hint.get("key") if tone_hint else DEFAULT_CONFIG.FALLBACK_KEY
-        if not key or key == "auto":
-            key = DEFAULT_CONFIG.FALLBACK_KEY
-
-        # Task 1.3: Style.build() вместо FALLBACK значений
-        if self.style:
-            style_result = self.style.build(
-                emotions, tlp, raw, bpm, semantic_hints, voice_hint
-            )
-            style = style_result
-        else:
-            # Fallback если style engine недоступен
-            style = {
-                "genre": DEFAULT_CONFIG.FALLBACK_STYLE,
-                "style": DEFAULT_CONFIG.FALLBACK_STYLE,
-                "bpm": bpm,
-                "key": key,
-                "visual": DEFAULT_CONFIG.FALLBACK_VISUAL,
-                "narrative": DEFAULT_CONFIG.FALLBACK_NARRATIVE,
-                "structure": DEFAULT_CONFIG.FALLBACK_STRUCTURE,
-                "emotion": emotions.get("dominant") or DEFAULT_CONFIG.FALLBACK_EMOTION,
-            }
-            log.warning("Style engine недоступен, используются FALLBACK значения")
-
-        # Task 1.4: Semantic Layers
+        # 4.3: resolve_key_conflict
+        # Key уже извлечен из tone_hint в Phase 2, но можем проверить конфликты
+        resolver = GenreConflictResolver()
+        suggested_key, was_key_resolved = resolver.resolve_color_key_conflict(key, color_wave, {})
+        if was_key_resolved:
+            log.debug(f"[Phase 4.3] Color-Key конфликт разрешен: {key} → {suggested_key}")
+            key = suggested_key
+        
+        # 4.4: build_semantic_layers (нужно для annotation и structure)
         semantic_layers = self._build_semantic_layers(emotions, tlp, bpm, key)
         semantic_sections = semantic_layers.get("layers", {}).get("sections", [])
-
-        # Определяем layout из semantic_sections или используем fallback
+        
         layout = DEFAULT_CONFIG.FALLBACK_STRUCTURE
         if semantic_sections and len(semantic_sections) > 0:
             layout = semantic_sections[0].get("tag", DEFAULT_CONFIG.FALLBACK_STRUCTURE)
-
+        
         structure = {
             "sections": text_blocks,
             "section_count": len(text_blocks),
             "layout": layout,
         }
+        
+        # Обновляем annotation с правильными semantic_sections
+        if semantic_sections:
+            annotation_result = self.annotate_text(text_blocks, section_profiles, semantic_sections)
+        if isinstance(annotation_result, tuple) and len(annotation_result) == 2:
+            annotated_text_ui, annotated_text_suno = annotation_result
+        
+        # 4.5: determine_matrix_mode_or_legacy
+        # Task 1.3: Style.build() с поддержкой Matrix Architecture
+        style = None
+        # Variables for Matrix Mode data (for GUI)
+        quantum_jitter_data = None
+        serendipity_data = None
+        fibonacci_data = None
+        
+        if self.matrix_enabled and self.matrix_genre_engine:
+            # === MATRIX MODE: Use UniversalMatrixGenreEngine ===
+            try:
+                # Extract pain, energy, density from TLP and text analysis
+                pain_score = tlp.get("pain", 0.0)
+                # Calculate energy from text structure
+                text_lines = [l for l in raw.split('\n') if l.strip()]
+                avg_line_len = sum(len(l) for l in text_lines) / len(text_lines) if text_lines else 50
+                energy_score = min(1.0, (avg_line_len / 60.0) + (bpm / 200.0))
+                density_score = min(1.0, len(text_lines) / 10.0)
+                
+                # Apply Quantum Jitter (Creative Noise) to prevent deterministic results
+                j_pain = self._apply_quantum_jitter(pain_score)
+                j_energy = self._apply_quantum_jitter(energy_score)
+                j_density = self._apply_quantum_jitter(density_score)
+                
+                # Save Quantum Jitter data for GUI
+                quantum_jitter_data = {
+                    "pain": {"original": pain_score, "jittered": j_pain},
+                    "energy": {"original": energy_score, "jittered": j_energy},
+                    "density": {"original": density_score, "jittered": j_density},
+                }
+                
+                # Force Fibonacci Rotation (increment counter to rotate sunflower)
+                fibonacci_counter = None
+                if self.matrix_serendipity:
+                    # Explicitly increment counter to ensure rotation on every run
+                    self.matrix_serendipity.counter += 1
+                    fibonacci_counter = self.matrix_serendipity.counter
+                    # Also call fibonacci_select to maintain internal state
+                    self.matrix_serendipity.fibonacci_select(["dummy"])
+                    # Save Fibonacci Rotation data for GUI
+                    fibonacci_data = {"counter": fibonacci_counter}
+                
+                # Resolve genre using Matrix Engine with jittered values
+                matrix_genre, confidence = self.matrix_genre_engine.resolve_genre(
+                    pain=j_pain, energy=j_energy, density=j_density
+                )
+                
+                # Apply Serendipity (luck factor)
+                serendipity_applied = False
+                final_genre = matrix_genre
+                if self.matrix_serendipity:
+                    final_genre = self.matrix_serendipity.roll_for_serendipity(matrix_genre)
+                    serendipity_applied = (final_genre != matrix_genre)
+                
+                # Save Serendipity data for GUI
+                serendipity_data = {
+                    "applied": serendipity_applied,
+                    "original_genre": matrix_genre,
+                    "final_genre": final_genre,
+                }
+                
+                # Select instruments
+                # 🔧 ИСПРАВЛЕНИЕ ОБРЫВА ЦЕПИ: EMOTIONS → STYLE (в Matrix Mode)
+                # Безопасное получение primary_emotion
+                if emotions and isinstance(emotions, dict) and len(emotions) > 0:
+                    try:
+                        primary_emotion = max(emotions, key=emotions.get)
+                    except (ValueError, TypeError):
+                        primary_emotion = list(emotions.keys())[0] if emotions else "neutral"
+                else:
+                    primary_emotion = "neutral"
+                    log.debug("[Chain Fix] emotions invalid in Matrix Mode, using neutral")
+                
+                instruments = self.matrix_instrument_engine.select_instruments(
+                    genre_profile=final_genre,
+                    energy=energy_score,
+                    mood=primary_emotion
+                ) if self.matrix_instrument_engine else []
+                
+                # Get top genres for GUI (alternative genres)
+                top_genres_list = []
+                try:
+                    # Try to get alternative genres from matrix engine if available
+                    if hasattr(self.matrix_genre_engine, 'get_top_genres'):
+                        top_genres_list = self.matrix_genre_engine.get_top_genres(
+                            pain=j_pain, energy=j_energy, density=j_density, top_n=5
+                        )
+                    else:
+                        # Fallback: create list with current genre
+                        top_genres_list = [(final_genre, confidence)]
+                except Exception as e:
+                    log.debug(f"[Matrix] Could not get top genres: {e}")
+                    top_genres_list = [(final_genre, confidence)]
+                
+                # Build style result with Matrix data
+                style = {
+                    "genre": final_genre,
+                    "style": final_genre,
+                    "bpm": bpm,
+                    "key": key,
+                    "confidence": confidence,
+                    "instruments": instruments,
+                    "genre_source": "universal_matrix_fibonacci",
+                    "matrix_mode": True,
+                    "visual": DEFAULT_CONFIG.FALLBACK_VISUAL,
+                    "narrative": DEFAULT_CONFIG.FALLBACK_NARRATIVE,
+                    "structure": DEFAULT_CONFIG.FALLBACK_STRUCTURE,
+                    "emotion": primary_emotion,
+                    "top_genres": top_genres_list,  # Add top genres for GUI
+                }
+                log.debug("[Matrix] Genre resolved: %s (confidence: %.2f)", final_genre, confidence)
+            except (AttributeError, TypeError, ValueError, KeyError) as e:
+                log.warning("[Matrix] Error in Matrix mode, falling back to legacy: %s", e)
+                # Fall through to legacy mode
+                style = None
+            except Exception as e:
+                # Catch-all для неожиданных ошибок
+                log.error("[Matrix] Unexpected error in Matrix mode: %s", e, exc_info=True)
+                style = None
+        
+        # === LEGACY MODE: Use PatchedStyleMatrix (if Matrix didn't work) ===
+        if style is None:
+            if self.style:
+                style_result = self.style.build(
+                    emotions, tlp, raw, bpm, semantic_hints, voice_hint
+                )
+                style = style_result
+                
+                # 🎯 ИСПОЛЬЗОВАНИЕ РАСШИРЕННОЙ БАЗЫ ДАННЫХ: Обогащаем жанр данными из GENRE_DATABASE_EXPANDED.json
+                if style and self.genre_database:
+                    try:
+                        genre_from_style = style.get("genre", "")
+                        if genre_from_style:
+                            genre_key_normalized = genre_from_style.lower().replace(" ", "_").replace("-", "_")
+                            expanded_genre_data = self.genre_database.get_genre(genre_key_normalized)
+                            
+                            if expanded_genre_data:
+                                log.debug(f"[Genre Database] Найден жанр в расширенной базе (Legacy Mode): {genre_key_normalized}")
+                                
+                                # Обновляем BPM из расширенной базы (если доступен)
+                                db_bpm = self.genre_database.get_bpm(genre_key_normalized)
+                                if db_bpm and isinstance(db_bpm, dict):
+                                    style["bpm"] = db_bpm.get("default", style.get("bpm", bpm))
+                                
+                                # Обновляем Key из расширенной базы (если доступен)
+                                db_keys = self.genre_database.get_key(genre_key_normalized)
+                                if db_keys and isinstance(db_keys, list) and len(db_keys) > 0:
+                                    style["key"] = db_keys[0]
+                                
+                                # Добавляем цвета из расширенной базы
+                                db_colors = self.genre_database.get_colors(genre_key_normalized)
+                                if db_colors and isinstance(db_colors, list):
+                                    style["genre_colors"] = db_colors
+                                    style["color_wave"] = db_colors
+                                
+                                # Обновляем источник
+                                original_source = style.get("genre_source", "legacy")
+                                style["genre_source"] = f"{original_source}_expanded_db"
+                    except (AttributeError, TypeError, KeyError) as e:
+                        log.warning(f"[Genre Database] Ошибка обогащения жанра (Legacy Mode): {e}")
+                    except Exception as e:
+                        log.error(f"[Genre Database] Unexpected error enriching genre (Legacy Mode): {e}", exc_info=True)
+            else:
+                # Fallback если style engine недоступен
+                style = {
+                    "genre": DEFAULT_CONFIG.FALLBACK_STYLE,
+                    "style": DEFAULT_CONFIG.FALLBACK_STYLE,
+                    "bpm": bpm,
+                    "key": key,
+                    "visual": DEFAULT_CONFIG.FALLBACK_VISUAL,
+                    "narrative": DEFAULT_CONFIG.FALLBACK_NARRATIVE,
+                    "structure": DEFAULT_CONFIG.FALLBACK_STRUCTURE,
+                    "emotion": (
+                        max(emotions, key=emotions.get) 
+                        if emotions and isinstance(emotions, dict) and len(emotions) > 0
+                        else DEFAULT_CONFIG.FALLBACK_EMOTION
+                    ),
+                }
+                log.warning("Style engine недоступен, используются FALLBACK значения")
 
-        # Task 1.6: Vocal Allocator
-        vocal_result = self.vocal_allocator.analyze(emotions, tlp, bpm, raw)
-        log.debug(f"Результат Vocal: {vocal_result}")
+        # 🛡️ ЗАЩИТА: Гарантируем, что style никогда не None перед использованием в Fusion Engine
+        if style is None:
+            log.error("[CRITICAL] Style остался None после всех попыток инициализации, используем минимальный fallback")
+            style = {
+                "genre": DEFAULT_CONFIG.FALLBACK_STYLE,
+                "style": DEFAULT_CONFIG.FALLBACK_STYLE,
+                "bpm": bpm if isinstance(bpm, (int, float)) else DEFAULT_CONFIG.FALLBACK_BPM,
+                "key": key if key else DEFAULT_CONFIG.FALLBACK_KEY,
+                "visual": DEFAULT_CONFIG.FALLBACK_VISUAL,
+                "narrative": DEFAULT_CONFIG.FALLBACK_NARRATIVE,
+                "structure": DEFAULT_CONFIG.FALLBACK_STRUCTURE,
+                "emotion": DEFAULT_CONFIG.FALLBACK_EMOTION,
+            }
+        
+        # 4.6: hybrid_genre_refinement
+        if self.hybrid_genre_engine and style:
+            try:
+                genre = style.get("genre")
+                if genre and genre not in ("auto", "unknown", ""):
+                    context = {
+                        "emotions": emotions or {},
+                        "tlp": tlp or {},
+                        "bpm": bpm,
+                        "key": key,
+                    }
+                    resolved_genre = self.hybrid_genre_engine.resolve(genre=genre, context=context)
+                    if resolved_genre and isinstance(resolved_genre, str) and resolved_genre != genre:
+                        style["genre"] = resolved_genre
+                        original_source = style.get("genre_source", "unknown")
+                        style["genre_source"] = f"{original_source}_hybrid_refined"
+                        log.debug(f"[Phase 4.6] Hybrid genre refined: {genre} → {resolved_genre}")
+                        if "hybrid" in resolved_genre.lower():
+                            genre_parts = resolved_genre.lower().replace(" hybrid", "").split()
+                            if len(genre_parts) >= 2:
+                                style["secondary_genre"] = genre_parts[1]
+                                style["is_hybrid"] = True
+            except (AttributeError, TypeError, ValueError) as e:
+                log.warning(f"[Phase 4.6] Hybrid genre refinement failed: {e}")
+            except Exception as e:
+                log.error(f"[Phase 4.6] Unexpected error in hybrid genre refinement: {e}", exc_info=True)
+        
+        log.debug(f"[Phase 4] CORE_LOGIC завершен: style={bool(style)}, semantic_layers={bool(semantic_layers)}")
 
-        # Task 1.6: Integrity Scan
-        # Task 2.3: Передаем emotions и tlp для устранения повторных анализов
-        # Note: integrity requires emotions and tlp, so it runs after they are available (not in parallel)
-        integrity_result = self.integrity.analyze(raw, emotions=emotions, tlp=tlp)
-        log.debug(f"Результат Integrity: {integrity_result}")
+        # Semantic Layers, Vocal, Integrity, Annotation уже выполнены параллельно выше
+        # Используем результаты из style_dependent_results
+        
+        # Обогащаем vocal_result section_techniques на основе semantic_sections
+        if semantic_sections and isinstance(semantic_sections, list) and len(semantic_sections) > 0:
+            try:
+                from .vocal_techniques import get_vocal_for_section
+                
+                section_techniques_list = []
+                for section in semantic_sections:
+                    if isinstance(section, dict):
+                        section_emotion = section.get("emotion") or dominant_emotion if emotions else "neutral"
+                        section_intensity = section.get("intensity") or (emotions.get(section_emotion, 0.5) if emotions and isinstance(emotions, dict) else 0.5)
+                        section_name = section.get("tag") or section.get("name") or "Verse"
+                        genre_name = style.get("genre") if style else None
+                        
+                        # Получаем вокальную технику для секции
+                        section_tech = get_vocal_for_section(
+                            section_emotion=section_emotion,
+                            section_intensity=section_intensity,
+                            global_emotion=dominant_emotion if emotions else None,
+                            genre=genre_name,
+                            section_name=section_name
+                        )
+                        section_techniques_list.append(section_tech)
+                
+                if section_techniques_list:
+                    vocal_result["section_techniques"] = section_techniques_list
+                    log.debug(f"[Vocal] Added {len(section_techniques_list)} section techniques to vocal_result")
+            except (ImportError, AttributeError, Exception) as e:
+                log.debug(f"[Vocal] Could not add section techniques: {e}")
+        
+        # --- SUNO PROMPT ENGINE: Enhance annotations with advanced tags ---
+        if self.suno_prompt_engine and annotated_text_suno:
+            try:
+                # Enhance annotated_text_suno with advanced Suno tags
+                # This adds structure tags, voice tags, and FX tags where appropriate
+                enhanced_suno = self._enhance_suno_annotations(
+                    annotated_text_suno, 
+                    emotions, 
+                    vocal_result,
+                    style
+                )
+                if enhanced_suno:
+                    annotated_text_suno = enhanced_suno
+                    log.debug("[Suno Prompt Engine] Annotations enhanced with advanced tags")
+                
+                # 📊 ДОПОЛНИТЕЛЬНЫЙ: Also use get_style_prompt as alternative style description
+                # Это альтернативный формат от SunoPromptEngine, не основной источник
+                if style and style.get("genre"):
+                    genre = style.get("genre", "")
+                    
+                    # 🔧 ИСПРАВЛЕНИЕ ОБРЫВА ЦЕПИ: EMOTIONS → STYLE (в SunoPromptEngine)
+                    # Безопасное получение vibe из emotions
+                    if emotions and isinstance(emotions, dict) and len(emotions) > 0:
+                        try:
+                            vibe_from_emotions = max(emotions, key=emotions.get)
+                        except (ValueError, TypeError):
+                            vibe_from_emotions = list(emotions.keys())[0] if emotions else "neutral"
+                    else:
+                        vibe_from_emotions = "neutral"
+                    
+                    vibe = style.get("mood") or style.get("atmosphere") or vibe_from_emotions
+                    
+                    # 🔧 ИСПРАВЛЕНИЕ ОБРЫВА ЦЕПИ: STYLE → INSTRUMENTS
+                    # Безопасное извлечение instruments из style
+                    instruments_list = style.get("instruments", [])
+                    if isinstance(instruments_list, list) and len(instruments_list) > 0:
+                        instruments_str = instruments_list
+                    else:
+                        instruments_str = []
+                        log.debug("[Chain Fix] instruments invalid in style, using empty list")
+                    
+                    style_prompt_alt = self.suno_prompt_engine.get_style_prompt(genre, vibe, instruments_str)
+                    style["suno_style_prompt_alt"] = style_prompt_alt
+                    log.debug(f"[Suno Prompt Engine] Alternative style prompt: {style_prompt_alt}")
+            except (AttributeError, TypeError, KeyError) as e:
+                log.warning(f"[Suno Prompt Engine] Failed to enhance annotations: {e}")
+            except Exception as e:
+                log.error(f"[Suno Prompt Engine] Unexpected error enhancing annotations: {e}", exc_info=True)
 
-        # Task 1.5: Text Annotation
-        annotated_text_ui, annotated_text_suno = self.annotate_text(
-            text_blocks, section_profiles, semantic_sections
-        )
+        # --- DYNAMIC EMOTION ENGINE: Get normalized emotion profile ---
+        # ✅ УЖЕ ВЫПОЛНЕНО ПАРАЛЛЕЛЬНО ВЫШЕ (строка 1293, результат в emotion_profile_7axis)
+        # emotion_profile_7axis уже извлечен из style_dependent_results (строка 1308)
+        if emotion_profile_7axis:
+            log.debug(f"[Dynamic Emotion Engine] 7-axis profile already generated (parallel)")
 
-        # Дополнительно: Color Resolution
-        # Собираем промежуточный результат для Color Engine
-        intermediate_result = {
-            "emotions": emotions,
-            "tlp": tlp,
-            "style": style,
-        }
-        color_resolution = self.color_engine.resolve_color_wave(intermediate_result)
-        color_wave = color_resolution.colors if color_resolution else []
+        # --- EMOTION-DRIVEN SUNO ADAPTER: Build emotion-based annotations ---
+        emotion_driven_annotations = None
+        if self.emotion_suno_adapter_available and structure:
+            try:
+                # Prepare emotion curve from emotions and TLP
+                # 🔧 ИСПРАВЛЕНИЕ ОБРЫВА ЦЕПИ: EMOTIONS → STYLE (в EmotionDrivenSunoAdapter)
+                # Безопасное получение dominant_cluster из emotions
+                if emotions and isinstance(emotions, dict) and len(emotions) > 0:
+                    try:
+                        dominant_cluster = max(emotions, key=emotions.get)
+                    except (ValueError, TypeError):
+                        dominant_cluster = list(emotions.keys())[0] if emotions else "narrative"
+                else:
+                    dominant_cluster = "narrative"
+                    log.debug("[Chain Fix] emotions invalid in EmotionDrivenSunoAdapter, using narrative")
+                
+                emotion_curve = {
+                    "dominant_cluster": dominant_cluster,
+                    "global_tlp": tlp or {},
+                }
+                
+                # Prepare sections from structure
+                # 🔧 ИСПРАВЛЕНИЕ ОБРЫВА ЦЕПИ: STRUCTURE → SECTIONS
+                # Безопасное извлечение sections из structure
+                sections_data = []
+                if structure and isinstance(structure, dict):
+                    structure_sections = structure.get("sections", [])
+                    if isinstance(structure_sections, list) and len(structure_sections) > 0:
+                        # Используем sections из structure
+                        pass
+                    else:
+                        # Fallback на text_blocks если sections пустой
+                        structure_sections = text_blocks if text_blocks else []
+                        log.debug("[Chain Fix] structure.sections invalid, using text_blocks fallback")
+                else:
+                    # Fallback если structure невалидный
+                    structure_sections = text_blocks if text_blocks else []
+                    log.debug("[Chain Fix] structure invalid, using text_blocks fallback")
+                
+                for idx, section_text in enumerate(structure_sections):
+                    # Безопасное получение intensity из emotions
+                    intensity = 0.5
+                    if emotions and isinstance(emotions, dict):
+                        intensity = emotions.get("joy", emotions.get("happiness", 0.5))
+                    
+                    sections_data.append({
+                        "section": f"section_{idx+1}",
+                        "name": f"Section {idx+1}",
+                        "intensity": intensity,
+                        "hot_phrases": [],
+                    })
+                
+                # Build emotion-driven annotations
+                emotion_driven_annotations = build_suno_annotations(
+                    raw, sections_data, emotion_curve
+                )
+                log.debug(f"[Emotion Suno Adapter] Built annotations: {emotion_driven_annotations.get('style', 'N/A')}")
+            except (AttributeError, TypeError, KeyError, ValueError) as e:
+                log.warning(f"[Emotion Suno Adapter] Failed to build annotations: {e}")
+            except Exception as e:
+                log.error(f"[Emotion Suno Adapter] Unexpected error building annotations: {e}", exc_info=True)
+
+        # --- SUNO ANNOTATION ENGINE: Build safe annotations ---
+        suno_safe_annotations = None
+        if self.suno_annotation_engine and structure:
+            try:
+                # Get section texts
+                # 🔧 ИСПРАВЛЕНИЕ ОБРЫВА ЦЕПИ: STRUCTURE → SECTIONS (в SunoAnnotationEngine)
+                # Безопасное извлечение sections из structure
+                if structure and isinstance(structure, dict):
+                    section_texts = structure.get("sections", [])
+                    if not isinstance(section_texts, list) or len(section_texts) == 0:
+                        # Fallback на text_blocks если sections невалидный
+                        section_texts = text_blocks if text_blocks else []
+                        log.debug("[Chain Fix] structure.sections invalid in SunoAnnotationEngine, using text_blocks")
+                else:
+                    # Fallback если structure невалидный
+                    section_texts = text_blocks if text_blocks else []
+                    log.debug("[Chain Fix] structure invalid in SunoAnnotationEngine, using text_blocks")
+                
+                # Prepare diagnostics for annotation engine
+                diagnostics_for_annotations = {
+                    "legacy": {
+                        "style": style,
+                        "bpm": bpm,
+                    },
+                    "out": {
+                        "emotions": emotions,
+                        "tlp": tlp,
+                        "bpm": {"estimate": bpm} if isinstance(bpm, (int, float)) else bpm,
+                        "tone": {"key": key} if key else {},
+                        "vocal": vocal_result,
+                    },
+                }
+                
+                # Build safe annotations
+                suno_safe_annotations = self.suno_annotation_engine.build_suno_safe_annotations(
+                    section_texts, diagnostics_for_annotations
+                )
+                log.debug(f"[Suno Annotation Engine] Built {len(suno_safe_annotations)} safe annotations")
+            except (AttributeError, TypeError, KeyError) as e:
+                log.warning(f"[Suno Annotation Engine] Failed to build safe annotations: {e}")
+            except Exception as e:
+                log.error(f"[Suno Annotation Engine] Unexpected error building safe annotations: {e}", exc_info=True)
+
+        # Color Resolution уже выполнено параллельно выше
+        # Обновляем intermediate_result с актуальным style для повторного использования
+        if style and color_resolution:
+            try:
+                # ✅ УЖЕ ВЫПОЛНЕНО ПАРАЛЛЕЛЬНО ВЫШЕ (строка 1289, результат в color_resolution)
+                # color_resolution уже извлечен из style_dependent_results (строка 1307)
+                # color_wave уже извлечен из color_resolution (строка 1311-1314)
+                # Если style изменился, можно пересчитать, но для оптимизации используем существующий результат
+                if not color_wave or color_wave == ["#FFFFFF", "#B0BEC5"]:
+                    # Только если color_wave не был установлен, пересчитываем
+                    intermediate_result = {
+                        "emotions": emotions,
+                        "tlp": tlp,
+                        "style": style,
+                    }
+                    color_resolution = self.color_engine.resolve_color_wave(intermediate_result)
+                    if color_resolution and hasattr(color_resolution, 'colors') and color_resolution.colors:
+                        color_wave = color_resolution.colors
+            except Exception as e:
+                log.warning(f"[Color Engine] Error recalculating with style: {e}")
+                # Используем предыдущий результат
+                pass
         
         # Task 18.2: Auto-resolve Color-Key conflicts
         resolver = GenreConflictResolver()
@@ -969,15 +1956,127 @@ class StudioCore:
             # Update style dict with new key
             style["key"] = key
 
-        # Дополнительно: RDE Analysis
-        # RDE требует bpm_payload, breathing_profile, emotion_profile, instrumentation_payload
-        rde_result = {
-            "resonance": self.rde_engine.calc_resonance(raw),
-            "fracture": self.rde_engine.calc_fracture(raw),
-            "entropy": self.rde_engine.calc_entropy(raw),
-        }
-        # Если есть TLP, используем его для экспорта emotion vector
-        if tlp:
+        # ============================================================
+        # 🥇 ИЕРАРХИЯ СОЗДАНИЯ SUNO ПРОМПТОВ (ПОРЯДОК ВЫПОЛНЕНИЯ)
+        # ============================================================
+        # Порядок создания НЕ совпадает с приоритетом использования!
+        # Сначала создаем базовые промпты, потом золотой стандарт.
+        #
+        # 1. 🥈 ВЫСОКИЙ: build_suno_prompt (Legacy Bridge) - создается первым
+        #    - Профессиональный форматтер с Matrix Architecture данными
+        #    - Результат: style["suno_ready_prompt"]
+        # 2. 📊 ДОПОЛНИТЕЛЬНЫЙ: SunoPromptEngine.get_style_prompt() - создается в _enhance_suno_annotations
+        #    - Альтернативный формат
+        #    - Результат: style["suno_style_prompt_alt"]
+        # 3. 🗺️ МАППИНГ: GenreRoutingEngine.SUNO_STYLE - создается в Fusion Engine секции
+        #    - Suno стиль из маппинга жанров
+        #    - Результат: style["suno_style_from_routing"]
+        # 4. 🥇 ЗОЛОТОЙ СТАНДАРТ: FusionEngine - создается последним (использует все предыдущие данные)
+        #    - Объединяет все источники (emotion, bpm, tonality, color, instrumentation, vocal)
+        #    - Результат: fusion_summary["suno_style_prompt"] и fusion_summary["suno_lyrics_prompt"]
+        #    - Также сохраняется в: style["suno_style_prompt_fusion"] и style["suno_lyrics_prompt_fusion"]
+        # ============================================================
+        
+        # --- Legacy Bridge: Build Suno Prompt using legacy formatter ---
+        # 🥈 ВЫСОКИЙ ПРИОРИТЕТ: Профессиональный форматтер (создается первым)
+        if LEGACY_SUNO_AVAILABLE and style:
+            try:
+                # Prepare data for the legacy formatter
+                genre = style.get("genre", "Unknown")
+                # 🔧 ИСПРАВЛЕНИЕ: Проверка типа для instruments_list
+                instruments_list = style.get("instruments", [])
+                if isinstance(instruments_list, list) and len(instruments_list) > 0:
+                    instruments_str = instruments_list
+                else:
+                    instruments_str = []
+                    log.debug("[Type Check] instruments_list invalid, using empty list")
+                
+                # Get mood from emotions or style
+                primary_mood = (
+                    max(emotions, key=emotions.get) if emotions else "neutral"
+                ) if isinstance(emotions, dict) and emotions else (
+                    style.get("mood") or style.get("atmosphere") or "neutral"
+                )
+                
+                # Get vocals from vocal_result
+                # 🔧 ИСПРАВЛЕНИЕ ОБРЫВА ЦЕПИ: VOCAL_RESULT → VOCALS_LIST
+                # Безопасное извлечение vocals из vocal_result
+                vocals_list = []
+                if vocal_result and isinstance(vocal_result, dict) and len(vocal_result) > 0:
+                    vocal_form = vocal_result.get("vocal_form", "solo")
+                    gender = vocal_result.get("gender", "auto")
+                    if gender and gender != "auto":
+                        vocals_list.append(gender)
+                    if vocal_form and vocal_form != "solo":
+                        vocals_list.append(vocal_form)
+                else:
+                    log.debug("[Chain Fix] vocal_result invalid, using empty vocals_list")
+                
+                # Get BPM (ensure it's an int)
+                bpm_val = bpm if isinstance(bpm, int) else (int(bpm) if isinstance(bpm, (float, str)) and str(bpm).isdigit() else 120)
+                
+                # Get key
+                key_val = style.get("key") or key or "auto"
+                
+                # Prepare style_data dict for build_suno_prompt
+                style_data_for_prompt = {
+                    "genre": genre,
+                    "style": style.get("style", genre),
+                    "key": key_val,
+                    "atmosphere": primary_mood,
+                    "visual": style.get("visual", DEFAULT_CONFIG.FALLBACK_VISUAL),
+                    "vocal_form": vocal_result.get("vocal_form", "solo") if isinstance(vocal_result, dict) else "solo",
+                    "techniques": [],
+                    # Добавляем emotions, tlp и vocal_result для определения vocal
+                    "emotions": emotions if emotions and isinstance(emotions, dict) else {},
+                    "tlp": tlp if tlp and isinstance(tlp, dict) else {},
+                    "vocal_result": vocal_result if isinstance(vocal_result, dict) else {},
+                }
+                
+                # Call the legacy builder to get a professional Suno string
+                suno_prompt_advanced = build_suno_prompt(
+                    style_data=style_data_for_prompt,
+                    vocals=vocals_list,
+                    instruments=instruments_str,
+                    bpm=bpm_val,
+                    philosophy="Matrix Architecture + Legacy Bridge",
+                    version=STUDIOCORE_VERSION,
+                    prompt_variant="suno_style"
+                )
+                
+                # Save into style result
+                style["suno_ready_prompt"] = suno_prompt_advanced
+                log.debug("[Legacy Bridge] Suno prompt generated successfully")
+            except (AttributeError, TypeError, KeyError, ValueError) as e:
+                log.warning(f"[Legacy Bridge] Prompt Builder failed: {e}")
+            except Exception as e:
+                log.error(f"[Legacy Bridge] Unexpected error in prompt builder: {e}", exc_info=True)
+                # Fallback to simple format
+                genre = style.get("genre", "Unknown")
+                instruments_list = style.get("instruments", [])
+                instruments_str = ", ".join(str(instr) for instr in instruments_list) if isinstance(instruments_list, list) and instruments_list else "None"
+                primary_mood = max(emotions, key=emotions.get) if emotions and isinstance(emotions, dict) else "neutral"
+                style["suno_ready_prompt"] = f"{genre} | {instruments_str} | {primary_mood} | {bpm} BPM | {key}"
+        else:
+            # Fallback if legacy adapter not available
+            if style:
+                genre = style.get("genre", "Unknown")
+                instruments_list = style.get("instruments", [])
+                instruments_str = ", ".join(str(instr) for instr in instruments_list) if isinstance(instruments_list, list) and instruments_list else "None"
+                primary_mood = max(emotions, key=emotions.get) if emotions and isinstance(emotions, dict) else "neutral"
+                style["suno_ready_prompt"] = f"{genre} | {instruments_str} | {primary_mood} | {bpm} BPM | {key}"
+        
+        # Ensure suno_ready_prompt is always set (final safety check)
+        if style and "suno_ready_prompt" not in style:
+            # Ultimate fallback
+            genre = style.get("genre", "Unknown")
+            instruments_str = "None"
+            primary_mood = "neutral"
+            style["suno_ready_prompt"] = f"{genre} | {instruments_str} | {primary_mood} | {bpm} BPM | {key}"
+
+        # RDE Analysis уже выполнено параллельно выше (resonance, fracture, entropy)
+        # Добавляем emotion_vector если TLP доступен
+        if tlp and "emotion_vector" not in rde_result:
             try:
                 rde_emotion_vector = self.rde_engine.export_emotion_vector(raw)
                 rde_result["emotion_vector"] = {
@@ -987,38 +2086,358 @@ class StudioCore:
             except Exception as e:
                 log.warning(f"Не удалось экспортировать RDE emotion vector: {e}")
         
-        # Task 18.1: Auto-resolve Genre-RDE conflicts
-        genre = style.get("genre", "")
+        # Task 18.1: Auto-resolve Genre-RDE conflicts (part of Phase 4)
+        genre = style.get("genre", "") if style else ""
         adjusted_rde, was_resolved = consistency.resolve_genre_rde_conflict(genre, rde_result)
         if was_resolved:
             log.debug(f"Genre-RDE Konflikt aufgelöst: {rde_result} → {adjusted_rde}")
             rde_result = adjusted_rde
 
-        # Task 10.2: Calculate runtime and add to result
-        runtime_ms = int((time.time() - start_time) * 1000)
-        log.debug(f"--- АНАЛИЗ УСПЕШНО ЗАВЕРШЕН (runtime: {runtime_ms}ms) ---")
+        # ============================================================
+        # PHASE 5: FUSION_AND_FINALIZE
+        # Финальная сборка: suno_prompt_generation, fusion_engine_routing, deduplicate_results, assemble_final_json
+        # ============================================================
+        log.debug("[Phase 5] Запуск FUSION_AND_FINALIZE: suno_prompt_generation, fusion_engine_routing, deduplicate_results, assemble_final_json")
+        
+        # 5.1: suno_prompt_generation (Legacy Bridge)
+        if LEGACY_SUNO_AVAILABLE and style:
+            try:
+                genre = style.get("genre", "Unknown")
+                instruments_list = style.get("instruments", [])
+                instruments_str = instruments_list if isinstance(instruments_list, list) and len(instruments_list) > 0 else []
+                primary_mood = max(emotions, key=emotions.get) if emotions and isinstance(emotions, dict) else "neutral"
+                vocals_list = []
+                if vocal_result and isinstance(vocal_result, dict):
+                    gender = vocal_result.get("gender", "auto")
+                    if gender and gender != "auto":
+                        vocals_list.append(gender)
+                bpm_val = bpm if isinstance(bpm, int) else (int(bpm) if isinstance(bpm, (float, str)) and str(bpm).isdigit() else 120)
+                key_val = style.get("key") or key or "auto"
+                style_data_for_prompt = {
+                    "genre": genre,
+                    "style": style.get("style", genre),
+                    "key": key_val,
+                    "atmosphere": primary_mood,
+                    "visual": style.get("visual", DEFAULT_CONFIG.FALLBACK_VISUAL),
+                    "vocal_form": vocal_result.get("vocal_form", "solo") if isinstance(vocal_result, dict) else "solo",
+                    "techniques": [],
+                    # Добавляем emotions, tlp и vocal_result для определения vocal
+                    "emotions": emotions if emotions and isinstance(emotions, dict) else {},
+                    "tlp": tlp if tlp and isinstance(tlp, dict) else {},
+                    "vocal_result": vocal_result if isinstance(vocal_result, dict) else {},
+                }
+                suno_prompt_advanced = build_suno_prompt(
+                    style_data=style_data_for_prompt,
+                    vocals=vocals_list,
+                    instruments=instruments_str,
+                    bpm=bpm_val,
+                    philosophy="Matrix Architecture + Legacy Bridge",
+                    version=STUDIOCORE_VERSION,
+                    prompt_variant="suno_style"
+                )
+                style["suno_ready_prompt"] = suno_prompt_advanced
+                log.debug("[Phase 5.1] Suno prompt generated (Legacy Bridge)")
+            except Exception as e:
+                log.warning(f"[Phase 5.1] Suno prompt generation failed: {e}")
+                if style:
+                    genre = style.get("genre", "Unknown")
+                    style["suno_ready_prompt"] = f"{genre} | {bpm} BPM | {key}"
+        
+        # 5.2: fusion_engine_routing
+        fusion_summary = None
+        if self.fusion_engine and self.genre_routing_engine:
+            try:
+                # Get dominant emotion for genre routing
+                dominant_emotion = max(emotions, key=emotions.get) if emotions and isinstance(emotions, dict) else "neutral"
+                
+                # Get genre route from GenreRoutingEngineV64
+                genre_route = self.genre_routing_engine.route(emotions or {}, dominant_emotion)
+                log.debug(f"[Fusion Engine] Genre route: {genre_route}")
+                
+                # 🗺️ МАППИНГ: Also use SUNO_STYLE mapping directly to enhance style
+                # Это дополнительный источник для style, не основной
+                if genre_route.get("suno_style") and style:
+                    style["suno_style_from_routing"] = genre_route["suno_style"]
+                    log.debug(f"[Genre Routing] Suno style from routing: {genre_route['suno_style']}")
+                
+                # Prepare payload in format expected by FusionEngine
+                # FusionEngine expects: legacy, emotion, bpm, tonality, color, instrumentation, vocal, tlp
+                fusion_payload = {
+                    "legacy": {
+                        "style": style,
+                        "bpm": bpm,
+                        "instruments": style.get("instruments", []),
+                        "vocals": vocal_result.get("vocals", []) if isinstance(vocal_result, dict) else [],
+                        "vocal_form": vocal_result.get("vocal_form", "solo") if isinstance(vocal_result, dict) else "solo",
+                        "tlp": tlp,
+                    },
+                    "emotion": {
+                        "profile": emotions or {},
+                        "dominant": dominant_emotion,
+                    },
+                    "bpm": {
+                        "estimate": bpm if isinstance(bpm, (int, float)) else 120,
+                        "target_bpm": bpm if isinstance(bpm, (int, float)) else 120,
+                    },
+                    "tonality": {
+                        "section_keys": [key] if key else [],
+                        "fallback_key": key or "C (C minor)",
+                    },
+                    "color": {
+                        "profile": {
+                            "primary_color": color_wave[0] if color_wave else "soft light",
+                            "accent_color": color_wave[-1] if len(color_wave) > 1 else "shadows",
+                        },
+                        "wave": color_wave,
+                    },
+                    "instrumentation": {
+                        "selection": {
+                            "selected": style.get("instruments", []),
+                        },
+                        "palette": style.get("instruments", []),
+                    },
+                    "vocal": {
+                        "tone": vocal_result.get("tone", "neutral") if isinstance(vocal_result, dict) else "neutral",
+                        "style": vocal_result.get("style", "standard") if isinstance(vocal_result, dict) else "standard",
+                        "gender": vocal_result.get("gender", "auto") if isinstance(vocal_result, dict) else "auto",
+                    },
+                    "tlp": tlp,
+                }
+                
+                # Call FusionEngine.fuse()
+                fusion_summary = self.fusion_engine.fuse(fusion_payload, genre_route=genre_route)
+                log.debug(f"[Fusion Engine] Fusion summary generated: {fusion_summary.get('final_genre', 'N/A')}")
+                
+                # 🥇 ЗОЛОТОЙ СТАНДАРТ: Update style with fusion results if available
+                # Fusion Engine объединяет все источники и создает лучшие промпты
+                if fusion_summary:
+                    # Merge fusion results into style
+                    if fusion_summary.get("final_genre"):
+                        style["genre"] = fusion_summary["final_genre"]
+                    if fusion_summary.get("final_subgenre"):
+                        style["subgenre"] = fusion_summary["final_subgenre"]
+                    if fusion_summary.get("mood"):
+                        style["mood"] = fusion_summary["mood"]
+                    if fusion_summary.get("suno_style_prompt"):
+                        # Store fusion suno prompt (это золотой стандарт, но сохраняем как альтернативу для совместимости)
+                        # Основной промпт будет в fusion_summary["suno_style_prompt"] и используется в app.py с приоритетом 1
+                        style["suno_style_prompt_fusion"] = fusion_summary["suno_style_prompt"]
+                    if fusion_summary.get("suno_lyrics_prompt"):
+                        # Store fusion lyrics prompt (это золотой стандарт для lyrics)
+                        style["suno_lyrics_prompt_fusion"] = fusion_summary["suno_lyrics_prompt"]
+                    
+                    log.debug("[Phase 5.2] Fusion Engine: Style updated with fusion results")
+            except Exception as e:
+                log.warning(f"[Phase 5.2] Fusion Engine failed: {e}")
+                fusion_summary = None
 
-        # Task 1.7: Обновленный return словарь с всеми рассчитанными данными
+        # Task 10.2: Calculate runtime
+        runtime_ms = int((time.time() - start_time) * 1000)
+
+        # 5.3: deduplicate_results
+        breathing_map = {}
+        all_module_results: List[Tuple[str, Dict[str, Any]]] = []
+        
+        # Собираем результаты от всех модулей
+        all_module_results.append(("emotion_engine", {"emotions": emotions} if emotions else {}))
+        all_module_results.append(("tone_engine", {"key": key, "tone_hint": tone_hint} if tone_hint else {"key": key}))
+        all_module_results.append(("tlp_engine", {"tlp": tlp} if tlp else {}))
+        all_module_results.append(("rhythm_engine", {"bpm": bpm, "rhythm_analysis": rhythm_analysis}))
+        all_module_results.append(("rde_engine", {"rde": rde_result} if rde_result else {}))
+        all_module_results.append(("semantic_layers", {"semantic_layers": semantic_layers} if semantic_layers else {}))
+        all_module_results.append(("vocal_allocator", {"vocal": vocal_result} if vocal_result else {}))
+        all_module_results.append(("integrity_engine", {"integrity": integrity_result} if integrity_result else {}))
+        all_module_results.append(("text_annotation", {"annotated_text_ui": annotated_text_ui, "annotated_text_suno": annotated_text_suno}))
+        all_module_results.append(("color_engine", {"color_wave": color_wave}))
+        
+        if style:
+            style_source = "matrix_style" if style.get("matrix_mode") else "legacy_style"
+            all_module_results.append((style_source, {"style": style}))
+        
+        if emotion_profile_7axis:
+            all_module_results.append(("dynamic_emotion_engine", {"emotion_profile_7axis": emotion_profile_7axis}))
+        
+        if self.suno_prompt_engine and style and style.get("suno_style_prompt_alt"):
+            all_module_results.append(("suno_prompt_engine", {"suno_style_prompt_alt": style.get("suno_style_prompt_alt")}))
+        
+        if emotion_driven_annotations:
+            all_module_results.append(("emotion_suno_adapter", {"emotion_driven_annotations": emotion_driven_annotations}))
+        
+        if suno_safe_annotations:
+            all_module_results.append(("suno_annotation_engine", {"suno_safe_annotations": suno_safe_annotations}))
+        
+        if fusion_summary:
+            all_module_results.append(("fusion_engine", {"fusion": fusion_summary}))
+        
+        # Применяем дедупликацию
+        deduplicated_result = deduplicator.deduplicate_results(all_module_results)
+        log.debug(f"[Phase 5.3] Дедупликация завершена: {len(all_module_results)} модулей обработано")
+
+        # 5.4: assemble_final_json
+        log.debug("[Phase 5.4] Сборка финального JSON результата")
         result = {
-            "emotions": emotions,
-            "tlp": tlp,
-            "bpm": bpm,
-            "key": key,
-            "structure": structure,
-            "style": style,
-            "vocal": vocal_result,
-            "semantic_layers": semantic_layers,
-            "integrity": integrity_result,
-            "annotated_text_ui": annotated_text_ui,
-            "annotated_text_suno": annotated_text_suno,
-            "color_wave": color_wave,
-            "rde": rde_result,
+            "emotions": deduplicated_result.get("emotions", emotions if emotions and isinstance(emotions, dict) else {}),
+            "tlp": deduplicated_result.get("tlp", tlp if tlp and isinstance(tlp, dict) else {}),
+            "bpm": deduplicated_result.get("bpm", bpm if isinstance(bpm, (int, float)) else DEFAULT_CONFIG.FALLBACK_BPM),
+            "key": deduplicated_result.get("key", key if key and isinstance(key, str) else DEFAULT_CONFIG.FALLBACK_KEY),
+            "structure": structure if structure and isinstance(structure, dict) else {},
+            "style": deduplicated_result.get("style", style if style and isinstance(style, dict) else {}),
+            "vocal": deduplicated_result.get("vocal", vocal_result if vocal_result and isinstance(vocal_result, dict) else {}),
+            "semantic_layers": deduplicated_result.get("semantic_layers", semantic_layers if semantic_layers and isinstance(semantic_layers, dict) else {}),
+            "integrity": deduplicated_result.get("integrity", integrity_result if integrity_result and isinstance(integrity_result, dict) else {}),
+            "annotated_text_ui": deduplicated_result.get("annotated_text_ui", annotated_text_ui if annotated_text_ui and isinstance(annotated_text_ui, str) else ""),
+            "annotated_text_suno": deduplicated_result.get("annotated_text_suno", annotated_text_suno if annotated_text_suno and isinstance(annotated_text_suno, str) else ""),
+            "color_wave": deduplicated_result.get("color_wave", color_wave if isinstance(color_wave, list) else ["#FFFFFF", "#B0BEC5"]),
+            "rde": deduplicated_result.get("rde", rde_result if rde_result and isinstance(rde_result, dict) else {}),
+            "breathing_map": breathing_map if isinstance(breathing_map, dict) else {},
+            "section_profiles": section_profiles if isinstance(section_profiles, list) else [],
             # Task 10.2: Add runtime metrics for diagnostics
-            "runtime_ms": runtime_ms,
+            "runtime_ms": runtime_ms if isinstance(runtime_ms, (int, float)) else 0,
+        }
+        
+        # Добавляем метаданные о дедупликации
+        if "_deduplication_metadata" in deduplicated_result:
+            result["_deduplication_metadata"] = deduplicated_result["_deduplication_metadata"]
+        
+        # Add fusion summary if available (enhances final result)
+        if fusion_summary and isinstance(fusion_summary, dict):
+            result["fusion"] = fusion_summary
+            # Also add fusion prompts to style for easy access (if not already set)
+            if fusion_summary.get("suno_style_prompt") and not style.get("suno_style_prompt_fusion"):
+                style["suno_style_prompt_fusion"] = fusion_summary["suno_style_prompt"]
+            if fusion_summary.get("suno_lyrics_prompt") and not style.get("suno_lyrics_prompt_fusion"):
+                style["suno_lyrics_prompt_fusion"] = fusion_summary["suno_lyrics_prompt"]
+        
+        # Add emotion-driven annotations if available (с проверкой типов)
+        if emotion_driven_annotations and isinstance(emotion_driven_annotations, dict):
+            result["emotion_driven_annotations"] = emotion_driven_annotations
+            # Also merge into style for easy access
+            if emotion_driven_annotations.get("style"):
+                style["emotion_driven_style"] = emotion_driven_annotations["style"]
+            if emotion_driven_annotations.get("vocal_profile"):
+                style["emotion_driven_vocal"] = emotion_driven_annotations["vocal_profile"]
+            if emotion_driven_annotations.get("instrumentation"):
+                style["emotion_driven_instruments"] = emotion_driven_annotations["instrumentation"]
+        
+        # Add safe annotations if available (с проверкой типов)
+        if suno_safe_annotations and isinstance(suno_safe_annotations, list):
+            result["suno_safe_annotations"] = suno_safe_annotations
+        
+        # Add 7-axis emotion profile if available (с проверкой типов)
+        if emotion_profile_7axis and isinstance(emotion_profile_7axis, dict):
+            result["emotion_profile_7axis"] = emotion_profile_7axis
+        
+        # Add Genre Selection Process data (clusters, genre_scores)
+        genre_selection_data = {}
+        # Try to get clusters and genre_scores from EmotionEngine
+        # Note: self.emotion is AutoEmotionalAnalyzer, not EmotionEngine
+        # We need to create EmotionEngine instance to get clusters and genre_scores
+        try:
+            from .emotion import EmotionEngine
+            
+            # Create EmotionEngine instance for getting clusters and genre_scores
+            emotion_engine = EmotionEngine()
+            emotion_profile = emotion_engine.build_emotion_profile(raw)
+            
+            if isinstance(emotion_profile, dict):
+                clusters = emotion_profile.get("clusters", {})
+                genre_scores = emotion_profile.get("genre_scores", {})
+                
+                if clusters or genre_scores:
+                    genre_selection_data["clusters"] = clusters
+                    genre_selection_data["genre_scores"] = genre_scores
+                    log.debug(f"[Genre Selection] Got clusters: {len(clusters)}, genre_scores: {len(genre_scores)}")
+                
+                # Add top_genres to style if not already set (for Legacy Mode)
+                if genre_scores and isinstance(genre_scores, dict) and not style.get("top_genres"):
+                    sorted_genres = sorted(genre_scores.items(), key=lambda x: x[1], reverse=True)[:5]
+                    top_genres_list = [(genre, score) for genre, score in sorted_genres if score > 0]
+                    if top_genres_list:
+                        style["top_genres"] = top_genres_list
+                        log.debug(f"[Genre Selection] Added top_genres to style: {len(top_genres_list)} genres")
+        except (ImportError, AttributeError, Exception) as e:
+            log.debug(f"[Genre Selection] Could not get emotion profile from EmotionEngine: {e}")
+            # Fallback: try to compute clusters and genre_scores manually if possible
+            try:
+                # If we have emotions, we can try to compute clusters manually
+                if emotions and isinstance(emotions, dict) and len(emotions) > 0:
+                    # This is a simplified fallback - not as accurate as EmotionEngine
+                    log.debug("[Genre Selection] Using fallback method for clusters/genre_scores")
+            except Exception as e2:
+                log.debug(f"[Genre Selection] Fallback also failed: {e2}")
+        
+        if genre_selection_data:
+            result["genre_selection"] = genre_selection_data
+            log.debug(f"[Genre Selection] Saved genre_selection data: {bool(genre_selection_data.get('clusters'))}, {bool(genre_selection_data.get('genre_scores'))}")
+        else:
+            log.debug("[Genre Selection] No genre_selection data available")
+        
+        # If emotion_profile_7axis is available, try to compute genre_bias
+        if emotion_profile_7axis and isinstance(emotion_profile_7axis, dict):
+            try:
+                from .emotion_genre_matrix import compute_genre_bias
+                genre_bias = compute_genre_bias(emotion_profile_7axis)
+                if genre_bias:
+                    result["genre_bias"] = genre_bias
+            except Exception as e:
+                log.debug(f"[Genre Bias] Could not compute genre bias: {e}")
+        
+        # Add Genre Routing data
+        if self.genre_routing_engine and emotions:
+            try:
+                dominant_emotion = max(emotions, key=emotions.get) if emotions and isinstance(emotions, dict) else "neutral"
+                genre_route = self.genre_routing_engine.route(emotions or {}, dominant_emotion)
+                if genre_route and isinstance(genre_route, dict):
+                    result["genre_routing"] = genre_route
+            except Exception as e:
+                log.debug(f"[Genre Routing] Could not get genre route: {e}")
+        
+        # Add Matrix Mode specific data (Quantum Jitter, Serendipity, Fibonacci)
+        if quantum_jitter_data:
+            result["quantum_jitter"] = quantum_jitter_data
+        if serendipity_data:
+            result["serendipity"] = serendipity_data
+        if fibonacci_data:
+            result["fibonacci_rotation"] = fibonacci_data
+        
+        # Add Matrix Architecture metadata to result
+        if self.matrix_enabled:
+            result["matrix_architecture"] = {
+                "enabled": True,
+                "engines": {
+                    "genre": self.matrix_genre_engine is not None,
+                    "instruments": self.matrix_instrument_engine is not None,
+                    "serendipity": self.matrix_serendipity is not None,
+                    "breathing": self.matrix_breathing_engine is not None,
+                }
+            }
+        
+        # Add integration metadata (shows what engines are active) - с безопасными проверками
+        result["integrations"] = {
+            "fusion_engine": bool(self.fusion_engine),
+            "hybrid_genre_engine": bool(self.hybrid_genre_engine),
+            "suno_prompt_engine": bool(self.suno_prompt_engine),
+            "emotion_suno_adapter": bool(self.emotion_suno_adapter_available),
+            "suno_annotation_engine": bool(self.suno_annotation_engine),
+            "dynamic_emotion_engine": bool(self.dynamic_emotion_engine),
+            "legacy_suno_bridge": bool(LEGACY_SUNO_AVAILABLE),
+            "matrix_architecture": bool(self.matrix_enabled),
+            "genre_database_loader": bool(getattr(self, 'genre_database', None)),
         }
         
         # Enrich result with smart defaults for missing fields
         result = self._enrich_result_with_smart_defaults(result, text, preferred_gender)
+        
+        # 🔧 ИСПРАВЛЕНИЕ: Обновляем breathing_map в result после _enrich_result_with_smart_defaults
+        # _enrich_result_with_smart_defaults устанавливает result["breathing"], 
+        # поэтому мы обновляем result["breathing_map"] из result["breathing"]
+        if isinstance(result, dict):
+            breathing_data = result.get("breathing")
+            if isinstance(breathing_data, dict):
+                result["breathing_map"] = breathing_data
+            elif not result.get("breathing_map"):
+                # Если breathing_map еще не установлен, используем пустой словарь
+                result["breathing_map"] = {}
         
         return result
 

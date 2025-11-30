@@ -156,15 +156,99 @@ def build_suno_prompt(
         )
     )
 
-    # Добавляем M / F на основе формы
-    if "mf" in vocal_form:
-        vocal_desc = f"male and female duet ({', '.join(clean_vocals)})"
-    elif "_m" in vocal_form:
-        vocal_desc = f"male vocal ({', '.join(clean_vocals)})"
-    elif "_f" in vocal_form:
-        vocal_desc = f"female vocal ({', '.join(clean_vocals)})"
-    else:  # auto или mixed
-        vocal_desc = f"mixed vocals ({', '.join(clean_vocals)})"
+    # Инициализируем vocal_desc
+    vocal_desc = None
+    
+    # Определяем vocal на основе эмоций и TLP (если доступны)
+    emotions = style_data.get("emotions")
+    tlp = style_data.get("tlp")
+    vocal_result = style_data.get("vocal_result") or {}
+    
+    # Используем vocal_result если доступен
+    if isinstance(vocal_result, dict):
+        vocal_gender = vocal_result.get("gender", "auto")
+        vocal_style = vocal_result.get("style", "standard")
+        vocal_tone = vocal_result.get("tone", "neutral")
+    else:
+        vocal_gender = "auto"
+        vocal_style = "standard"
+        vocal_tone = "neutral"
+    
+    # Если есть эмоции и TLP, используем их для определения vocal
+    if emotions and isinstance(emotions, dict) and len(emotions) > 0:
+        try:
+            from .suno_annotations import emotion_to_vocal
+            
+            # Находим доминирующую эмоцию
+            dominant_emotion = max(emotions, key=emotions.get)
+            
+            # Получаем vocal описание на основе эмоции
+            emotion_vocal = emotion_to_vocal(dominant_emotion)
+            
+            # Если emotion_to_vocal вернул что-то кроме "auto", используем это
+            if emotion_vocal and emotion_vocal != "auto":
+                # Определяем gender на основе техник
+                if "female" in emotion_vocal.lower() or "soprano" in emotion_vocal.lower() or "alto" in emotion_vocal.lower():
+                    vocal_gender = "female"
+                elif "male" in emotion_vocal.lower() or "tenor" in emotion_vocal.lower() or "baritone" in emotion_vocal.lower() or "bass" in emotion_vocal.lower():
+                    vocal_gender = "male"
+                
+                # Используем emotion_vocal как основу для vocal_desc
+                if clean_vocals:
+                    vocal_desc = f"{emotion_vocal} ({', '.join(clean_vocals)})"
+                else:
+                    vocal_desc = emotion_vocal
+            else:
+                # Fallback на TLP если emotion_to_vocal не дал результата
+                if tlp and isinstance(tlp, dict):
+                    love = tlp.get("love", 0.0)
+                    pain = tlp.get("pain", 0.0)
+                    truth = tlp.get("truth", 0.0)
+                    
+                    if love > 0.6:
+                        vocal_gender = "female"
+                        vocal_style = "soft"
+                        vocal_tone = "warm"
+                    elif pain > 0.6:
+                        vocal_gender = "male"
+                        vocal_style = "harsh"
+                        vocal_tone = "dark"
+                    elif truth > 0.6:
+                        vocal_gender = "male"
+                        vocal_style = "clear"
+                        vocal_tone = "clear"
+        except (ImportError, AttributeError, Exception) as e:
+            log.debug(f"[Adapter] Could not use emotions/TLP for vocal: {e}")
+    
+    # Формируем vocal_desc на основе определенных параметров (если еще не определен)
+    if not vocal_desc:
+        # Используем определенные параметры
+        gender_part = ""
+        if vocal_gender == "female":
+            gender_part = "female"
+        elif vocal_gender == "male":
+            gender_part = "male"
+        
+        style_part = vocal_style if vocal_style != "standard" else ""
+        tone_part = vocal_tone if vocal_tone != "neutral" else ""
+        
+        if "mf" in vocal_form:
+            vocal_desc = "male and female duet"
+        elif "_m" in vocal_form or vocal_gender == "male":
+            vocal_desc = "male vocal"
+        elif "_f" in vocal_form or vocal_gender == "female":
+            vocal_desc = "female vocal"
+        else:
+            vocal_desc = f"{gender_part or 'auto'} vocal" if gender_part else "auto vocal"
+        
+        # Добавляем style и tone
+        if style_part or tone_part:
+            style_tone = ", ".join([p for p in [style_part, tone_part] if p])
+            vocal_desc += f", {style_tone}"
+        
+        # Добавляем clean_vocals если есть
+        if clean_vocals:
+            vocal_desc += f" ({', '.join(clean_vocals)})"
 
     # === [Style of Music] Prompt ===
     if prompt_variant == "suno_style":
