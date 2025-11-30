@@ -190,17 +190,40 @@ def emotion_to_instruments(emotion: str) -> List[str]:
 def emotion_to_vocal(emotion: str) -> str:
     """
     Подбор вокала по эмоции.
+    Использует детальный маппинг из vocal_techniques.py.
     """
-    table = {
-        "dark": "male low whisper + distant choir",
-        "rage": "male harsh / female aggressive",
-        "love": "soft female alto / gentle male tenor",
-        "hope": "female airy soprano",
-        "melancholic": "male baritone soft",
-        "epic": "layered choir",
-        "neutral": "auto",
-    }
-    return table.get(emotion, "auto")
+    try:
+        from .vocal_techniques import get_vocal_for_emotion
+        
+        # Используем детальный маппинг
+        techniques = get_vocal_for_emotion(emotion, 1.0)
+        
+        if techniques:
+            # Преобразуем техники в Suno формат
+            # Берем топ-3 техники и форматируем их
+            formatted_techniques = []
+            for tech in techniques[:3]:
+                # Преобразуем технику в читаемый формат
+                if "soprano" in tech.lower():
+                    formatted_techniques.append("female " + tech.replace("_", " "))
+                elif "tenor" in tech.lower() or "baritone" in tech.lower() or "bass" in tech.lower():
+                    formatted_techniques.append("male " + tech.replace("_", " "))
+                else:
+                    formatted_techniques.append(tech.replace("_", " "))
+            
+            return " / ".join(formatted_techniques) if formatted_techniques else "auto"
+    except (ImportError, AttributeError, Exception):
+        # Fallback на старый маппинг
+        table = {
+            "dark": "male low whisper + distant choir",
+            "rage": "male harsh / female aggressive",
+            "love": "soft female alto / gentle male tenor",
+            "hope": "female airy soprano",
+            "melancholic": "male baritone soft",
+            "epic": "layered choir",
+            "neutral": "auto",
+        }
+        return table.get(emotion, "auto")
 
 
 def emotion_to_style(emotion: str) -> str:
